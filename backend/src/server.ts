@@ -9,7 +9,12 @@ import chatRoutes from './routes/chatRoutes';
 const app = express();
 
 // Middlewares globais
-app.use(cors({ origin: config.corsOrigin }));
+app.use(cors({ 
+  origin: config.corsOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Log de requisições
