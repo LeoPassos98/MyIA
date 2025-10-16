@@ -40,6 +40,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - [POST /api/chat/message](#post-apichatmessage) - Enviar mensagem
 - [DELETE /api/chat/context](#delete-apichatcontext) - Limpar histórico
 
+### AI Providers
+- [GET /api/ai/providers](#get-apiaiproviders) - Listar providers disponíveis
+- [POST /api/ai/test/:provider](#post-apiaitestprovider) - Testar conexão com provider
+
 ### Utilitários
 - [GET /health](#get-health) - Status do servidor
 
@@ -237,12 +241,14 @@ Authorization: Bearer <seu-token-jwt>
 **Body:**
 ```json
 {
-  "message": "Olá, como você está?"
+  "message": "Olá, como você está?",
+  "provider": "groq"
 }
 ```
 
 **Validações:**
 - `message`: obrigatório, não vazio, máximo 2000 caracteres
+- `provider`: opcional, deve ser um dos providers válidos (openai, groq, together, perplexity, mistral)
 
 #### Response
 
@@ -250,13 +256,15 @@ Authorization: Bearer <seu-token-jwt>
 ```json
 {
   "response": "Estou bem, obrigado por perguntar! Como posso ajudar você hoje?",
-  "contextSize": 2
+  "contextSize": 2,
+  "provider": "groq"
 }
 ```
 
 **Campos:**
 - `response`: Resposta da IA
 - `contextSize`: Número de mensagens no contexto atual
+- `provider`: Provider de IA utilizado
 
 **Erro - Mensagem vazia (400 Bad Request):**
 ```json
@@ -342,6 +350,108 @@ Authorization: Bearer <seu-token-jwt>
 ```bash
 curl -X DELETE http://localhost:3001/api/chat/context \
   -H "Authorization: Bearer eyJhbGc..."
+```
+
+---
+
+## 🤖 AI Providers
+
+### GET /api/ai/providers
+
+Lista todos os providers de IA disponíveis e seu status de configuração.
+
+#### Request
+
+**Headers:** Nenhum  
+**Body:** Nenhum
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "providers": [
+    {
+      "name": "openai",
+      "configured": true,
+      "model": "gpt-3.5-turbo"
+    },
+    {
+      "name": "groq",
+      "configured": false,
+      "model": "llama-3.1-8b-instant"
+    },
+    {
+      "name": "together",
+      "configured": false,
+      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+    },
+    {
+      "name": "perplexity",
+      "configured": false,
+      "model": "llama-3.1-sonar-small-128k-online"
+    },
+    {
+      "name": "mistral",
+      "configured": false,
+      "model": "mistral-small-latest"
+    }
+  ],
+  "total": 5,
+  "configured": 1
+}
+```
+
+#### Exemplo cURL
+
+```bash
+curl http://localhost:3001/api/ai/providers
+```
+
+---
+
+### POST /api/ai/test/:provider
+
+Testa a conexão com um provider específico.
+
+#### Request
+
+**Headers:** Nenhum  
+**URL Params:** `provider` - Nome do provider (openai, groq, together, perplexity, mistral)  
+**Body:** Nenhum
+
+#### Response
+
+**Sucesso - Configurado (200 OK):**
+```json
+{
+  "provider": "groq",
+  "success": true,
+  "message": "Connection successful",
+  "responseTime": 245
+}
+```
+
+**Sucesso - Não Configurado (200 OK):**
+```json
+{
+  "provider": "groq",
+  "success": false,
+  "message": "API key not configured. Set GROQ_API_KEY in .env file"
+}
+```
+
+**Erro - Provider Inválido (400 Bad Request):**
+```json
+{
+  "error": "Invalid provider. Valid options: openai, groq, together, perplexity, mistral"
+}
+```
+
+#### Exemplo cURL
+
+```bash
+curl -X POST http://localhost:3001/api/ai/test/groq
 ```
 
 ---

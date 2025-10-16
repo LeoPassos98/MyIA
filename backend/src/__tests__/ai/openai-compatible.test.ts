@@ -1,4 +1,4 @@
-import { aiService } from '../../services/aiService';
+import { aiService } from '../../services/ai';
 
 describe('OpenAI-Compatible Providers', () => {
   

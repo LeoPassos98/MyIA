@@ -33,10 +33,16 @@ Ideal para:
 - Proteção de rotas no frontend e backend
 
 ### 💬 Chat Inteligente
-- Integração com OpenAI (GPT-3.5-turbo ou GPT-4)
+- Integração com múltiplos providers de IA:
+  - OpenAI (GPT-3.5-turbo, GPT-4)
+  - Groq (gratuito - Llama 3.1)
+  - Together.ai (crédito grátis - Llama 3.1)
+  - Perplexity (crédito grátis - Sonar)
+  - Mistral (Mistral Small)
 - Contexto de conversa (últimas 15 mensagens)
 - Respostas rápidas e precisas
 - Botão de limpar histórico
+- Modo mock quando API key não configurada
 
 ### 🎨 Interface Moderna
 - Design responsivo com Material-UI
@@ -158,9 +164,28 @@ DATABASE_URL="file:./dev.db"
 JWT_SECRET=sua-chave-secreta-super-segura-aqui
 JWT_EXPIRES_IN=7d
 
-# OpenAI
+# OpenAI (opcional)
 OPENAI_API_KEY=sk-proj-sua-chave-aqui
 OPENAI_MODEL=gpt-3.5-turbo
+
+# Groq (opcional - gratuito!)
+GROQ_API_KEY=sua-chave-groq-aqui
+GROQ_MODEL=llama-3.1-8b-instant
+
+# Together.ai (opcional)
+TOGETHER_API_KEY=sua-chave-together-aqui
+TOGETHER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
+
+# Perplexity (opcional)
+PERPLEXITY_API_KEY=sua-chave-perplexity-aqui
+PERPLEXITY_MODEL=llama-3.1-sonar-small-128k-online
+
+# Mistral (opcional)
+MISTRAL_API_KEY=sua-chave-mistral-aqui
+MISTRAL_MODEL=mistral-small-latest
+
+# Provider padrão (se não especificado na requisição)
+API_PROVIDER=groq
 
 # Contexto
 MAX_CONTEXT_MESSAGES=15
@@ -231,6 +256,8 @@ MyIA/
 | GET | `/api/auth/me` | Dados do usuário | ✅ |
 | POST | `/api/chat/message` | Enviar mensagem | ✅ |
 | DELETE | `/api/chat/context` | Limpar histórico | ✅ |
+| GET | `/api/ai/providers` | Listar providers | ❌ |
+| POST | `/api/ai/test/:provider` | Testar provider | ❌ |
 | GET | `/health` | Status do servidor | ❌ |
 
 Veja a [documentação completa da API](docs/api-endpoints.md) para exemplos de uso.
