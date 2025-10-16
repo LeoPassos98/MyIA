@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { contextService } from '../services/contextService';
-import { openaiService } from '../services/openaiService';
+import { aiService } from '../services/aiService';
 import { logger } from '../utils/logger';
 
 export const chatController = {
@@ -26,7 +26,7 @@ export const chatController = {
       }));
 
       // Obter resposta da IA
-      const aiResponse = await openaiService.chat(openaiMessages);
+      const aiResponse = await aiService.chat(openaiMessages);
 
       // Adicionar resposta da IA ao contexto
       contextService.addMessage(req.userId, 'assistant', aiResponse);
