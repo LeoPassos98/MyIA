@@ -32,7 +32,7 @@ describe('OpenAI-Compatible Providers', () => {
     // Testar cada provider individualmente
     providers.forEach(provider => {
       it(`should test ${provider} connection`, async () => {
-        const result = await openaiService.testProvider(provider);
+        const result = await aiService.testProvider(provider);
         
         expect(result).toHaveProperty('success');
         expect(result).toHaveProperty('message');
@@ -51,7 +51,7 @@ describe('OpenAI-Compatible Providers', () => {
   describe('chat - Message Generation', () => {
     it('should return mock response if no provider configured', async () => {
       // Usar provider que sabemos que não está configurado
-      const response = await openaiService.chat(
+      const response = await aiService.chat(
         [{ role: 'user', content: 'Test' }],
         'mistral' // Provavelmente não configurado
       );
@@ -61,7 +61,7 @@ describe('OpenAI-Compatible Providers', () => {
 
     it('should generate response with configured provider', async () => {
       // Encontrar um provider configurado
-      const providers = openaiService.getConfiguredProviders();
+      const providers = aiService.getConfiguredProviders();
       const configured = providers.find(p => p.configured);
       
       if (!configured) {
@@ -69,7 +69,7 @@ describe('OpenAI-Compatible Providers', () => {
         return;
       }
 
-      const response = await openaiService.chat(
+      const response = await aiService.chat(
         [{ role: 'user', content: 'Hi' }],
         configured.name as any
       );
@@ -85,12 +85,12 @@ describe('OpenAI-Compatible Providers', () => {
   describe('Error Handling', () => {
     it('should handle invalid provider gracefully', async () => {
       await expect(
-        openaiService.testProvider('invalid' as any)
+        aiService.testProvider('invalid' as any)
       ).rejects.toThrow('Unknown provider');
     });
 
     it('should return helpful message for unconfigured provider', async () => {
-      const response = await openaiService.chat(
+      const response = await aiService.chat(
         [{ role: 'user', content: 'Test' }],
         'perplexity' // Assumindo que não está configurado
       );
@@ -103,7 +103,7 @@ describe('OpenAI-Compatible Providers', () => {
 
   describe('Performance', () => {
     it('should respond within reasonable time', async () => {
-      const providers = openaiService.getConfiguredProviders();
+      const providers = aiService.getConfiguredProviders();
       const configured = providers.find(p => p.configured);
       
       if (!configured) {
@@ -113,7 +113,7 @@ describe('OpenAI-Compatible Providers', () => {
 
       const startTime = Date.now();
       
-      await openaiService.chat(
+      await aiService.chat(
         [{ role: 'user', content: 'Hi' }],
         configured.name as any
       );

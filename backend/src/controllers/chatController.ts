@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { contextService } from '../services/contextService';
-import { aiService } from '../services/aiService';
+import { aiService } from '../services/ai';
 import { logger } from '../utils/logger';
 
 export const chatController = {
