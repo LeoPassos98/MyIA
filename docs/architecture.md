@@ -20,7 +20,7 @@
 | **ORM** | Prisma | Type-safe, migrações facilitadas |
 | **Auth** | JWT | Stateless, simples |
 | **Contexto** | Map em memória | Sem dependências externas no MVP |
-| **API IA** | OpenAI (GPT-3.5-turbo) | Modelo conversacional maduro |
+| **API IA** | OpenAI + Claude + Groq + Together + Perplexity + Mistral | 6 providers para redundância e flexibilidade |
 | **Build Tool** | Vite | Build rápido, HMR eficiente |
 | **Deploy** | GitHub Codespaces | Ambiente de desenvolvimento completo |
 
@@ -365,6 +365,29 @@ JWT_EXPIRES_IN=7d
 # OpenAI
 OPENAI_API_KEY=sk-proj-...
 OPENAI_MODEL=gpt-3.5-turbo
+
+# Claude/Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+
+# Groq
+GROQ_API_KEY=...
+GROQ_MODEL=llama-3.1-8b-instant
+
+# Together.ai
+TOGETHER_API_KEY=...
+TOGETHER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
+
+# Perplexity
+PERPLEXITY_API_KEY=...
+PERPLEXITY_MODEL=llama-3.1-sonar-small-128k-online
+
+# Mistral
+MISTRAL_API_KEY=...
+MISTRAL_MODEL=mistral-small-latest
+
+# Provider padrão
+API_PROVIDER=groq
 
 # Context
 MAX_CONTEXT_MESSAGES=15

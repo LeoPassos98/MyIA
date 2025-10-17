@@ -1,5 +1,3 @@
-// backend/src/services/ai/types.ts
-
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -11,7 +9,7 @@ export interface ProviderConfig {
   defaultModel: string;
 }
 
-export type ProviderName = 'openai' | 'groq' | 'together' | 'perplexity' | 'mistral';
+export type ProviderName = 'openai' | 'groq' | 'together' | 'perplexity' | 'mistral' | 'claude';
 
 export interface ProviderInfo {
   name: string;

@@ -19,5 +19,5 @@ export const chatMessageSchema = z.object({
 
 export const messageSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty').max(2000, 'Message too long'),
-  provider: z.enum(['openai', 'groq', 'together', 'perplexity', 'mistral']).optional(),
+  provider: z.enum(['openai', 'groq', 'together', 'perplexity', 'mistral', 'claude']).optional(),
 });

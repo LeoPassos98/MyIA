@@ -15,7 +15,8 @@ export const chatController = {
       const { message, provider } = req.body; // ← ADICIONAR provider aqui
 
       // Validar provider se fornecido
-      const validProviders: ProviderName[] = ['openai', 'groq', 'together', 'perplexity', 'mistral'];
+      const validProviders: ProviderName[] = ['openai', 'groq', 'together', 'perplexity', 'mistral', 'claude'];
+      
       if (provider && !validProviders.includes(provider)) {
         return res.status(400).json({ 
           error: `Invalid provider. Valid options: ${validProviders.join(', ')}` 

@@ -27,10 +27,10 @@ export const aiController = {
   async testProvider(req: Request, res: Response, next: NextFunction) {
     try {
       const { provider } = req.params;
-      
+
       // Validar se o provider existe
-      const validProviders: ProviderName[] = ['openai', 'groq', 'together', 'perplexity', 'mistral'];
-      
+      const validProviders: ProviderName[] = ['openai', 'groq', 'together', 'perplexity', 'mistral', 'claude'];
+
       if (!validProviders.includes(provider as ProviderName)) {
         return res.status(400).json({
           error: `Invalid provider. Valid options: ${validProviders.join(', ')}`,

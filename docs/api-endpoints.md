@@ -242,13 +242,13 @@ Authorization: Bearer <seu-token-jwt>
 ```json
 {
   "message": "Olá, como você está?",
-  "provider": "groq"
+  "provider": "claude"
 }
 ```
 
 **Validações:**
 - `message`: obrigatório, não vazio, máximo 2000 caracteres
-- `provider`: opcional, deve ser um dos providers válidos (openai, groq, together, perplexity, mistral)
+- `provider`: opcional, valores válidos: openai, groq, together, perplexity, mistral, claude
 
 #### Response
 
@@ -395,9 +395,14 @@ Lista todos os providers de IA disponíveis e seu status de configuração.
       "name": "mistral",
       "configured": false,
       "model": "mistral-small-latest"
+    },
+    {
+      "name": "claude",
+      "configured": false,
+      "model": "claude-3-5-sonnet-20241022"
     }
   ],
-  "total": 5,
+  "total": 6,
   "configured": 1
 }
 ```
@@ -417,7 +422,7 @@ Testa a conexão com um provider específico.
 #### Request
 
 **Headers:** Nenhum  
-**URL Params:** `provider` - Nome do provider (openai, groq, together, perplexity, mistral)  
+**URL Params:** `provider` - Nome do provider (openai, groq, together, perplexity, mistral, claude)  
 **Body:** Nenhum
 
 #### Response
@@ -444,7 +449,7 @@ Testa a conexão com um provider específico.
 **Erro - Provider Inválido (400 Bad Request):**
 ```json
 {
-  "error": "Invalid provider. Valid options: openai, groq, together, perplexity, mistral"
+  "error": "Invalid provider. Valid options: openai, groq, together, perplexity, mistral, claude"
 }
 ```
 

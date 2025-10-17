@@ -34,15 +34,17 @@ Ideal para:
 
 ### 💬 Chat Inteligente
 - Integração com múltiplos providers de IA:
-  - OpenAI (GPT-3.5-turbo, GPT-4)
-  - Groq (gratuito - Llama 3.1)
-  - Together.ai (crédito grátis - Llama 3.1)
-  - Perplexity (crédito grátis - Sonar)
-  - Mistral (Mistral Small)
+  - **OpenAI** (GPT-3.5-turbo, GPT-4)
+  - **Claude** (Anthropic - Claude 3.5 Sonnet)
+  - **Groq** (gratuito - Llama 3.1)
+  - **Together.ai** (crédito grátis - Llama 3.1)
+  - **Perplexity** (crédito grátis - Sonar)
+  - **Mistral** (Mistral Small)
 - Contexto de conversa (últimas 15 mensagens)
 - Respostas rápidas e precisas
 - Botão de limpar histórico
 - Modo mock quando API key não configurada
+- Seleção de provider por requisição
 
 ### 🎨 Interface Moderna
 - Design responsivo com Material-UI
@@ -83,6 +85,37 @@ Login/Registro → Chat → Conversa com IA → Logout
      ↓              ↓           ↓            ↓
   JWT Token    Contexto    OpenAI API   Limpar sessão
 ```
+
+---
+
+## 🤖 Providers de IA Suportados
+
+MyIA suporta **6 providers diferentes** de IA, permitindo flexibilidade e redundância:
+
+| Provider | Modelo Padrão | Custo | Link |
+|----------|--------------|-------|------|
+| **OpenAI** | GPT-3.5-turbo | Pago | [Obter chave](https://platform.openai.com/api-keys) |
+| **Claude** | Claude 3.5 Sonnet | Pago (crédito inicial grátis) | [Obter chave](https://console.anthropic.com/) |
+| **Groq** | Llama 3.1 8B | **100% Gratuito** | [Obter chave](https://console.groq.com/) |
+| **Together.ai** | Llama 3.1 8B | $25 crédito grátis | [Obter chave](https://api.together.ai/) |
+| **Perplexity** | Sonar Small | $5 crédito grátis | [Obter chave](https://www.perplexity.ai/settings/api) |
+| **Mistral** | Mistral Small | Pago | [Obter chave](https://console.mistral.ai/) |
+
+### Como usar diferentes providers:
+
+```bash
+# Usar provider padrão (definido em API_PROVIDER)
+curl -X POST /api/chat/message \
+  -d '{"message":"Olá!"}'
+
+# Especificar provider na requisição
+curl -X POST /api/chat/message \
+  -d '{"message":"Olá!", "provider":"claude"}'
+```
+
+### Modo Mock
+
+Se **nenhuma API key** estiver configurada, a aplicação funciona em **modo mock**, retornando respostas pré-definidas. Perfeito para testar a interface sem custos!
 
 ---
 
@@ -167,6 +200,10 @@ JWT_EXPIRES_IN=7d
 # OpenAI (opcional)
 OPENAI_API_KEY=sk-proj-sua-chave-aqui
 OPENAI_MODEL=gpt-3.5-turbo
+
+# Claude/Anthropic (opcional)
+ANTHROPIC_API_KEY=sk-ant-sua-chave-aqui
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 
 # Groq (opcional - gratuito!)
 GROQ_API_KEY=sua-chave-groq-aqui
@@ -254,10 +291,10 @@ MyIA/
 | POST | `/api/auth/register` | Criar conta | ❌ |
 | POST | `/api/auth/login` | Fazer login | ❌ |
 | GET | `/api/auth/me` | Dados do usuário | ✅ |
-| POST | `/api/chat/message` | Enviar mensagem | ✅ |
+| POST | `/api/chat/message` | Enviar mensagem (com provider opcional) | ✅ |
 | DELETE | `/api/chat/context` | Limpar histórico | ✅ |
-| GET | `/api/ai/providers` | Listar providers | ❌ |
-| POST | `/api/ai/test/:provider` | Testar provider | ❌ |
+| GET | `/api/ai/providers` | Listar 6 providers disponíveis | ❌ |
+| POST | `/api/ai/test/:provider` | Testar conexão com provider | ❌ |
 | GET | `/health` | Status do servidor | ❌ |
 
 Veja a [documentação completa da API](docs/api-endpoints.md) para exemplos de uso.
@@ -305,7 +342,13 @@ curl -X POST http://localhost:3001/api/auth/login \
 - **ORM:** Prisma
 - **Autenticação:** JWT + bcrypt
 - **Validação:** Zod
-- **AI:** OpenAI API (GPT-3.5/GPT-4)
+- **AI:** 6 providers suportados
+  - OpenAI (GPT-3.5/4)
+  - Claude (Anthropic 3.5 Sonnet)
+  - Groq (Llama 3.1)
+  - Together.ai (Llama 3.1)
+  - Perplexity (Sonar)
+  - Mistral (Mistral Small)
 
 ### Frontend
 - **Framework:** React 18

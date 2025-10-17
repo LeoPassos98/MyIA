@@ -28,6 +28,12 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     keyEnv: 'MISTRAL_API_KEY',
     defaultModel: 'mistral-small-latest',
   },
+  // ← NOVO: Claude (Anthropic)
+  claude: {
+    baseURL: 'https://api.anthropic.com/v1',
+    keyEnv: 'ANTHROPIC_API_KEY',
+    defaultModel: 'claude-3-5-sonnet-20241022',
+  },
 };
 
 export const DEFAULT_PROVIDER: ProviderName = 
