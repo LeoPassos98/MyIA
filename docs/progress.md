@@ -420,6 +420,203 @@ Este documento registra todas as etapas, decisões e mudanças do projeto.
 
 ---
 
-**Última atualização:** 08/10/2025 - 20:30  
-**Status do Projeto:** ✅ 100% Completo e Funcional  
-**Próxima revisão:** Quando adicionar novas features
+## 🗓️ 17/10/2025
+
+### ✅ Sessão 6: Modularização do AI Service e Multi-Provider (08:00 - 12:00)
+
+#### Decisões Arquiteturais
+- **Modularização:** Refatoração completa do aiService em estrutura modular
+- **Multi-Provider:** Suporte a 6 providers de IA diferentes
+- **Separação de responsabilidades:** Handlers, utils, clients separados
+
+#### Atividades Realizadas
+
+**1. Estrutura Modular Criada**
+```
+backend/src/services/ai/
+├── client/
+│   ├── openaiClient.ts      # Cliente genérico OpenAI-compatible
+│   └── claudeClient.ts      # Cliente específico para Claude
+├── config/
+│   └── providers.ts         # Configuração dos 6 providers
+├── handlers/
+│   ├── chatHandler.ts       # Lógica de chat com suporte multi-provider
+│   └── providerHandler.ts   # Gerenciamento e teste de providers
+├── utils/
+│   ├── providerUtils.ts     # Utilidades para providers
+│   └── errorMessages.ts     # Mensagens de erro amigáveis
+├── types.ts                 # Interfaces TypeScript
+└── index.ts                 # Entry point do serviço
+```
+
+**2. Providers Implementados**
+- ✅ OpenAI (GPT-3.5/GPT-4)
+- ✅ Claude/Anthropic (Claude 3.5 Sonnet) - Cliente HTTP customizado
+- ✅ Groq (Llama 3.1 - gratuito)
+- ✅ Together.ai (Llama 3.1)
+- ✅ Perplexity (Sonar)
+- ✅ Mistral (Mistral Small)
+
+**3. Novos Endpoints Criados**
+- `GET /api/ai/providers` - Lista todos os providers e status
+- `POST /api/ai/test/:provider` - Testa conexão com provider específico
+
+**4. Chat Controller Atualizado**
+- Suporte a provider opcional no body da requisição
+- Validação de provider
+- Response inclui qual provider foi usado
+
+**5. Cliente Específico para Claude**
+- API do Claude é diferente (não usa SDK OpenAI)
+- Implementado com Axios
+- Conversão de formato de mensagens
+- Suporte a system messages
+
+#### Problemas Encontrados e Resolvidos
+
+**Problema 1: API do Claude incompatível com SDK OpenAI**
+- **Erro:** Claude não usa o formato OpenAI Chat Completions
+- **Causa:** API diferente (Messages API)
+- **Solução:** Cliente HTTP customizado com Axios
+- **Status:** ✅ Resolvido
+
+**Problema 2: Imports não atualizados após modularização**
+- **Erro:** `cannot find module '../services/aiService'`
+- **Causa:** Refatoração mudou path de `aiService.ts` para `ai/index.ts`
+- **Solução:** Atualizar imports para `../services/ai`
+- **Status:** ✅ Resolvido
+
+**Problema 3: Claude sem créditos**
+- **Erro:** `Your credit balance is too low`
+- **Causa:** Anthropic mudou política - não há mais $5 automáticos
+- **Solução:** Solicitação de créditos via formulário (aguardando)
+- **Status:** ⏳ Em andamento
+
+**Problema 4: OpenAI quota excedida**
+- **Erro:** `insufficient_quota`
+- **Causa:** Trial account com limite baixo
+- **Solução:** Usar Groq como provider principal (gratuito)
+- **Status:** ✅ Resolvido (Groq configurado)
+
+#### Configurações Realizadas
+
+**API Keys Configuradas:**
+- ✅ Groq (gratuito) - Funcionando perfeitamente
+- ✅ Claude (aguardando créditos)
+- ⚠️ OpenAI (quota excedida)
+
+**Provider Padrão:**
+```env
+API_PROVIDER=groq
+```
+
+#### Testes Realizados
+
+**Teste 1: Listar providers**
+```bash
+curl http://localhost:3001/api/ai/providers
+```
+**Resultado:** ✅ 6 providers listados, 3 configurados
+
+**Teste 2: Testar conexão Groq**
+```bash
+curl -X POST http://localhost:3001/api/ai/test/groq
+```
+**Resultado:** ✅ Conexão bem-sucedida
+
+**Teste 3: Chat com Groq**
+```bash
+curl -X POST /api/chat/message -d '{"message":"Conte uma piada","provider":"groq"}'
+```
+**Resultado:** ✅ Resposta real da IA:
+> "Um homem entra em um bar e pede um copo de água..."
+
+**Teste 4: Chat com Claude**
+**Resultado:** ❌ Sem créditos (aguardando aprovação)
+
+**Teste 5: Chat com OpenAI**
+**Resultado:** ❌ Quota excedida
+
+**Teste 6: Contexto de conversa**
+**Resultado:** ✅ Mantido corretamente (contextSize aumentando)
+
+#### Documentação Atualizada
+- ✅ README.md - Seção de providers adicionada
+- ✅ api-endpoints.md - Novos endpoints documentados
+- ✅ architecture.md - Estrutura modular documentada
+
+#### Estatísticas
+- **Arquivos criados:** 8 novos arquivos na estrutura modular
+- **Endpoints adicionados:** 2 (providers, test)
+- **Providers suportados:** 6
+- **Providers funcionando:** 1 (Groq)
+- **Linhas de código adicionadas:** ~400
+- **Testes executados:** 6
+- **Taxa de sucesso (Groq):** 100%
+
+---
+
+### 📊 Estatísticas Atualizadas do Projeto
+
+| Métrica | Valor Anterior | Valor Atual |
+|---------|----------------|-------------|
+| **Total de arquivos** | 52 | 60 |
+| **Linhas de código** | ~1.200 | ~1.600 |
+| **Endpoints API** | 6 | 8 |
+| **Providers de IA** | 1 (OpenAI) | 6 (múltiplos) |
+| **Arquitetura** | Monolítica | Modular |
+
+---
+
+### 🎯 Objetivos Alcançados (Sessão 6)
+
+- ✅ Estrutura modular e escalável
+- ✅ Suporte a 6 providers diferentes
+- ✅ Cliente customizado para Claude
+- ✅ Endpoints de gerenciamento de providers
+- ✅ Chat com seleção de provider
+- ✅ Groq funcionando (gratuito)
+- ✅ Documentação completa atualizada
+
+---
+
+### 🔮 Próximos Passos
+
+#### Curto Prazo (Próxima Sessão)
+- [ ] Atualizar frontend para seleção de provider
+- [ ] Aguardar aprovação de créditos Claude
+- [ ] Adicionar Together.ai (gratuito)
+- [ ] Interface para trocar provider
+
+#### Médio Prazo
+- [ ] Streaming de respostas (SSE)
+- [ ] Estatísticas de uso por provider
+- [ ] Cache de respostas
+- [ ] Fallback automático entre providers
+
+---
+
+## 📝 Lições Aprendidas (Sessão 6)
+
+### O que funcionou bem
+✅ Modularização facilitou adicionar novos providers  
+✅ Groq como alternativa gratuita à OpenAI  
+✅ Estrutura de pastas clara e organizada  
+✅ Tratamento de erros específico por provider  
+
+### Desafios Enfrentados
+⚠️ API do Claude diferente (não usa SDK OpenAI)  
+⚠️ Política de créditos mudou (não há mais $5 grátis)  
+⚠️ OpenAI trial muito limitado  
+
+### Decisões Importantes
+💡 Criar cliente HTTP separado para Claude  
+💡 Usar Groq como provider principal (gratuito e rápido)  
+💡 Manter estrutura modular para fácil expansão  
+💡 Modo mock para providers não configurados  
+
+---
+
+**Última atualização:** 17/10/2025 - 12:00  
+**Status do Projeto:** ✅ Multi-Provider Implementado  
+**Próxima revisão:** Após implementação do frontend
