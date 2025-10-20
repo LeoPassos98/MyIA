@@ -6,7 +6,7 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-> Assistente de IA conversacional full-stack com autenticação JWT, contexto inteligente e interface moderna.
+> Assistente de IA conversacional full-stack com autenticação JWT, suporte a 6 providers de IA e interface moderna.
 
 [Demo](#-demo) • [Recursos](#-recursos) • [Instalação](#-instalação-rápida) • [Documentação](#-documentação) • [Roadmap](#-roadmap)
 
@@ -14,9 +14,9 @@
 
 ## 📖 Sobre
 
-**MyIA** é uma aplicação full-stack completa que permite conversar com uma IA (OpenAI GPT) com **contexto de conversa persistente**, **autenticação segura** e uma **interface moderna e responsiva**.
+**MyIA** é uma aplicação full-stack completa que permite conversar com múltiplos providers de IA com **contexto de conversa inteligente**, **autenticação segura** e **interface responsiva**.
 
-Ideal para:
+**Ideal para:**
 - 💼 Assistente pessoal inteligente
 - 📚 Base de conhecimento conversacional
 - 🎓 Aprendizado sobre desenvolvimento full-stack
@@ -32,32 +32,32 @@ Ideal para:
 - Senhas criptografadas com bcrypt
 - Proteção de rotas no frontend e backend
 
-### 💬 Chat Inteligente
-- Integração com múltiplos providers de IA:
-  - **OpenAI** (GPT-3.5-turbo, GPT-4)
-  - **Claude** (Anthropic - Claude 3.5 Sonnet)
-  - **Groq** (gratuito - Llama 3.1)
-  - **Together.ai** (crédito grátis - Llama 3.1)
-  - **Perplexity** (crédito grátis - Sonar)
-  - **Mistral** (Mistral Small)
-- Contexto de conversa (últimas 15 mensagens)
-- Respostas rápidas e precisas
-- Botão de limpar histórico
-- Modo mock quando API key não configurada
+### 💬 Chat Inteligente com Multi-Provider
+- **6 providers de IA suportados:**
+  - OpenAI (GPT-3.5/GPT-4)
+  - Claude (Anthropic 3.5 Sonnet)
+  - Groq (Llama 3.1 - **100% gratuito**)
+  - Together.ai (Llama 3.1)
+  - Perplexity (Sonar)
+  - Mistral (Mistral Small)
 - Seleção de provider por requisição
+- Contexto de conversa (últimas 15 mensagens)
+- Modo mock quando API key não configurada
+- Botão de limpar histórico
 
 ### 🎨 Interface Moderna
 - Design responsivo com Material-UI
-- Modo claro (expansível para escuro)
 - Scroll automático de mensagens
 - Loading states e feedback visual
+- Modo claro (expansível para escuro)
 
 ### 🏗️ Arquitetura Profissional
-- Backend: Node.js + Express + TypeScript
-- Frontend: React + TypeScript + Vite
-- Banco de dados: SQLite (dev) / PostgreSQL (prod)
-- ORM: Prisma com migrações
-- Validação: Zod schemas
+- **Backend:** Node.js + Express + TypeScript
+- **Frontend:** React + TypeScript + Vite
+- **Banco de dados:** SQLite (dev) / PostgreSQL (prod)
+- **ORM:** Prisma com migrações
+- **Validação:** Zod schemas
+- **Arquitetura modular** para fácil expansão
 
 ---
 
@@ -79,43 +79,34 @@ Ideal para:
 └─────────────────────────────────────────┘
 ```
 
-### Fluxo de Autenticação
-```
-Login/Registro → Chat → Conversa com IA → Logout
-     ↓              ↓           ↓            ↓
-  JWT Token    Contexto    OpenAI API   Limpar sessão
-```
-
 ---
 
 ## 🤖 Providers de IA Suportados
 
-MyIA suporta **6 providers diferentes** de IA, permitindo flexibilidade e redundância:
+MyIA suporta **6 providers diferentes**, permitindo flexibilidade e redundância:
 
 | Provider | Modelo Padrão | Custo | Link |
 |----------|--------------|-------|------|
+| **Groq** | Llama 3.1 8B | **100% Gratuito** ⭐ | [Obter chave](https://console.groq.com/) |
 | **OpenAI** | GPT-3.5-turbo | Pago | [Obter chave](https://platform.openai.com/api-keys) |
-| **Claude** | Claude 3.5 Sonnet | Pago (crédito inicial grátis) | [Obter chave](https://console.anthropic.com/) |
-| **Groq** | Llama 3.1 8B | **100% Gratuito** | [Obter chave](https://console.groq.com/) |
-| **Together.ai** | Llama 3.1 8B | $25 crédito grátis | [Obter chave](https://api.together.ai/) |
-| **Perplexity** | Sonar Small | $5 crédito grátis | [Obter chave](https://www.perplexity.ai/settings/api) |
+| **Claude** | Claude 3.5 Sonnet | Pago | [Obter chave](https://console.anthropic.com/) |
+| **Together.ai** | Llama 3.1 8B | Pago | [Obter chave](https://api.together.ai/) |
+| **Perplexity** | Sonar Small | Pago | [Obter chave](https://www.perplexity.ai/settings/api) |
 | **Mistral** | Mistral Small | Pago | [Obter chave](https://console.mistral.ai/) |
 
-### Como usar diferentes providers:
+### Como usar
 
 ```bash
 # Usar provider padrão (definido em API_PROVIDER)
-curl -X POST /api/chat/message \
-  -d '{"message":"Olá!"}'
+POST /api/chat/message
+{ "message": "Olá!" }
 
-# Especificar provider na requisição
-curl -X POST /api/chat/message \
-  -d '{"message":"Olá!", "provider":"claude"}'
+# Especificar provider
+POST /api/chat/message
+{ "message": "Olá!", "provider": "groq" }
 ```
 
-### Modo Mock
-
-Se **nenhuma API key** estiver configurada, a aplicação funciona em **modo mock**, retornando respostas pré-definidas. Perfeito para testar a interface sem custos!
+**Modo Mock:** Funciona sem API keys, retornando respostas de exemplo.
 
 ---
 
@@ -125,65 +116,52 @@ Se **nenhuma API key** estiver configurada, a aplicação funciona em **modo moc
 
 - Node.js 18+ ([Download](https://nodejs.org/))
 - npm ou yarn
-- Chave da API OpenAI ([Obter aqui](https://platform.openai.com/api-keys))
+- (Opcional) Chave de API de algum provider
 
-### 1. Clone o repositório
+### 1. Clone e configure
 
 ```bash
+# Clone o repositório
 git clone https://github.com/LeoPassos98/MyIA.git
 cd MyIA
-```
 
-### 2. Configure o Backend
-
-```bash
+# Configure o Backend
 cd backend
-
-# Instale as dependências
 npm install
-
-# Configure as variáveis de ambiente
 cp .env.example .env
-nano .env  # Adicione sua OPENAI_API_KEY
+# Edite .env e adicione suas API keys (opcional)
 
-# Execute as migrações do banco
+# Execute migrações do banco
 npm run prisma:migrate
 
-# Inicie o servidor
+# Inicie o backend
 npm run dev
 ```
 
-O backend estará rodando em `http://localhost:3001`
+O backend estará em `http://localhost:3001`
 
-### 3. Configure o Frontend
+### 2. Configure o Frontend
 
 ```bash
-cd ../frontend
-
-# Instale as dependências
+# Em outro terminal
+cd frontend
 npm install
 
-# Configure as variáveis de ambiente
-cp .env.example .env
-# .env já está configurado para localhost:3001
-
-# Inicie o app
+# Inicie o frontend
 npm run dev
 ```
 
-O frontend estará rodando em `http://localhost:3000`
+O frontend estará em `http://localhost:3000`
 
-### 4. Acesse a aplicação
+### 3. Acesse
 
-Abra [http://localhost:3000](http://localhost:3000) no seu navegador!
+Abra [http://localhost:3000](http://localhost:3000) no navegador!
 
 ---
 
 ## 🔧 Configuração
 
-### Variáveis de Ambiente
-
-#### Backend (`.env`)
+### Variáveis de Ambiente Backend
 
 ```env
 # Servidor
@@ -197,31 +175,7 @@ DATABASE_URL="file:./dev.db"
 JWT_SECRET=sua-chave-secreta-super-segura-aqui
 JWT_EXPIRES_IN=7d
 
-# OpenAI (opcional)
-OPENAI_API_KEY=sk-proj-sua-chave-aqui
-OPENAI_MODEL=gpt-3.5-turbo
-
-# Claude/Anthropic (opcional)
-ANTHROPIC_API_KEY=sk-ant-sua-chave-aqui
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
-
-# Groq (opcional - gratuito!)
-GROQ_API_KEY=sua-chave-groq-aqui
-GROQ_MODEL=llama-3.1-8b-instant
-
-# Together.ai (opcional)
-TOGETHER_API_KEY=sua-chave-together-aqui
-TOGETHER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
-
-# Perplexity (opcional)
-PERPLEXITY_API_KEY=sua-chave-perplexity-aqui
-PERPLEXITY_MODEL=llama-3.1-sonar-small-128k-online
-
-# Mistral (opcional)
-MISTRAL_API_KEY=sua-chave-mistral-aqui
-MISTRAL_MODEL=mistral-small-latest
-
-# Provider padrão (se não especificado na requisição)
+# Provider padrão
 API_PROVIDER=groq
 
 # Contexto
@@ -230,17 +184,21 @@ CONTEXT_CLEANUP_INTERVAL=3600000
 
 # CORS
 CORS_ORIGIN=http://localhost:3000
+
+# API Keys (todas opcionais)
+OPENAI_API_KEY=sk-proj-...
+ANTHROPIC_API_KEY=sk-ant-...
+GROQ_API_KEY=gsk_...
+TOGETHER_API_KEY=...
+PERPLEXITY_API_KEY=...
+MISTRAL_API_KEY=...
 ```
 
-#### Frontend (`.env`)
+### Variáveis de Ambiente Frontend
 
 ```env
 VITE_API_URL=http://localhost:3001/api
 ```
-
-### Modo Mock (Sem chave OpenAI)
-
-Se você **não tiver** uma chave da OpenAI, a aplicação funciona em **modo mock**, retornando respostas pré-definidas. Ideal para testar a interface!
 
 ---
 
@@ -251,38 +209,8 @@ Se você **não tiver** uma chave da OpenAI, a aplicação funciona em **modo mo
 - 📐 **[Arquitetura](docs/architecture.md)** - Visão técnica completa
 - 🛠️ **[Setup Guide](docs/setup-guide.md)** - Guia passo a passo detalhado
 - 📡 **[API Endpoints](docs/api-endpoints.md)** - Documentação da API REST
+- 🧪 **[Guia de Testes](docs/testing.md)** - Documentação completa de testes
 - 📊 **[Progress Log](docs/progress.md)** - Histórico de desenvolvimento
-
-### Estrutura do Projeto
-
-```
-MyIA/
-├── backend/           # API Node.js + Express
-│   ├── src/
-│   │   ├── controllers/    # Lógica dos endpoints
-│   │   ├── services/       # Lógica de negócio
-│   │   ├── middleware/     # Auth, validação, erros
-│   │   ├── routes/         # Definição de rotas
-│   │   └── server.ts       # Servidor principal
-│   ├── prisma/
-│   │   └── schema.prisma   # Schema do banco
-│   └── dev.db             # Banco SQLite
-│
-├── frontend/          # App React + Vite
-│   ├── src/
-│   │   ├── components/     # Componentes reutilizáveis
-│   │   ├── pages/          # Páginas (Login, Chat)
-│   │   ├── services/       # Integração com API
-│   │   ├── contexts/       # Estado global (Auth)
-│   │   └── App.tsx         # Componente raiz
-│   └── index.html
-│
-└── docs/              # Documentação completa
-    ├── architecture.md
-    ├── setup-guide.md
-    ├── api-endpoints.md
-    └── progress.md
-```
 
 ### Endpoints da API
 
@@ -291,130 +219,102 @@ MyIA/
 | POST | `/api/auth/register` | Criar conta | ❌ |
 | POST | `/api/auth/login` | Fazer login | ❌ |
 | GET | `/api/auth/me` | Dados do usuário | ✅ |
-| POST | `/api/chat/message` | Enviar mensagem (com provider opcional) | ✅ |
+| POST | `/api/chat/message` | Enviar mensagem | ✅ |
 | DELETE | `/api/chat/context` | Limpar histórico | ✅ |
-| GET | `/api/ai/providers` | Listar 6 providers disponíveis | ❌ |
-| POST | `/api/ai/test/:provider` | Testar conexão com provider | ❌ |
+| GET | `/api/ai/providers` | Listar providers | ❌ |
+| POST | `/api/ai/test/:provider` | Testar conexão | ❌ |
 | GET | `/health` | Status do servidor | ❌ |
-
-Veja a [documentação completa da API](docs/api-endpoints.md) para exemplos de uso.
 
 ---
 
 ## 🧪 Testes
 
+### Documentação
+
+📚 **[Guia Completo de Testes](docs/testing.md)** - Documentação detalhada com:
+- Estrutura de testes (unitários, integração, E2E)
+- Exemplos de código
+- Setup do Jest e Supertest
+- Checklist de implementação (0/50 testes)
+- Convenções e padrões
+
 ### Testes Manuais
 
 ```bash
-# Backend
-cd backend
-
-# 1. Health check
+# Health check
 curl http://localhost:3001/health
 
-# 2. Registrar usuário
+# Registrar usuário
 curl -X POST http://localhost:3001/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","password":"123456","name":"Test User"}'
+  -d '{"email":"test@test.com","password":"123456","name":"Test"}'
 
-# 3. Login
+# Login
 curl -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@test.com","password":"123456"}'
 ```
 
-### Testes Automatizados
+### Status dos Testes Automatizados
 
-🚧 **Em desenvolvimento** - Próxima versão incluirá:
-- Jest para testes unitários
-- React Testing Library
-- Supertest para testes de API
+```
+📊 Progresso: 0/50 testes (0%)
+
+🔴 Crítico: 0/23 (Auth + Chat)
+🟡 Importante: 0/13 (Providers + Context)
+🟢 Complementar: 0/14 (Middlewares + Utils)
+```
 
 ---
 
 ## 🛠️ Stack Tecnológica
 
 ### Backend
-- **Runtime:** Node.js 18+
-- **Framework:** Express.js
-- **Linguagem:** TypeScript
-- **Banco de Dados:** SQLite (dev) / PostgreSQL (prod)
-- **ORM:** Prisma
-- **Autenticação:** JWT + bcrypt
-- **Validação:** Zod
-- **AI:** 6 providers suportados
-  - OpenAI (GPT-3.5/4)
-  - Claude (Anthropic 3.5 Sonnet)
-  - Groq (Llama 3.1)
-  - Together.ai (Llama 3.1)
-  - Perplexity (Sonar)
-  - Mistral (Mistral Small)
+- Node.js 18+ + Express.js
+- TypeScript
+- SQLite (dev) / PostgreSQL (prod)
+- Prisma ORM
+- JWT + bcrypt
+- Zod (validação)
+- 6 AI providers
 
 ### Frontend
-- **Framework:** React 18
-- **Linguagem:** TypeScript
-- **Build Tool:** Vite
-- **UI Library:** Material-UI (MUI)
-- **Roteamento:** React Router v6
-- **HTTP Client:** Axios
-- **Estado:** Context API
+- React 18 + TypeScript
+- Vite
+- Material-UI (MUI)
+- React Router v6
+- Axios
+- Context API
 
 ### DevOps
-- **Versionamento:** Git
-- **CI/CD:** GitHub Actions (planejado)
-- **Deploy:** Vercel (frontend) + Railway (backend)
-- **Monitoramento:** Logs estruturados
+- Git
+- GitHub Actions (planejado)
+- Vercel + Railway (planejado)
 
 ---
 
 ## 🗺️ Roadmap
 
 ### v1.1 (Em breve)
-- [ ] Testes automatizados (Jest + RTL)
+- [ ] Implementar testes automatizados (0/50)
+  - [ ] Testes unitários (Jest)
+  - [ ] Testes de integração
+  - [ ] Testes E2E (Supertest)
+- [x] Documentação de testes completa
 - [ ] Modo escuro
 - [ ] Múltiplas conversas por usuário
-- [ ] Pesquisa no histórico
 
 ### v1.2
-- [ ] Persistir histórico de conversas no banco
+- [ ] Persistir histórico no banco
 - [ ] Upload de imagens
 - [ ] Streaming de respostas (SSE)
 - [ ] Rate limiting
 
 ### v2.0
-- [ ] Redis para cache de contexto
+- [ ] Redis para cache
 - [ ] Busca semântica com embeddings
 - [ ] Dashboard de analytics
 - [ ] Suporte a múltiplos idiomas
-- [ ] Fine-tuning customizado
-
-Veja o [roadmap completo](docs/progress.md#-próximos-passos) para mais detalhes.
-
----
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Siga estes passos:
-
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/NovaFuncionalidade`)
-3. Commit suas mudanças (`git commit -m 'feat: adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
-5. Abra um Pull Request
-
-### Padrão de Commits
-
-Seguimos o [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat: nova funcionalidade
-fix: correção de bug
-docs: documentação
-style: formatação
-refactor: refatoração
-test: testes
-chore: tarefas gerais
-```
 
 ---
 
@@ -424,22 +324,20 @@ chore: tarefas gerais
 
 - GitHub: [@LeoPassos98](https://github.com/LeoPassos98)
 - LinkedIn: [Leonardo Passos](https://linkedin.com/in/seu-usuario)
-- Email: seu-email@example.com
 
 ---
 
 ## 🙏 Agradecimentos
 
 - [OpenAI](https://openai.com/) pela API de IA
+- [Anthropic](https://www.anthropic.com/) pelo Claude
+- [Groq](https://groq.com/) pelo acesso gratuito
 - [Material-UI](https://mui.com/) pelos componentes
-- [Prisma](https://www.prisma.io/) pelo ORM fantástico
-- [Anthropic](https://www.anthropic.com/) pelo Claude (assistente de desenvolvimento)
+- [Prisma](https://www.prisma.io/) pelo ORM
 
 ---
 
-## 📞 Contato e Suporte
-
-Encontrou um bug? Tem uma sugestão?
+## 📞 Suporte
 
 - 🐛 [Reportar Bug](https://github.com/LeoPassos98/MyIA/issues)
 - 💡 [Solicitar Feature](https://github.com/LeoPassos98/MyIA/issues)
@@ -454,3 +352,5 @@ Encontrou um bug? Tem uma sugestão?
 [⬆ Voltar ao topo](#-myia---assistente-conversacional-inteligente)
 
 </div>
+
+---
