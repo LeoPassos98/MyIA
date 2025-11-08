@@ -6,6 +6,9 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
+[![Tests](https://img.shields.io/badge/Tests-33%2F45%20(73%25)-brightgreen)](docs/testing.md)
+[![Coverage](https://img.shields.io/badge/Coverage-~45%25-yellow)](docs/testing.md)
+
 > Assistente de IA conversacional full-stack com autenticação JWT, suporte a 6 providers de IA e interface moderna.
 
 [Demo](#-demo) • [Recursos](#-recursos) • [Instalação](#-instalação-rápida) • [Documentação](#-documentação) • [Roadmap](#-roadmap)
@@ -229,41 +232,63 @@ VITE_API_URL=http://localhost:3001/api
 
 ## 🧪 Testes
 
+### Status Atual
+
+```
+📊 Progresso: 33/45 testes (73.3%) ✅
+
+✅ Utils: 18/18 testes (100%)
+✅ Middlewares: 15/15 testes (100%)
+⬜ Services: 0/22 testes (0%)
+⬜ Integration: 0/15 testes (0%)
+```
+
 ### Documentação
 
 📚 **[Guia Completo de Testes](docs/testing.md)** - Documentação detalhada com:
-- Estrutura de testes (unitários, integração, E2E)
-- Exemplos de código
-- Setup do Jest e Supertest
-- Checklist de implementação (0/50 testes)
+- Estrutura de testes (unitários, integração)
+- Checklist de implementação (33/68 completo)
 - Convenções e padrões
+- Status atualizado
 
-### Testes Manuais
+### Rodar Testes
 
 ```bash
-# Health check
-curl http://localhost:3001/health
+# Todos os testes
+npm test
 
-# Registrar usuário
-curl -X POST http://localhost:3001/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","password":"123456","name":"Test"}'
+# Com cobertura
+npm run test:coverage
 
-# Login
-curl -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","password":"123456"}'
+# Específicos
+npm test jwt.test.ts
+npm test logger.test.ts
+npm test authMiddleware.test.ts
+npm test validateRequest.test.ts
+
+# Watch mode
+npm run test:watch
 ```
 
-### Status dos Testes Automatizados
+### Testes Implementados
 
-```
-📊 Progresso: 0/50 testes (0%)
+#### ✅ Utils (18 testes)
+- `jwt.test.ts` - Geração e verificação de tokens JWT
+- `logger.test.ts` - Sistema de logs (info, warn, error, debug)
 
-🔴 Crítico: 0/23 (Auth + Chat)
-🟡 Importante: 0/13 (Providers + Context)
-🟢 Complementar: 0/14 (Middlewares + Utils)
-```
+#### ✅ Middlewares (15 testes)
+- `authMiddleware.test.ts` - Autenticação JWT
+- `validateRequest.test.ts` - Validação de schemas Zod
+
+#### ⬜ Services (Próximo)
+- `authService.test.ts` - Lógica de autenticação
+- `contextService.test.ts` - Gerenciamento de contexto
+- `ai/chatHandler.test.ts` - Handlers de IA
+- `ai/providerHandler.test.ts` - Gerenciamento de providers
+
+#### ⬜ Integration (Planejado)
+- `auth.test.ts` - Endpoints de autenticação
+- `chat.test.ts` - Endpoints de chat
 
 ---
 

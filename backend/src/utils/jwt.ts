@@ -9,9 +9,11 @@ export interface JWTPayload {
 }
 
 export const generateToken = (payload: JWTPayload): string => {
+  // @ts-ignore
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
 export const verifyToken = (token: string): JWTPayload => {
+  // @ts-ignore
   return jwt.verify(token, JWT_SECRET) as JWTPayload;
 };

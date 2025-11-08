@@ -17,6 +17,7 @@ const CLEANUP_INTERVAL = parseInt(process.env.CONTEXT_CLEANUP_INTERVAL || '36000
 
 class ContextService {
   private contexts: Map<string, ChatContext>;
+  private cleanupTimer?: NodeJS.Timeout;
 
   constructor() {
     this.contexts = new Map();
@@ -64,8 +65,15 @@ class ContextService {
     return this.getMessages(userId).length;
   }
 
+  stopCleanupTask(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+  }
+
   private startCleanupTask(): void {
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       const now = new Date();
       let cleaned = 0;
 

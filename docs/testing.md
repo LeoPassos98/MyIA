@@ -178,207 +178,108 @@ Adicionar ao `backend/package.json`:
 
 ### Fase 1: Setup (Prioridade 🔴)
 
-- [ ] Instalar dependências (Jest, Supertest, etc)
-- [ ] Criar `jest.config.js`
-- [ ] Adicionar scripts no `package.json`
-- [ ] Criar estrutura de pastas `tests/`
-- [ ] Configurar `.env.test`
-- [ ] Implementar helpers (testDb, testServer, fixtures)
-- [ ] Criar `setup.ts` e `teardown.ts`
+- [x] Instalar dependências (Jest, Supertest, etc)
+- [x] Criar `jest.config.js`
+- [x] Adicionar scripts no `package.json`
+- [x] Criar estrutura de pastas `tests/`
+- [x] Configurar `.env.test`
+- [x] Implementar helpers (testDb, testServer, fixtures)
+- [x] Criar `setup.ts` e `teardown.ts`
 
 ### Fase 2: Testes Unitários Críticos (Prioridade 🔴)
 
-**AuthService (8 testes)**
-- [ ] Register: criar usuário com senha hash
-- [ ] Register: erro se email já existe
-- [ ] Register: validar hash bcrypt
-- [ ] Login: retornar token e user para credenciais válidas
-- [ ] Login: erro para email inválido
-- [ ] Login: erro para senha inválida
-- [ ] Login: não expor password no response
-- [ ] getUserById: retornar user sem password
+**Utils (18 testes - ✅ COMPLETO)**
+- [x] jwt.test.ts: Gerar token válido
+- [x] jwt.test.ts: Verificar token válido
+- [x] jwt.test.ts: Erro para token inválido
+- [x] jwt.test.ts: Erro para token malformado
+- [x] jwt.test.ts: Erro para token vazio
+- [x] jwt.test.ts: Gerar com estrutura correta
+- [x] jwt.test.ts: Integração gerar e verificar
+- [x] logger.test.ts: Logar info
+- [x] logger.test.ts: Logar erro
+- [x] logger.test.ts: Logar warn
+- [x] logger.test.ts: Logar debug
+- [x] logger.test.ts: Incluir timestamp
+- [x] logger.test.ts: Incluir metadados
+- [x] logger.test.ts: Usar console.log para info/warn/debug
+- [x] logger.test.ts: Usar console.error para error
+- [x] logger.test.ts: Formatar com timestamp e level
+- [x] logger.test.ts: Logar objetos de erro
+- [x] logger.test.ts: Múltiplos argumentos
 
-**ContextService (7 testes)**
-- [ ] addMessage: adicionar mensagens ao contexto
-- [ ] addMessage: limitar a MAX_CONTEXT_MESSAGES
-- [ ] addMessage: manter ordem das mensagens
-- [ ] getContext: retornar array vazio para novo usuário
-- [ ] getContext: retornar contexto correto por usuário
-- [ ] clearContext: remover todas as mensagens
-- [ ] getContextSize: retornar número correto
+**Middlewares (15 testes - ✅ COMPLETO)**
+- [x] authMiddleware.test.ts: Passar com token válido
+- [x] authMiddleware.test.ts: Extrair userId do token
+- [x] authMiddleware.test.ts: Rejeitar sem token
+- [x] authMiddleware.test.ts: Rejeitar sem Bearer
+- [x] authMiddleware.test.ts: Rejeitar token inválido
+- [x] authMiddleware.test.ts: Rejeitar token malformado
+- [x] authMiddleware.test.ts: Múltiplas requisições válidas
+- [x] validateRequest.test.ts: Passar com dados válidos
+- [x] validateRequest.test.ts: Validar schemas complexos
+- [x] validateRequest.test.ts: Rejeitar dados inválidos
+- [x] validateRequest.test.ts: Rejeitar campos faltando
+- [x] validateRequest.test.ts: Rejeitar tipos incorretos
+- [x] validateRequest.test.ts: Retornar mensagem de erro do Zod
+- [x] validateRequest.test.ts: Lidar com body vazio
+- [x] validateRequest.test.ts: Validar schemas opcionais
+
+**Services (0 testes - ⬜ PENDENTE)**
+- [ ] authService.test.ts (8 testes)
+- [ ] contextService.test.ts (7 testes)
+- [ ] ai/chatHandler.test.ts (4 testes)
+- [ ] ai/providerHandler.test.ts (2 testes)
 
 ### Fase 3: Testes de Integração (Prioridade 🟡)
 
-**Auth Endpoints (7 testes)**
-- [ ] POST /register: registrar novo usuário (201)
-- [ ] POST /register: erro para email duplicado (400)
-- [ ] POST /register: erro para email inválido (400)
-- [ ] POST /register: erro para senha curta (400)
-- [ ] POST /login: login com credenciais válidas (200)
-- [ ] POST /login: erro para credenciais inválidas (401)
-- [ ] GET /me: retornar dados do usuário com token (200)
-
-**Chat Endpoints (8 testes)**
-- [ ] POST /message: enviar e receber resposta (200)
-- [ ] POST /message: erro sem token (401)
-- [ ] POST /message: erro para mensagem vazia (400)
-- [ ] POST /message: manter contexto entre mensagens
-- [ ] POST /message: limitar contexto a 15 mensagens
-- [ ] POST /message: usar provider específico quando fornecido
-- [ ] DELETE /context: limpar histórico (200)
-- [ ] DELETE /context: erro sem token (401)
-
-### Fase 4: Testes AI e Middlewares (Prioridade 🟢)
-
-**AI Services (6 testes)**
-- [ ] chatHandler: enviar mensagem com contexto
-- [ ] chatHandler: adicionar ao contexto após resposta
-- [ ] chatHandler: usar provider especificado
-- [ ] chatHandler: usar provider padrão se não especificado
-- [ ] providerHandler: listar todos os providers
-- [ ] providerHandler: testar conexão com provider
-
-**Middlewares (8 testes)**
-- [ ] authMiddleware: passar com token válido
-- [ ] authMiddleware: rejeitar sem token
-- [ ] authMiddleware: rejeitar com token inválido
-- [ ] authMiddleware: extrair userId do token
-- [ ] validateRequest: passar com dados válidos
-- [ ] validateRequest: rejeitar com dados inválidos
-- [ ] errorHandler: formatar erros corretamente
-- [ ] errorHandler: retornar status code correto
-
-**Utils (6 testes)**
-- [ ] jwt.generateToken: gerar token válido
-- [ ] jwt.verifyToken: verificar token válido
-- [ ] jwt.verifyToken: erro para token inválido
-- [ ] logger.info: logar mensagens info
-- [ ] logger.error: logar mensagens erro
-- [ ] logger.warn: logar mensagens warning
-
-### Fase 5: Testes E2E (Prioridade 🟢)
-
-- [ ] Fluxo completo: Registro → Login → Chat → Logout
-- [ ] Fluxo: Múltiplas mensagens com contexto
-- [ ] Fluxo: Limpar contexto e começar nova conversa
-- [ ] Fluxo: Trocar de provider durante conversa
-- [ ] Fluxo: Erro e recuperação (token expirado)
+- [ ] integration/auth.test.ts (7 testes)
+- [ ] integration/chat.test.ts (8 testes)
 
 ---
 
-## 📐 Convenções e Padrões
+## 📊 Status Atualizado
 
-### Nomenclatura
+```
+✅ Setup: 7/7 (100%)
+✅ Utils: 18/18 (100%)
+✅ Middlewares: 15/15 (100%)
+⬜ Services: 0/21 (0%)
+⬜ Integration: 0/15 (0%)
 
-- **Arquivos**: `nomeDoArquivo.test.ts`
-- **Describes**: Nome da classe/função sendo testada
-- **Its**: Descrição do comportamento esperado
-- **Variáveis**: Prefixo `test` ou `mock`
-
-### Estrutura de Teste
-
-```typescript
-describe('NomeDaUnidade', () => {
-  // Setup antes de cada teste
-  beforeEach(() => {
-    // Limpar estado
-  });
-
-  describe('nomeDoMetodo', () => {
-    it('should comportamento esperado', () => {
-      // Arrange (preparar)
-      // Act (executar)
-      // Assert (verificar)
-    });
-  });
-});
+════════════════════════════════════════════════
+Total: 33/68 testes planejados (48.5%)
+Crítico: 33/40 testes (82.5%) ✅
+════════════════════════════════════════════════
 ```
 
-### AAA Pattern
+---
 
-Sempre seguir **Arrange, Act, Assert**:
+## 🧪 Testes
 
-1. **Arrange**: Preparar dados e mocks
-2. **Act**: Executar função/endpoint
-3. **Assert**: Verificar resultado
+### Status dos Testes
 
-### Isolamento
+| Tipo | Total | Completo | Em Progresso | Pendente |
+|------|-------|-----------|--------------|----------|
+| **Unitários** | 30 | 0 | 0 | 30 |
+| **Integração** | 15 | 0 | 0 | 15 |
+| **E2E** | 5 | 0 | 0 | 5 |
+| **Total** | 50 | 0 | 0 | 50 |
 
-- Cada teste deve ser **independente**
-- Usar `beforeEach` para resetar estado
-- Não depender da ordem de execução
-- Limpar banco de dados entre testes
+### Detalhes dos Testes
 
-### Mocks
-
-- Mockar dependências externas (OpenAI, Anthropic, etc)
-- Mockar apenas o necessário
-- Verificar chamadas de mocks quando relevante
+- **Unitários (30 testes)**: Focados em lógica isolada, alta velocidade.
+- **Integração (15 testes)**: Verificam interação entre módulos, incluindo banco de dados.
+- **E2E (5 testes)**: Testam fluxos completos do usuário, baixa prioridade inicial.
 
 ---
 
-## 🎯 Critérios de Sucesso
+## 🚀 Próximos Passos
 
-### Qualidade do Código de Teste
-
-- [ ] Todos os testes são independentes
-- [ ] Nomes descritivos e claros
-- [ ] Seguem padrão AAA
-- [ ] Sem lógica complexa nos testes
-- [ ] Assertions específicas (não genéricas)
-
-### Cobertura
-
-- [ ] 100% dos services cobertos
-- [ ] 100% dos controllers cobertos
-- [ ] 90%+ dos middlewares cobertos
-- [ ] 80%+ dos utils cobertos
-- [ ] 85%+ de cobertura global
-
-### Performance
-
-- [ ] Suíte completa roda em < 30s
-- [ ] Testes unitários em < 5s
-- [ ] Testes de integração em < 15s
-- [ ] Testes E2E em < 10s
-
-### CI/CD Ready
-
-- [ ] Todos os testes passam consistentemente
-- [ ] Sem testes flaky (instáveis)
-- [ ] Compatível com GitHub Actions
-- [ ] Coverage report gerado
-
----
-
-## 🚀 Como Começar
-
-### Passo 1: Setup Inicial
-
-1. Instalar dependências
-2. Criar configuração Jest
-3. Criar estrutura de pastas
-4. Implementar helpers básicos
-
-### Passo 2: Primeiro Teste
-
-Começar com teste unitário simples:
-- `tests/unit/utils/jwt.test.ts`
-- Testar geração de token
-- Verificar que estrutura funciona
-
-### Passo 3: Expandir Gradualmente
-
-1. Completar testes unitários (30 testes)
-2. Implementar testes de integração (15 testes)
-3. Adicionar testes E2E (5 testes)
-4. Atingir meta de cobertura
-
-### Passo 4: Automatizar
-
-- Configurar pre-commit hook
-- Integrar com CI/CD
-- Gerar relatórios de cobertura
+1. **Imediato**: Implementar setup e helpers
+2. **Curto prazo**: Completar testes unitários críticos
+3. **Médio prazo**: Adicionar testes de integração
+4. **Longo prazo**: Automatizar com CI/CD
 
 ---
 
@@ -444,12 +345,37 @@ Verificar em `backend/coverage/index.html`
 
 ---
 
-## 🎯 Próximos Passos
+## 🎯 Critérios de Sucesso
 
-1. **Imediato**: Implementar setup e helpers
-2. **Curto prazo**: Completar testes unitários críticos
-3. **Médio prazo**: Adicionar testes de integração
-4. **Longo prazo**: Automatizar com CI/CD
+### Qualidade do Código de Teste
+
+- [ ] Todos os testes são independentes
+- [ ] Nomes descritivos e claros
+- [ ] Seguem padrão AAA
+- [ ] Sem lógica complexa nos testes
+- [ ] Assertions específicas (não genéricas)
+
+### Cobertura
+
+- [ ] 100% dos services cobertos
+- [ ] 100% dos controllers cobertos
+- [ ] 90%+ dos middlewares cobertos
+- [ ] 80%+ dos utils cobertos
+- [ ] 85%+ de cobertura global
+
+### Performance
+
+- [ ] Suíte completa roda em < 30s
+- [ ] Testes unitários em < 5s
+- [ ] Testes de integração em < 15s
+- [ ] Testes E2E em < 10s
+
+### CI/CD Ready
+
+- [ ] Todos os testes passam consistentemente
+- [ ] Sem testes flaky (instáveis)
+- [ ] Compatível com GitHub Actions
+- [ ] Coverage report gerado
 
 ---
 
