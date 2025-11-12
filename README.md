@@ -186,7 +186,9 @@ MAX_CONTEXT_MESSAGES=15
 CONTEXT_CLEANUP_INTERVAL=3600000
 
 # CORS
-CORS_ORIGIN=http://localhost:3000
+# Lista de origens permitidas, separadas por vírgula (sem espaço)
+# Exemplo para dev local + codespace
+CORS_ORIGIN=http://localhost:3000,http://127.0.0.1:3000
 
 # API Keys (todas opcionais)
 OPENAI_API_KEY=sk-proj-...
@@ -230,78 +232,6 @@ VITE_API_URL=http://localhost:3001/api
 
 ---
 
-## 🧪 Testes
-
-### ✅ Status Atual
-
-```
-📊 70/70 testes passando (100%)
-
-✅ Utils: 18 testes (300% da meta)
-✅ Middlewares: 15 testes (187% da meta)
-✅ Services: 37 testes (168% da meta)
-
-Tempo de execução: ~7s
-Coverage crítico: ~90%
-```
-
-### 📚 Documentação
-
-- **[Guia Completo de Testes](docs/testing.md)** - Estratégia, checklist e convenções
-- **[Histórico de Progresso](docs/progress.md)** - Log detalhado de implementação
-
-### 🏃 Rodar Testes
-
-```bash
-# Todos os testes
-npm test
-
-# Com cobertura
-npm run test:coverage
-
-# Watch mode
-npm run test:watch
-
-# Específicos
-npm test jwt.test.ts
-npm test authService.test.ts
-```
-
-### 📦 Testes Implementados
-
-#### ✅ Utils (18 testes)
-- `jwt.test.ts` - Geração e verificação de tokens JWT
-- `logger.test.ts` - Sistema de logs (info, warn, error, debug)
-
-#### ✅ Middlewares (15 testes)
-- `authMiddleware.test.ts` - Autenticação JWT e validação de tokens
-- `validateRequest.test.ts` - Validação de schemas Zod
-
-#### ✅ Services (37 testes)
-- `authService.test.ts` - Registro, login, getUserById
-- `contextService.test.ts` - Gerenciamento de contexto de conversas
-
-### 🎯 Padrões e Convenções
-
-- **Padrão AAA:** Arrange-Act-Assert em todos os testes
-- **Nomenclatura:** Descrições em português + código em inglês
-- **Isolamento:** beforeEach/afterEach para cleanup
-- **Mocking:** Jest spies para console, timers e Express
-- **Fixtures:** Dados reutilizáveis em `tests/helpers/`
-
-### 📊 Cobertura de Código
-
-| Componente | Coverage |
-|------------|----------|
-| Utils | 100% ✅ |
-| authService | 100% ✅ |
-| Middlewares | 88.88% ✅ |
-| contextService | 72.72% ✅ |
-
-**Código crítico:** ~90% de cobertura real
-
----
-
 ## 🛠️ Stack Tecnológica
 
 ### Backend
@@ -331,11 +261,6 @@ npm test authService.test.ts
 ## 🗺️ Roadmap
 
 ### v1.1 (Em breve)
-- [ ] Implementar testes automatizados (0/50)
-  - [ ] Testes unitários (Jest)
-  - [ ] Testes de integração
-  - [ ] Testes E2E (Supertest)
-- [x] Documentação de testes completa
 - [ ] Modo escuro
 - [ ] Múltiplas conversas por usuário
 
