@@ -13,7 +13,12 @@ export const config = {
   openaiModel: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
   maxContextMessages: parseInt(process.env.MAX_CONTEXT_MESSAGES || '15'),
   contextCleanupInterval: parseInt(process.env.CONTEXT_CLEANUP_INTERVAL || '3600000'),
+  // Raw comma-separated value and parsed array of allowed CORS origins
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  corsOrigins: String(process.env.CORS_ORIGIN || 'http://localhost:3000')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean),
 };
 
 // Validar variáveis críticas

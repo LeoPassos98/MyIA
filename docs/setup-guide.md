@@ -340,6 +340,31 @@ npm run prisma:migrate
 - Tabela `users` criada
 - Pasta `prisma/migrations/` criada
 
+### CORS / Desenvolvimento
+
+- Variável: `CORS_ORIGIN`
+   - Formato: lista de origens separadas por vírgula.
+   - Exemplo: `CORS_ORIGIN=http://127.0.0.1:3000,https://sturdy-goldfish-xxxx-3000.app.github.dev`
+   - Observações:
+      - Se `credentials: true` (cookies/autenticação), não use `*`; use origens explícitas.
+      - Após alterar o `.env` é necessário reiniciar o backend (`npm run dev`).
+
+- Teste (preflight):
+   - Com o backend rodando, rode:
+
+```bash
+curl -i -X OPTIONS 'http://localhost:3001/api/auth/register' \
+   -H 'Origin: http://127.0.0.1:3000' \
+   -H 'Access-Control-Request-Method: POST' \
+   -H 'Access-Control-Request-Headers: Content-Type, Authorization'
+```
+
+   - Resposta esperada: `HTTP/1.1 204 No Content` e header `Access-Control-Allow-Origin: http://127.0.0.1:3000`.
+
+- Debug:
+   - O servidor registra avisos quando uma origem é bloqueada: `[WARN] Blocked CORS origin: <origem>`.
+   - Verifique o terminal do backend para esses logs.
+
 ---
 
 ## ✅ Fase 6: Implementação Backend Core

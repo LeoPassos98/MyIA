@@ -348,6 +348,13 @@ Verificar em `backend/coverage/index.html`
 | Erro de importação | Verificar paths no jest.config |
 | Banco não limpa | Revisar beforeEach/afterEach |
 
+### Nota sobre CORS e logging de debug
+
+- Foi adicionada validação dinâmica de origens CORS baseada na variável `CORS_ORIGIN` (aceita múltiplas origens separadas por vírgula).
+- Para facilitar depuração, o backend agora emite um warning quando recebe uma origem não permitida:
+   - Exemplo de log: `[WARN] Blocked CORS origin: http://origem-nao-permitida`
+- Use o teste de preflight (curl) descrito em `docs/setup-guide.md` para validar headers CORS durante desenvolvimento.
+
 ---
 
 ## 🎯 Critérios de Sucesso
