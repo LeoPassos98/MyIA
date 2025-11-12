@@ -441,15 +441,33 @@ class ContextService {
 }
 ```
 
-#### **OpenAI Service (openaiService.ts)**
-```typescript
-export const openaiService = {
-  async chat(messages: ChatMessage[]): Promise<string> {
-    // Se não tiver chave válida, retorna mock
-    // Senão, chama API OpenAI com histórico completo
-    // Retorna resposta da IA
-  }
-}
+#### **AI Service (services/ai/)**
+Esta é a arquitetura modular que gerencia todos os 6 provedores de IA. Ela permite a seleção dinâmica de provedores por requisição.
+
+Providers Suportados:
+
+| Provider    | API Base              | Modelo Padrão           | Status |
+|-------------|----------------------|-------------------------|--------|
+| OpenAI      | api.openai.com       | gpt-3.5-turbo           | ✅     |
+| Claude      | api.anthropic.com    | claude-3-5-sonnet       | ✅     |
+| Groq        | api.groq.com         | llama-3.1-8b-instant    | ✅     |
+| Together.ai | api.together.xyz     | llama-3.1-8b-turbo      | ✅     |
+| Perplexity  | api.perplexity.ai    | sonar-small             | ✅     |
+| Mistral     | api.mistral.ai       | mistral-small           | ✅     |
+
+Fluxo de Seleção de Provider:
+
+```
+[Cliente]                [Backend]              [AI Service]         [Provider]
+    |                        |                        |                   |
+    |-- POST /chat/message ->|                        |                   |
+    | { provider: "groq" }   |                        |                   |
+    |                        |--- handleChat() ------>|                   |
+    |                        |                        |--- if groq ------>|
+    |                        |                        |                   |
+    |                        |                        |<-- response ------|
+    |                        |<-----------------------|                   |
+    |<-- AI response --------|                        |                   |
 ```
 
 ### **Frontend**
@@ -622,56 +640,3 @@ api.interceptors.response.use(
 
 **Documentação mantida por:** @LeoPassos98  
 **Última atualização:** 08/10/2025 - 20:30
-
----
-
-## 🤖 Arquitetura Multi-Provider
-
-### Estrutura Modular do AI Service
-
-```
-backend/src/services/ai/
-├── client/               # Clientes para diferentes APIs
-│   ├── openaiClient.ts   # OpenAI-compatible (Groq, Together, etc)
-│   └── claudeClient.ts   # Cliente específico Claude/Anthropic
-├── config/
-│   └── providers.ts      # Configuração centralizada
-├── handlers/
-│   ├── chatHandler.ts    # Lógica de chat
-│   └── providerHandler.ts # Gerenciamento de providers
-├── utils/
-│   ├── providerUtils.ts  # Utilidades
-│   └── errorMessages.ts  # Mensagens de erro
-├── types.ts              # Interfaces TypeScript
-└── index.ts              # Entry point
-```
-
-### Providers Suportados
-
-| Provider | API Base | Modelo Padrão | Status |
-|----------|----------|---------------|--------|
-| OpenAI | api.openai.com | gpt-3.5-turbo | ✅ |
-| Claude | api.anthropic.com | claude-3-5-sonnet | ✅ |
-| Groq | api.groq.com | llama-3.1-8b-instant | ✅ |
-| Together.ai | api.together.xyz | llama-3.1-8b-turbo | ✅ |
-| Perplexity | api.perplexity.ai | sonar-small | ✅ |
-| Mistral | api.mistral.ai | mistral-small | ✅ |
-
-### Fluxo de Seleção de Provider
-
-```
-[Cliente]                [Backend]              [AI Service]         [Provider]
-    |                        |                        |                   |
-    |-- POST /chat/message ->|                        |                   |
-    | { provider: "groq" }   |                        |                   |
-    |                        |--- handleChat() ------>|                   |
-    |                        |                        |--- if groq ------>|
-    |                        |                        |                   |
-    |                        |                        |<-- response ------|
-    |                        |<-----------------------|                   |
-    |<-- AI response --------|                        |                   |
-```
-
-### Tratamento de Erros por Provider
-
-Cada provider tem mensagens de erro específicas e fallback para modo mock quando não configurado
