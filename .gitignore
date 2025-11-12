@@ -21,6 +21,10 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 
+# Local runtime logs and PID files created by start.sh
+logs/
+*.pid
+
 # Build outputs
 dist/
 build/

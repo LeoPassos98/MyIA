@@ -282,7 +282,7 @@ Authorization: Bearer <seu-token-jwt>
 }
 ```
 
-**Erro - API OpenAI (500 Internal Server Error):**
+**Erro - Falha no Provider (500 Internal Server Error):**
 ```json
 {
   "error": "Failed to get AI response",
@@ -293,7 +293,7 @@ Authorization: Bearer <seu-token-jwt>
 #### Comportamento
 
 - Mantém contexto das últimas **15 mensagens**
-- Se não houver chave OpenAI válida, retorna resposta mock
+- Se a chave do provider selecionado (ou o padrão do .env) não estiver configurada, retorna resposta mock
 - Adiciona automaticamente mensagem do usuário e da IA ao contexto
 
 #### Exemplo cURL
@@ -373,12 +373,12 @@ Lista todos os providers de IA disponíveis e seu status de configuração.
   "providers": [
     {
       "name": "openai",
-      "configured": true,
+      "configured": false,
       "model": "gpt-3.5-turbo"
     },
     {
       "name": "groq",
-      "configured": false,
+      "configured": true,
       "model": "llama-3.1-8b-instant"
     },
     {
