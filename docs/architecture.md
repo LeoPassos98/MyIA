@@ -78,8 +78,14 @@ MyIA/
 │   │   │   └── chatController.ts        # Endpoints de chat
 │   │   ├── services/
 │   │   │   ├── authService.ts           # Lógica de autenticação
-│   │   │   ├── openaiService.ts         # Integração OpenAI
-│   │   │   └── contextService.ts        # Gerenciamento de contexto
+│   │   │   ├── contextService.ts        # Gerenciamento de contexto
+│   │   │   └── ai/                      # Serviços multi-provider
+│   │       ├── client/
+│   │       ├── config/
+│   │       ├── handlers/
+│   │       ├── utils/
+│   │       ├── types.ts
+│   │       └── index.ts
 │   │   ├── middleware/
 │   │   │   ├── authMiddleware.ts        # Validação JWT
 │   │   │   ├── errorHandler.ts          # Tratamento de erros
@@ -182,15 +188,15 @@ interface ChatContext {
 ## 💬 Fluxo de Chat com Contexto
 
 ```
-[Frontend]           [Backend]              [OpenAI]         [Map Memory]
+[Frontend]           [Backend]              [AI Provider]    [Map Memory]
     |                    |                      |                 |
     |-- POST /message -->|                      |                 |
     | { message: "Oi" }  |                      |                 |
     |                    |--- get context ----->|                 |
     |                    |<-- last 15 msgs -----|                 |
     |                    |                      |                 |
-    |                    |--- API call -------->|                 |
-    |                    | (with full context)  |                 |
+    |                    |--- Seleciona provider e chama API --->|
+    |                    |                      |                 |
     |                    |<-- AI response ------|                 |
     |                    |                      |                 |
     |                    |--- update context -->|                 |
