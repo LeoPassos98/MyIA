@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/authRoutes';
 import chatRoutes from './routes/chatRoutes';
 import aiRoutes from './routes/aiRoutes';
+import userSettingsRoutes from './routes/userSettingsRoutes';
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/settings', userSettingsRoutes);
 
 // Rota 404
 app.use((_req, res) => {

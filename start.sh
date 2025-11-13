@@ -21,6 +21,13 @@ ERR_LOG_FRONTEND="$LOG_DIR/frontend.err.log"
 BACKEND_PORT=3001
 FRONTEND_PORT=3000
 
+# Cores para output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
 usage() {
   echo "Usage: $0 {start|stop|restart|status} {backend|frontend|both}" >&2
   exit 1
@@ -28,9 +35,50 @@ usage() {
 
 ensure_node() {
   if ! command -v node >/dev/null 2>&1; then
-    echo "Node.js não encontrado no PATH. Instale o Node.js para prosseguir." >&2
+    echo -e "${RED}✗ Node.js não encontrado no PATH. Instale o Node.js para prosseguir.${NC}" >&2
     exit 2
   fi
+  echo -e "${GREEN}✓${NC} Node.js $(node --version) detectado"
+}
+
+check_dependencies() {
+  local dir=$1
+  local name=$2
+  
+  if [ ! -d "$dir/node_modules" ]; then
+    echo -e "${YELLOW}⚠${NC}  Dependências do $name não instaladas. Instalando..."
+    (cd "$dir" && npm install)
+    echo -e "${GREEN}✓${NC} Dependências do $name instaladas"
+  else
+    echo -e "${GREEN}✓${NC} Dependências do $name já instaladas"
+  fi
+}
+
+wait_for_server() {
+  local port=$1
+  local name=$2
+  local max_wait=30
+  local waited=0
+  
+  echo -e "${BLUE}⏳${NC} Aguardando $name iniciar na porta $port..."
+  
+  while [ $waited -lt $max_wait ]; do
+    if lsof -ti:$port >/dev/null 2>&1; then
+      echo -e "${GREEN}✓${NC} $name está respondendo na porta $port"
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+    printf "."
+  done
+  
+  echo -e "\n${RED}✗${NC} $name não respondeu após ${max_wait}s. Verifique os logs:"
+  if [ "$name" = "Backend" ]; then
+    echo -e "   ${YELLOW}tail -f $ERR_LOG_BACKEND${NC}"
+  else
+    echo -e "   ${YELLOW}tail -f $ERR_LOG_FRONTEND${NC}"
+  fi
+  return 1
 }
 
 # Função para matar toda a árvore de processos
@@ -57,31 +105,47 @@ kill_port() {
   local pids=$(lsof -ti:$port 2>/dev/null || true)
   
   if [ -n "$pids" ]; then
-    echo "Matando processos na porta $port: $pids"
+    echo -e "${YELLOW}⚠${NC}  Matando processos na porta $port: $pids"
     for pid in $pids; do
       kill_process_tree "$pid"
     done
+    echo -e "${GREEN}✓${NC} Porta $port liberada"
   fi
 }
 
 start_backend() {
+  echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}🚀 Iniciando Backend${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  
   ensure_node
+  check_dependencies "$BACKEND_DIR" "backend"
   
   # Limpar porta antes de iniciar
   kill_port $BACKEND_PORT
   
   if [ -f "$PID_FILE_BACKEND" ] && kill -0 "$(cat "$PID_FILE_BACKEND")" >/dev/null 2>&1; then
-    echo "Backend já em execução (PID $(cat "$PID_FILE_BACKEND"))."; return
+    echo -e "${YELLOW}⚠${NC}  Backend já em execução (PID $(cat "$PID_FILE_BACKEND"))."
+    return
   fi
   
-  echo "Iniciando backend na porta $BACKEND_PORT...";
+  echo -e "${BLUE}▶${NC}  Iniciando servidor backend na porta $BACKEND_PORT..."
+  echo -e "${BLUE}📝${NC} Logs salvos em:"
+  echo -e "   Output: ${YELLOW}$OUT_LOG_BACKEND${NC}"
+  echo -e "   Errors: ${YELLOW}$ERR_LOG_BACKEND${NC}"
+  
   (cd "$BACKEND_DIR" && npm run dev) >"$OUT_LOG_BACKEND" 2>"$ERR_LOG_BACKEND" &
   echo $! >"$PID_FILE_BACKEND"
-  echo "Backend iniciado com PID $(cat "$PID_FILE_BACKEND")";
+  
+  if wait_for_server $BACKEND_PORT "Backend"; then
+    echo -e "${GREEN}✓${NC} Backend iniciado com sucesso (PID $(cat "$PID_FILE_BACKEND"))"
+    echo -e "${GREEN}🌐${NC} URL: ${BLUE}http://localhost:$BACKEND_PORT${NC}"
+    echo -e "${GREEN}📊${NC} Health: ${BLUE}http://localhost:$BACKEND_PORT/health${NC}"
+  fi
 }
 
 stop_backend() {
-  echo "Parando backend..."
+  echo -e "\n${YELLOW}⏹${NC}  Parando backend..."
   
   # Matar processos na porta
   kill_port $BACKEND_PORT
@@ -90,33 +154,47 @@ stop_backend() {
   if [ -f "$PID_FILE_BACKEND" ]; then
     PID=$(cat "$PID_FILE_BACKEND")
     if kill -0 "$PID" >/dev/null 2>&1; then
-      echo "Matando árvore de processos do backend (PID $PID)..."
+      echo -e "${YELLOW}🔄${NC} Matando árvore de processos do backend (PID $PID)..."
       kill_process_tree "$PID"
     fi
     rm -f "$PID_FILE_BACKEND"
   fi
   
-  echo "Backend parado."
+  echo -e "${GREEN}✓${NC} Backend parado."
 }
 
 start_frontend() {
+  echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}🚀 Iniciando Frontend${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  
   ensure_node
+  check_dependencies "$FRONTEND_DIR" "frontend"
   
   # Limpar porta antes de iniciar
   kill_port $FRONTEND_PORT
   
   if [ -f "$PID_FILE_FRONTEND" ] && kill -0 "$(cat "$PID_FILE_FRONTEND")" >/dev/null 2>&1; then
-    echo "Frontend já em execução (PID $(cat "$PID_FILE_FRONTEND"))."; return
+    echo -e "${YELLOW}⚠${NC}  Frontend já em execução (PID $(cat "$PID_FILE_FRONTEND"))."
+    return
   fi
   
-  echo "Iniciando frontend na porta $FRONTEND_PORT...";
+  echo -e "${BLUE}▶${NC}  Iniciando servidor frontend na porta $FRONTEND_PORT..."
+  echo -e "${BLUE}📝${NC} Logs salvos em:"
+  echo -e "   Output: ${YELLOW}$OUT_LOG_FRONTEND${NC}"
+  echo -e "   Errors: ${YELLOW}$ERR_LOG_FRONTEND${NC}"
+  
   (cd "$FRONTEND_DIR" && npm run dev) >"$OUT_LOG_FRONTEND" 2>"$ERR_LOG_FRONTEND" &
   echo $! >"$PID_FILE_FRONTEND"
-  echo "Frontend iniciado com PID $(cat "$PID_FILE_FRONTEND")";
+  
+  if wait_for_server $FRONTEND_PORT "Frontend"; then
+    echo -e "${GREEN}✓${NC} Frontend iniciado com sucesso (PID $(cat "$PID_FILE_FRONTEND"))"
+    echo -e "${GREEN}🌐${NC} URL: ${BLUE}http://localhost:$FRONTEND_PORT${NC}"
+  fi
 }
 
 stop_frontend() {
-  echo "Parando frontend..."
+  echo -e "\n${YELLOW}⏹${NC}  Parando frontend..."
   
   # Matar processos na porta
   kill_port $FRONTEND_PORT
@@ -125,41 +203,54 @@ stop_frontend() {
   if [ -f "$PID_FILE_FRONTEND" ]; then
     PID=$(cat "$PID_FILE_FRONTEND")
     if kill -0 "$PID" >/dev/null 2>&1; then
-      echo "Matando árvore de processos do frontend (PID $PID)..."
+      echo -e "${YELLOW}🔄${NC} Matando árvore de processos do frontend (PID $PID)..."
       kill_process_tree "$PID"
     fi
     rm -f "$PID_FILE_FRONTEND"
   fi
   
-  echo "Frontend parado."
+  echo -e "${GREEN}✓${NC} Frontend parado."
 }
 
 status() {
+  echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}📊 Status dos Servidores${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+  
   # Status Backend
+  echo -e "${BLUE}Backend (porta $BACKEND_PORT):${NC}"
   if [ -f "$PID_FILE_BACKEND" ] && kill -0 "$(cat "$PID_FILE_BACKEND")" >/dev/null 2>&1; then
-    echo "Backend em execução (PID $(cat "$PID_FILE_BACKEND"))."
+    echo -e "  ${GREEN}✓${NC} Em execução (PID $(cat "$PID_FILE_BACKEND"))"
+    echo -e "  ${GREEN}🌐${NC} http://localhost:$BACKEND_PORT"
   else
-    echo "Backend parado."
+    echo -e "  ${RED}✗${NC} Parado"
   fi
   
   # Verificar porta do backend
   local backend_port_pids=$(lsof -ti:$BACKEND_PORT 2>/dev/null || true)
   if [ -n "$backend_port_pids" ]; then
-    echo "  ⚠️  Porta $BACKEND_PORT ocupada por: $backend_port_pids"
+    echo -e "  ${YELLOW}⚠️${NC}  Porta $BACKEND_PORT ocupada por: $backend_port_pids"
   fi
   
   # Status Frontend
+  echo -e "\n${BLUE}Frontend (porta $FRONTEND_PORT):${NC}"
   if [ -f "$PID_FILE_FRONTEND" ] && kill -0 "$(cat "$PID_FILE_FRONTEND")" >/dev/null 2>&1; then
-    echo "Frontend em execução (PID $(cat "$PID_FILE_FRONTEND"))."
+    echo -e "  ${GREEN}✓${NC} Em execução (PID $(cat "$PID_FILE_FRONTEND"))"
+    echo -e "  ${GREEN}🌐${NC} http://localhost:$FRONTEND_PORT"
   else
-    echo "Frontend parado."
+    echo -e "  ${RED}✗${NC} Parado"
   fi
   
   # Verificar porta do frontend
   local frontend_port_pids=$(lsof -ti:$FRONTEND_PORT 2>/dev/null || true)
   if [ -n "$frontend_port_pids" ]; then
-    echo "  ⚠️  Porta $FRONTEND_PORT ocupada por: $frontend_port_pids"
+    echo -e "  ${YELLOW}⚠️${NC}  Porta $FRONTEND_PORT ocupada por: $frontend_port_pids"
   fi
+  
+  echo -e "\n${BLUE}📝 Logs:${NC}"
+  echo -e "  Backend: ${YELLOW}$LOG_DIR/backend.*.log${NC}"
+  echo -e "  Frontend: ${YELLOW}$LOG_DIR/frontend.*.log${NC}"
+  echo ""
 }
 
 # Parse args
@@ -174,7 +265,13 @@ case "$ACTION" in
     case "$TARGET" in
       backend) start_backend ;; 
       frontend) start_frontend ;; 
-      both) start_backend; start_frontend ;;
+      both) 
+        start_backend
+        start_frontend
+        echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${GREEN}✓ Todos os servidores iniciados!${NC}"
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+        ;;
       *) usage ;;
     esac
     ;;
@@ -182,7 +279,11 @@ case "$ACTION" in
     case "$TARGET" in
       backend) stop_backend ;; 
       frontend) stop_frontend ;; 
-      both) stop_backend; stop_frontend ;;
+      both) 
+        stop_backend
+        stop_frontend
+        echo -e "\n${GREEN}✓ Todos os servidores parados.${NC}\n"
+        ;;
       *) usage ;;
     esac
     ;;
@@ -190,7 +291,15 @@ case "$ACTION" in
     case "$TARGET" in
       backend) stop_backend; start_backend ;; 
       frontend) stop_frontend; start_frontend ;; 
-      both) stop_backend; stop_frontend; start_backend; start_frontend ;;
+      both) 
+        stop_backend
+        stop_frontend
+        start_backend
+        start_frontend
+        echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${GREEN}✓ Todos os servidores reiniciados!${NC}"
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+        ;;
       *) usage ;;
     esac
     ;;
