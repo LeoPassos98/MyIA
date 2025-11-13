@@ -4,3 +4,9 @@ export interface Message {
   content: string;
   timestamp: Date;
 }
+
+export interface Provider {
+  name: string;
+  configured: boolean;
+  model: string;
+}

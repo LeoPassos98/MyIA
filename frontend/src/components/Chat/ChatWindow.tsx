@@ -1,21 +1,39 @@
-import { useState } from 'react';
-import { Box, Paper, IconButton, Tooltip, Alert, Snackbar } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Paper, CircularProgress, FormControl, Select, MenuItem, Snackbar, Alert, Tooltip, IconButton } from '@mui/material';
 import { Delete } from '@mui/icons-material';
+import { Message, Provider } from '../../types';
 import { chatService } from '../../services/chatService';
-import { Message } from '../../types';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 
-interface ChatWindowProps {
-  messages: Message[];
-  onNewMessage: (message: Message) => void;
-  onClearMessages: () => void;
-}
-
-export default function ChatWindow({ messages, onNewMessage, onClearMessages }: ChatWindowProps) {
+const ChatWindow: React.FC = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [isLoadingProviders, setIsLoadingProviders] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    const loadProviders = async () => {
+      try {
+        const availableProviders = await chatService.getProviders();
+        setProviders(availableProviders);
+
+        const groqProvider = availableProviders.find((p) => p.name === 'groq');
+        setSelectedProvider(groqProvider ? 'groq' : availableProviders[0]?.name || '');
+      } catch (error) {
+        console.error('Erro ao carregar providers:', error);
+      } finally {
+        setIsLoadingProviders(false);
+      }
+    };
+
+    loadProviders();
+  }, []);
+
   const handleSendMessage = async (content: string) => {
+    setIsLoading(true);
     try {
       // Adicionar mensagem do usuário
       const userMessage: Message = {
@@ -24,10 +42,10 @@ export default function ChatWindow({ messages, onNewMessage, onClearMessages }: 
         content,
         timestamp: new Date(),
       };
-      onNewMessage(userMessage);
+      setMessages((prev) => [...prev, userMessage]);
 
       // Enviar para API e receber resposta
-      const response = await chatService.sendMessage(content);
+      const response = await chatService.sendMessage(content, selectedProvider);
 
       // Adicionar resposta da IA
       const aiMessage: Message = {
@@ -36,49 +54,65 @@ export default function ChatWindow({ messages, onNewMessage, onClearMessages }: 
         content: response.response,
         timestamp: new Date(),
       };
-      onNewMessage(aiMessage);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao enviar mensagem');
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      setError('Erro ao enviar mensagem. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleClearContext = async () => {
     try {
       await chatService.clearContext();
-      onClearMessages();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao limpar contexto');
+      setMessages([]);
+    } catch (error) {
+      setError('Erro ao limpar contexto. Tente novamente.');
     }
   };
 
   return (
-    <>
-      <Paper
-        elevation={3}
-        sx={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-        }}
-      >
-        {/* Botão de limpar contexto */}
-        <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}>
-          <Tooltip title="Limpar conversa">
-            <IconButton onClick={handleClearContext} disabled={messages.length === 0}>
+    <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+        <MessageList messages={messages} />
+      </Box>
+
+      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <FormControl fullWidth size="small">
+            {isLoadingProviders ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <Select
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                displayEmpty
+              >
+                {providers.map((provider) => (
+                  <MenuItem key={provider.name} value={provider.name}>
+                    {provider.name} ({provider.model})
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+          </FormControl>
+
+          <Tooltip title="Limpar Contexto">
+            <IconButton
+              onClick={handleClearContext}
+              disabled={messages.length === 0}
+              color="error"
+            >
               <Delete />
             </IconButton>
           </Tooltip>
         </Box>
 
-        {/* Lista de mensagens */}
-        <MessageList messages={messages} />
+        <MessageInput onSend={handleSendMessage} disabled={isLoading || !selectedProvider} />
+      </Box>
 
-        {/* Input de mensagem */}
-        <MessageInput onSend={handleSendMessage} />
-      </Paper>
-
-      {/* Snackbar de erro */}
       <Snackbar
         open={!!error}
         autoHideDuration={6000}
@@ -89,6 +123,8 @@ export default function ChatWindow({ messages, onNewMessage, onClearMessages }: 
           {error}
         </Alert>
       </Snackbar>
-    </>
+    </Paper>
   );
-}
+};
+
+export default ChatWindow;
