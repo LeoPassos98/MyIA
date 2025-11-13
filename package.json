@@ -1,0 +1,14 @@
+{
+  "name": "myia",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend:wait\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:frontend:wait": "echo '⏳ Aguardando Backend iniciar...' && wait-on -l http://localhost:3001/api/health -t 60000 --interval 1000 && npm run dev:frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^6.0.0",
+    "wait-on": "^7.2.0"
+  }
+}

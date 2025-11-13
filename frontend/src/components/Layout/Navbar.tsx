@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, Typography, Button, Box, Tooltip, IconButton } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Tooltip, IconButton } from '@mui/material';
 import { Logout, SmartToy, Settings as SettingsIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';

@@ -1,30 +1,58 @@
-import { Request, Response } from 'express';
-import { userSettingsService } from '../services/userSettingsService';
+import { Response, NextFunction } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
+import { prisma } from '../lib/prisma';
+import { AppError } from '../middleware/errorHandler';
+
+async function findOrCreateSettings(userId: string) {
+  let settings = await prisma.userSettings.findUnique({
+    where: { userId },
+  });
+
+  if (!settings) {
+    settings = await prisma.userSettings.create({
+      data: {
+        userId: userId,
+        theme: 'light',
+      },
+    });
+  }
+  return settings;
+}
 
 export const userSettingsController = {
-  async getUserSettings(req: Request, res: Response) {
+  getSettings: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const userId = req.userId!;
-      const settings = await userSettingsService.getSettings(userId);
+      if (!req.userId) {
+        throw new AppError('Usuário não autenticado', 401);
+      }
       
+      const settings = await findOrCreateSettings(req.userId);
       res.json(settings);
+
     } catch (error) {
-      console.error('Erro ao buscar configurações:', error);
-      res.status(500).json({ error: 'Erro ao buscar configurações' });
+      next(error);
     }
   },
 
-  async updateUserSettings(req: Request, res: Response) {
+  updateSettings: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const userId = req.userId!;
-      const { theme } = req.body;
+      if (!req.userId) {
+        throw new AppError('Usuário não autenticado', 401);
+      }
+
+      await findOrCreateSettings(req.userId);
+
+      const updatedSettings = await prisma.userSettings.update({
+        where: {
+          userId: req.userId,
+        },
+        data: req.body,
+      });
       
-      const settings = await userSettingsService.updateSettings(userId, { theme });
-      
-      res.json(settings);
+      res.json(updatedSettings);
+
     } catch (error) {
-      console.error('Erro ao atualizar configurações:', error);
-      res.status(500).json({ error: 'Erro ao atualizar configurações' });
+      next(error);
     }
-  }
+  },
 };

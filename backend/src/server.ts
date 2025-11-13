@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
+import { prisma } from './lib/prisma';
 import authRoutes from './routes/authRoutes';
 import chatRoutes from './routes/chatRoutes';
 import aiRoutes from './routes/aiRoutes';
@@ -40,12 +41,9 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.status(200).json({ 
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  });
+// Health check endpoint (adicione antes das outras rotas)
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Rotas
@@ -64,8 +62,62 @@ app.use((_req, res) => {
 app.use(errorHandler);
 
 // Iniciar servidor
-app.listen(config.port, () => {
-  logger.info(`🚀 Server running on port ${config.port}`);
-  logger.info(`📝 Environment: ${config.nodeEnv}`);
-  logger.info(`🌐 CORS enabled for: ${config.corsOrigins?.join(', ') || config.corsOrigin}`);
+const PORT = process.env.PORT || 3001;
+
+async function startServer() {
+  try {
+    console.log('🔧 Inicializando servidor...');
+    console.log('📦 Carregando dependências...');
+    
+    // Teste de conexão com banco
+    console.log('🗄️  Conectando ao banco de dados...');
+    await prisma.$connect();
+    console.log('✅ Banco de dados conectado!');
+    
+    app.listen(PORT, () => {
+      console.log('✅ Servidor rodando!');
+      console.log(`🚀 Backend disponível em http://localhost:${PORT}`);
+      console.log(`💚 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`🌍 CORS configurado para: ${allowedOrigins.join(', ')}`);
+      console.log(`📝 Ambiente: ${config.nodeEnv}`);
+    });
+  } catch (error) {
+    console.error('❌ Erro ao iniciar servidor:', error);
+    console.error('💡 Verifique se o PostgreSQL está rodando e o .env está configurado');
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown - desconecta do banco ao encerrar
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Encerrando servidor...');
+  await prisma.$disconnect();
+  console.log('✅ Banco desconectado');
+  process.exit(0);
 });
+
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 Encerrando servidor...');
+  await prisma.$disconnect();
+  console.log('✅ Banco desconectado');
+  process.exit(0);
+});
+
+// Capturar erros não tratados
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  // Em produção, você pode querer encerrar o processo
+  if (config.nodeEnv === 'production') {
+    process.exit(1);
+  }
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  // Em produção, encerre o processo
+  if (config.nodeEnv === 'production') {
+    process.exit(1);
+  }
+});
+
+startServer();
