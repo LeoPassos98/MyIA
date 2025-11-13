@@ -54,9 +54,18 @@ model UserSettings {
 model ApiCallLog {
   id         String   @id @default(uuid())
   timestamp  DateTime @default(now())
-  provider   String   // "groq", "openai", etc.
-  
-  // --- O Link de volta ao User ---
+  provider   String
+  model      String?  // <-- O "fiscal" não vê este
+
+  tokensIn   Int      @default(0) // <-- O "fiscal" não vê este
+  tokensOut  Int      @default(0) // <-- O "fiscal" não vê este
+  costInUSD  Float    @default(0.0) // <-- O "fiscal" não vê este
+
+  wordsIn    Int      @default(0)
+  wordsOut   Int      @default(0)
+  bytesIn    Int      @default(0)
+  bytesOut   Int      @default(0)
+
   userId     String
   user       User     @relation(fields: [userId], references: [id])
 

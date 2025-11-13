@@ -22,3 +22,11 @@ export interface TestResult {
   message: string;
   responseTime?: number;
 }
+
+// O "recibo" padronizado que CADA provider deve retornar
+export interface AiServiceResponse {
+  response: string;      // O texto puro
+  tokensIn: number;      // Tokens de prompt
+  tokensOut: number;     // Tokens de conclusão
+  model: string;         // O modelo exato usado (ex: 'gpt-4o')
+}

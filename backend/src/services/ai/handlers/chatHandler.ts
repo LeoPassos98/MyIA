@@ -2,7 +2,7 @@
 
 import { logger } from '../../../utils/logger';
 import { AppError } from '../../../middleware/errorHandler';
-import { ChatMessage, ProviderName } from '../types';
+import { ChatMessage, ProviderName, AiServiceResponse } from '../types';
 import { createClient } from '../client/openaiClient';
 import { callClaudeAPI } from '../client/claudeClient'; // ← NOVO IMPORT
 import { getProviderConfig, getModelForProvider } from '../utils/providerUtils';
@@ -16,8 +16,9 @@ import {
 export async function handleChat(
   messages: ChatMessage[],
   provider: ProviderName
-): Promise<string> {
-  // ← NOVO: Se for Claude, usar handler específico
+): Promise<AiServiceResponse> {
+
+  // Se for Claude, usar handler específico
   if (provider === 'claude') {
     return handleClaudeChat(messages);
   }
@@ -27,7 +28,12 @@ export async function handleChat(
   
   if (!client) {
     logger.warn(`${provider} API key not configured, using mock response`);
-    return getMockResponseMessage(provider, config);
+    return {
+      response: getMockResponseMessage(provider, config),
+      tokensIn: 0,
+      tokensOut: 0,
+      model: getModelForProvider(provider),
+    };
   }
 
   try {
@@ -41,48 +47,68 @@ export async function handleChat(
     });
 
     const content = response.choices[0]?.message?.content;
+    const usage = response.usage;
+    const modelUsed = response.model;
 
     if (!content) {
       throw new AppError('No response from AI', 500);
     }
 
     logger.info(`${provider.toUpperCase()} response received`, { 
-      tokens: response.usage?.total_tokens,
-      model
+      tokens: usage?.total_tokens,
+      model: modelUsed
     });
 
-    return content;
+    const standardizedResponse: AiServiceResponse = {
+      response: content,
+      tokensIn: usage?.prompt_tokens || 0,
+      tokensOut: usage?.completion_tokens || 0,
+      model: modelUsed,
+    };
+
+    return standardizedResponse;
+
   } catch (error: any) {
     logger.error(`${provider.toUpperCase()} API error:`, error);
-    return handleChatError(error, provider, config.keyEnv);
+    throw new AppError(handleChatError(error, provider, config.keyEnv), 500);
   }
 }
 
 // ← NOVA FUNÇÃO: Handler específico para Claude
-async function handleClaudeChat(messages: ChatMessage[]): Promise<string> {
+async function handleClaudeChat(
+  messages: ChatMessage[]
+): Promise<AiServiceResponse> {
   const config = getProviderConfig('claude');
   
   if (!config.isValidKey) {
     logger.warn('Claude API key not configured, using mock response');
-    return getMockResponseMessage('claude', config);
+    return {
+      response: getMockResponseMessage('claude', config),
+      tokensIn: 0,
+      tokensOut: 0,
+      model: config.defaultModel,
+    };
   }
 
   try {
-    const response = await callClaudeAPI(messages);
+    const response: AiServiceResponse = await callClaudeAPI(messages);
     
-    logger.info('CLAUDE response received');
+    logger.info('CLAUDE response received', {
+      tokensIn: response.tokensIn,
+      tokensOut: response.tokensOut,
+      model: response.model,
+    });
     
     return response;
+    
   } catch (error: any) {
     logger.error('CLAUDE API error:', error);
     
-    // Tratamento de erros específicos do Claude
     if (error.message.includes('invalid_api_key')) {
-      return getInvalidKeyMessage('claude', config.keyEnv);
+      throw new AppError(getInvalidKeyMessage('claude', config.keyEnv), 401);
     }
-    
     if (error.message.includes('rate_limit')) {
-      return getRateLimitMessage();
+      throw new AppError(getRateLimitMessage(), 429);
     }
     
     throw new AppError(`Failed to get AI response from Claude: ${error.message}`, 500);
