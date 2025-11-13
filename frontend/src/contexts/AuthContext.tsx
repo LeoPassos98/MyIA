@@ -1,20 +1,19 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authService, User, LoginData, RegisterData } from '../services/authService';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { authService, User } from '../services/authService';
 
 interface AuthContextType {
-  user: User | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (data: LoginData) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  user: User | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
+  setUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Verificar se há usuário salvo no localStorage
@@ -24,19 +23,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (storedUser && storedToken) {
       setUser(storedUser);
     }
-    
-    setIsLoading(false);
   }, []);
 
-  const login = async (data: LoginData) => {
-    const response = await authService.login(data);
-    setUser(response.user);
+  const login = async (email: string, password: string) => {
+    // Passar os dados como objeto para o authService
+    const data = await authService.login({ email, password });
+    setUser(data.user);
   };
 
-  const register = async (data: RegisterData) => {
-    await authService.register(data);
+  const register = async (email: string, password: string, name?: string) => {
+    // Passar os dados como objeto para o authService
+    await authService.register({ email, password, name });
     // Após registrar, fazer login automaticamente
-    await login({ email: data.email, password: data.password });
+    await login(email, password);
   };
 
   const logout = () => {
@@ -44,15 +43,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const setUserData = (userData: User) => {
+    setUser(userData);
+  };
+
+  const isAuthenticated = !!user;
+
   return (
     <AuthContext.Provider
       value={{
+        isAuthenticated,
         user,
-        isAuthenticated: !!user,
-        isLoading,
         login,
         register,
         logout,
+        setUser: setUserData,
       }}
     >
       {children}

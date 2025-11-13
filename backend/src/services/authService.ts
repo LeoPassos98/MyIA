@@ -73,4 +73,33 @@ export const authService = {
       createdAt: user.createdAt,
     };
   },
+
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    // 1. Buscar o usuário completo (incluindo a senha)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppError('Usuário não encontrado', 404);
+    }
+
+    // 2. Verificar se a senha antiga está correta
+    const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isPasswordValid) {
+      throw new AppError('Senha antiga incorreta', 401);
+    }
+
+    // 3. Criptografar a nova senha
+    const newHashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // 4. Salvar a nova senha no banco
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: newHashedPassword },
+    });
+
+    return { message: 'Senha atualizada com sucesso' };
+  },
 };

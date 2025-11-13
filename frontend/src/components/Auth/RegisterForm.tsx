@@ -18,22 +18,11 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    // Validações
-    if (password !== confirmPassword) {
-      setError('As senhas não coincidem');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      await register({ email, password, name: name || undefined });
+      // Passar email, password e name como parâmetros separados
+      await register(email, password, name);
       onSuccess();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao criar conta');

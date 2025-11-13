@@ -32,16 +32,16 @@ model User {
 // 2. ADICIONE ESTE NOVO MODELO (Configurações)
 model UserSettings {
   id        String   @id @default(uuid())
-  
-  // --- Aba 2: Aparência ---
   theme     String   @default("light") // "light" ou "dark"
 
   // --- Aba 3: Chaves de API ---
   // (IMPORTANTE: Você deve criptografar isso no backend antes de salvar!)
-  openaiApiKey  String?
-  groqApiKey    String?
-  claudeApiKey  String?
-  // ...outras chaves...
+  openaiApiKey     String?
+  groqApiKey       String?
+  claudeApiKey     String?
+  togetherApiKey   String?
+  perplexityApiKey String?
+  mistralApiKey    String?
 
   // --- O Link de volta ao User ---
   userId    String   @unique // O '@unique' garante a relação 1-para-1

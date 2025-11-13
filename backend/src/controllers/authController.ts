@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 
 export const authController = {
   async register(req: Request, res: Response, next: NextFunction) {
@@ -12,26 +13,31 @@ export const authController = {
 
       logger.info(`User registered: ${email}`);
 
-      res.status(201).json({
+      return res.status(201).json({
         message: 'User registered successfully',
         userId: result.userId,
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   },
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log('Login request body:', req.body); // Debug
       const { email, password } = req.body;
+
+      if (!email || !password) {
+        throw new AppError('Email e senha são obrigatórios', 400);
+      }
 
       const result = await authService.login(email, password);
 
       logger.info(`User logged in: ${email}`);
 
-      res.status(200).json(result);
+      return res.status(200).json(result);
     } catch (error) {
-      next(error);
+      return next(error);
     }
   },
 
@@ -43,9 +49,28 @@ export const authController = {
 
       const user = await authService.getUserById(req.userId);
 
-      res.status(200).json(user);
+      return res.status(200).json(user);
     } catch (error) {
-      next(error);
+      return next(error);
+    }
+  },
+
+  async handleChangePassword(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.userId) {
+        throw new AppError('Não autorizado', 401);
+      }
+      const { oldPassword, newPassword } = req.body;
+
+      if (!oldPassword || !newPassword) {
+        throw new AppError('Todos os campos são obrigatórios', 400);
+      }
+
+      const result = await authService.changePassword(req.userId, oldPassword, newPassword);
+      return res.json(result);
+
+    } catch (error) {
+      return next(error);
     }
   },
 };

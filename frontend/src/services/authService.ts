@@ -24,12 +24,26 @@ export interface LoginResponse {
 
 export const authService = {
   async register(data: RegisterData): Promise<{ userId: string }> {
-    const response = await api.post('/auth/register', data);
+    const response = await api.post('/auth/register', {
+      email: data.email,
+      password: data.password,
+      name: data.name
+    });
     return response.data;
   },
 
-  async login(data: LoginData): Promise<LoginResponse> {
-    const response = await api.post('/auth/login', data);
+  login: async (data: LoginData) => {
+    console.log('=== LOGIN SERVICE ===');
+    console.log('Data recebida:', data);
+    
+    const payload = {
+      email: data.email,
+      password: data.password
+    };
+    
+    console.log('Payload a enviar:', payload);
+    
+    const response = await api.post('/auth/login', payload);
     const { token, user } = response.data;
     
     // Salvar no localStorage
@@ -56,5 +70,13 @@ export const authService = {
 
   getStoredToken(): string | null {
     return localStorage.getItem('token');
+  },
+
+  async changePassword(data: { oldPassword: string; newPassword: string }): Promise<void> {
+    const response = await api.post('/auth/change-password', {
+      oldPassword: data.oldPassword,
+      newPassword: data.newPassword
+    });
+    return response.data;
   },
 };
