@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Message, Provider } from '../types'; // <--- CORREÇÃO 1: Adicione o 'Provider'
+import { Provider } from '../types';
 
 // Opcional: defina o tipo de resposta se ainda não o fez
 interface SendMessageResponse {
