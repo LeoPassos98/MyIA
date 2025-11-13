@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
+import Settings from './pages/Settings';
 
 const theme = createTheme({
   palette: {
@@ -27,6 +28,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>

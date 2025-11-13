@@ -1,5 +1,5 @@
-import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
-import { Logout, SmartToy } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Button, Box, Tooltip, IconButton } from '@mui/material';
+import { Logout, SmartToy, Settings as SettingsIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -27,13 +27,17 @@ export default function Navbar() {
             </Typography>
           )}
           
-          <Button 
-            color="inherit" 
-            startIcon={<Logout />}
-            onClick={handleLogout}
-          >
-            Sair
-          </Button>
+          <Tooltip title="Configurações">
+            <IconButton color="inherit" onClick={() => navigate('/settings')}>
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Sair">
+            <IconButton color="inherit" onClick={handleLogout}>
+              <Logout />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Toolbar>
     </AppBar>
