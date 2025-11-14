@@ -107,5 +107,8 @@ model Message {
   tokensOut Int?
   costInUSD Float?
 
+  // --- A "CAIXA PRETA" (A V13) ---
+  sentContext String? // JSON serializado: '[{role, content}, ...]'
+
   @@map("messages")
 }

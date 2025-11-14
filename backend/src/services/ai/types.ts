@@ -30,6 +30,8 @@ export interface TelemetryMetrics {
   costInUSD: number;
   model: string;
   provider: string;
+  chatId?: string; // <-- ADICIONAR: ID do chat para atualização do frontend
+  sentContext?: string; // <-- JSON serializado do contexto enviado
 }
 
 // O "protocolo" do gotejamento. Cada 'yield' será um destes.

@@ -4,7 +4,8 @@ import { api } from './api';
 export type StreamChunk = 
   | { type: 'chunk'; content: string }
   | { type: 'telemetry'; metrics: TelemetryMetrics }
-  | { type: 'error'; error: string };
+  | { type: 'error'; error: string }
+  | { type: 'debug'; log: string }; // <-- Tipo de debug adicionado
 
 export interface TelemetryMetrics {
   tokensIn: number;
@@ -12,6 +13,8 @@ export interface TelemetryMetrics {
   costInUSD: number;
   model: string;
   provider: string;
+  chatId?: string; // <-- ID do chat (para atualização após primeira mensagem)
+  sentContext?: string; // <-- Contexto enviado (JSON string)
 }
 
 export interface SendMessageResponse {
@@ -29,6 +32,7 @@ export const chatService = {
     message: string,
     provider: string,
     chatId: string | null,
+    contextStrategy: string, // <-- O NOVO PARÂMETRO
     // Callbacks para o "gotejamento"
     onChunk: (chunk: StreamChunk) => void,
     onComplete: () => void,
@@ -50,7 +54,12 @@ export const chatService = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message, provider, chatId }),
+        body: JSON.stringify({ 
+          message, 
+          provider, 
+          chatId, 
+          contextStrategy // <-- ADICIONE AQUI
+        }),
       });
 
       if (!response.ok) {

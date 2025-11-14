@@ -262,6 +262,10 @@ export const chatController = {
         if (finalMetrics) {
           writeSSE({ type: 'debug', log: '💾 Salvando resposta completa no banco...' });
           
+          // Serializar contexto para salvar no banco
+          const serializedContext = JSON.stringify(formattedMessages);
+          
+          // Salvar resposta completa do Assistente
           await prisma.message.create({
             data: {
               role: 'assistant',
@@ -272,9 +276,10 @@ export const chatController = {
               tokensIn: finalMetrics.tokensIn,
               tokensOut: finalMetrics.tokensOut,
               costInUSD: finalMetrics.costInUSD,
+              sentContext: serializedContext // <-- SALVA O PROMPT
             }
           });
-          writeSSE({ type: 'debug', log: '✅ Resposta salva!' });
+          writeSSE({ type: 'debug', log: '✅ Resposta salva (com contexto enviado)!' });
 
           // Calcular métricas de engenharia
           const outputWords = countWords(fullAssistantResponse);
@@ -282,7 +287,7 @@ export const chatController = {
           const inputWords = countWords(message);
           const inputBytes = Buffer.byteLength(message, 'utf8');
 
-          writeSSE({ type: 'debug', log: '📈 Salvando analytics...' });
+          // Salvar Log de Analytics
           prisma.apiCallLog.create({
             data: {
               userId: req.userId!,
@@ -298,11 +303,23 @@ export const chatController = {
             }
           }).catch(logErr => {
             console.error("Falha ao salvar log de analytics:", logErr);
-            writeSSE({ type: 'debug', log: '⚠️ Erro ao salvar analytics (não-crítico)' });
+          });
+
+          // ENVIAR TELEMETRIA VIA SSE COM chatId E sentContext
+          writeSSE({ 
+            type: 'telemetry', 
+            metrics: {
+              tokensIn: finalMetrics.tokensIn,
+              tokensOut: finalMetrics.tokensOut,
+              costInUSD: finalMetrics.costInUSD,
+              model: finalMetrics.model,
+              provider: finalMetrics.provider,
+              chatId: currentChat.id,
+              sentContext: serializedContext // <-- ENVIA CONTEXTO VIA SSE
+            }
           });
 
           logger.info(`Stream completo para user ${req.userId} usando ${lockedProvider}`);
-          writeSSE({ type: 'debug', log: '✅ Analytics salvo!' });
 
         } else {
           writeSSE({ type: 'debug', log: '⚠️ Stream sem telemetria!' });

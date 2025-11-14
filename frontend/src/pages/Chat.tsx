@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Select, MenuItem, FormControl, InputLabel, Chip } from '@mui/material';
-import { Send as SendIcon } from '@mui/icons-material';
+import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Select, MenuItem, FormControl, InputLabel, Chip, Switch, FormControlLabel, Modal } from '@mui/material';
+import { Send as SendIcon, Code as CodeIcon } from '@mui/icons-material';
 import MainLayout from '../components/Layout/MainLayout';
 import ChatSidebar from '../components/Chat/ChatSidebar';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,6 +20,13 @@ export default function Chat() {
   const [selectedProvider, setSelectedProvider] = useState<string>('groq');
   const [isLoading, setIsLoading] = useState(false);
   const [currentChatProvider, setCurrentChatProvider] = useState<string | null>(null);
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [contextStrategy, setContextStrategy] = useState('fast'); // Padrão: rápido
+
+  // --- Novos Estados para Modal de Contexto ---
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [selectedPrompt, setSelectedPrompt] = useState<Array<{ role: string; content: string }>>([]);
 
   // Proteger rota
   useEffect(() => {
@@ -71,7 +78,8 @@ export default function Chat() {
     setCurrentChatId(null);
     setMessages([]);
     setInputMessage('');
-    setCurrentChatProvider(null); // <-- Limpa o lock de provider
+    setCurrentChatProvider(null);
+    setDebugLogs([]); // Limpa monitor de debug
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -115,16 +123,18 @@ export default function Chat() {
 
     // 3. Inicia o Stream!
     const providerToUse = currentChatProvider || selectedProvider;
+    let newChatId: string | null = null;
+    let newProvider: string | null = null;
 
     await chatService.streamChat(
       userMessage,
       providerToUse,
       currentChatId,
-
+      contextStrategy,
+      
       // --- Callback de Gotejamento (onChunk) ---
       (chunk: StreamChunk) => {
         if (chunk.type === 'chunk') {
-          // Atualiza a última mensagem (balão do assistente) em tempo real
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -133,7 +143,6 @@ export default function Chat() {
             )
           );
         } else if (chunk.type === 'telemetry') {
-          // "Recibo" chegou - atualiza com métricas
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -144,10 +153,15 @@ export default function Chat() {
                     tokensIn: chunk.metrics.tokensIn,
                     tokensOut: chunk.metrics.tokensOut,
                     costInUSD: chunk.metrics.costInUSD,
+                    sentContext: chunk.metrics.sentContext // <-- CAPTURA sentContext
                   }
                 : msg
             )
           );
+          
+          // IMPORTANTE: Capturar chatId da telemetria
+          newChatId = chunk.metrics.chatId || null;
+          newProvider = chunk.metrics.provider;
         } else if (chunk.type === 'error') {
           console.error('Erro no stream:', chunk.error);
           setMessages((prev) =>
@@ -157,15 +171,27 @@ export default function Chat() {
                 : msg
             )
           );
+          setDebugLogs((prev) => [...prev, `❌ ERRO: ${chunk.error}`]);
+        } else if (chunk.type === 'debug') {
+          setDebugLogs((prev) => [...prev, chunk.log]);
         }
       },
 
       // --- Callback de Conclusão (onComplete) ---
       () => {
         setIsLoading(false);
-        // Atualizar sidebar se foi criado novo chat
-        if (!currentChatId) {
-          loadChatHistory();
+        
+        // ATUALIZAR currentChatId E currentChatProvider
+        if (newChatId && newChatId !== currentChatId) {
+          console.log(`🔄 Atualizando chatId: ${currentChatId} → ${newChatId}`);
+          setCurrentChatId(newChatId);
+          
+          if (newProvider && !currentChatProvider) {
+            console.log(`🔒 Travando provider: ${newProvider}`);
+            setCurrentChatProvider(newProvider);
+          }
+          
+          loadChatHistory(); // Atualiza sidebar
         }
       },
 
@@ -173,13 +199,97 @@ export default function Chat() {
       (error: string) => {
         console.error('Erro fatal no stream:', error);
         setIsLoading(false);
-        // Remove mensagem temporária do assistente
         setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
-        // Mostrar erro para usuário
         alert(`Erro ao enviar mensagem: ${error}`);
       }
     );
   };
+
+  // --- Modal do Visualizador de Prompt ---
+  const renderPromptModal = () => (
+    <Modal 
+      open={promptModalOpen} 
+      onClose={() => setPromptModalOpen(false)}
+      sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Paper sx={{ 
+        maxWidth: '80vw', 
+        maxHeight: '80vh', 
+        overflow: 'auto',
+        p: 3,
+        backgroundColor: 'background.paper'
+      }}>
+        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CodeIcon /> Contexto Enviado ao Provider
+        </Typography>
+        
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+          Este é o prompt exato (histórico) que foi enviado à IA para gerar a resposta.
+        </Typography>
+
+        <Box sx={{ 
+          maxHeight: '60vh', 
+          overflow: 'auto', 
+          backgroundColor: '#1E1E1E',
+          borderRadius: 1,
+          p: 2
+        }}>
+          {selectedPrompt.map((msg, index) => (
+            <Box key={index} sx={{ mb: 3 }}>
+              <Chip 
+                label={msg.role.toUpperCase()} 
+                color={msg.role === 'user' ? 'primary' : 'secondary'} 
+                size="small"
+                sx={{ mb: 1 }}
+              />
+              <Typography sx={{ 
+                whiteSpace: 'pre-wrap', 
+                fontFamily: 'monospace', 
+                color: '#00FF00',
+                fontSize: '12px',
+                lineHeight: 1.6
+              }}>
+                {msg.content}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        <Box sx={{ mt: 2, textAlign: 'right' }}>
+          <Chip 
+            label={`Total: ${selectedPrompt.length} mensagens`} 
+            size="small" 
+            variant="outlined"
+          />
+        </Box>
+      </Paper>
+    </Modal>
+  );
+
+  // Mapa de limites de contexto por provider
+  const providerContextLimits: Record<string, number> = {
+    'groq': 4000,        // 6000 - 2000 buffer
+    'openai': 126000,    // 128000 - 2000 buffer
+    'claude': 198000,    // 200000 - 2000 buffer
+    'together': 129072,  // 131072 - 2000 buffer
+    'perplexity': 125000, // 127000 - 2000 buffer
+    'mistral': 30000,    // 32000 - 2000 buffer
+  };
+
+  // Função para formatar número com k/M
+  const formatTokens = (tokens: number): string => {
+    if (tokens >= 1000000) {
+      return `${(tokens / 1000000).toFixed(1)}M`;
+    } else if (tokens >= 1000) {
+      return `${Math.round(tokens / 1000)}k`;
+    }
+    return tokens.toString();
+  };
+
+  // Pegar limite do provider atual
+  const activeProvider = currentChatProvider || selectedProvider;
+  const contextLimit = providerContextLimits[activeProvider] || 4000;
+  const formattedLimit = formatTokens(contextLimit);
 
   if (!isAuthenticated) {
     return null;
@@ -213,28 +323,101 @@ export default function Chat() {
               </Box>
             ) : (
               messages.map((msg) => (
-                <Paper
-                  key={msg.id}
-                  sx={{
-                    p: 2,
-                    mb: 2,
-                    maxWidth: '70%',
-                    ml: msg.role === 'user' ? 'auto' : 0,
-                    mr: msg.role === 'assistant' ? 'auto' : 0,
-                    bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
-                    color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
-                  }}
-                >
-                  <Typography variant="body1">{msg.content}</Typography>
-                </Paper>
+                <Box key={msg.id} sx={{ mb: 2 }}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      maxWidth: '70%',
+                      ml: msg.role === 'user' ? 'auto' : 0,
+                      mr: msg.role === 'assistant' ? 'auto' : 0,
+                      bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
+                      color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                    }}
+                  >
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {msg.content}
+                    </Typography>
+
+                    {/* Rodapé da mensagem (apenas para assistant) */}
+                    {msg.role === 'assistant' && (
+                      <Box sx={{ mt: 2, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+                        {/* Telemetria */}
+                        {msg.model && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                            {msg.model} • {msg.tokensOut || 0} tokens • ${(msg.costInUSD || 0).toFixed(6)}
+                          </Typography>
+                        )}
+
+                        {/* Botão de Visualizar Contexto (APENAS EM MODO DEV) */}
+                        {isDevMode && msg.sentContext && (
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => {
+                                // PARSEAR o JSON string para array
+                                const parsed = typeof msg.sentContext === 'string' 
+                                  ? JSON.parse(msg.sentContext) 
+                                  : msg.sentContext;
+                                setSelectedPrompt(parsed);
+                                setPromptModalOpen(true);
+                              }}
+                              title="Ver Contexto Enviado ao Provider"
+                              sx={{ 
+                                opacity: 0.7,
+                                '&:hover': { opacity: 1 },
+                                color: 'primary.main'
+                              }}
+                            >
+                              <CodeIcon fontSize="small" />
+                            </IconButton>
+                            <Typography variant="caption" color="text.secondary">
+                              Ver prompt ({typeof msg.sentContext === 'string' ? JSON.parse(msg.sentContext).length : msg.sentContext?.length || 0} msgs)
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </Paper>
+                </Box>
               ))
             )}
             <div ref={messagesEndRef} />
           </Box>
 
-          {/* Input com Seletor de Provider */}
+          {/* Monitor de Debug (Terminal) */}
+          {isDevMode && (
+            <Paper
+              elevation={4}
+              sx={{
+                height: '200px',
+                overflowY: 'auto',
+                backgroundColor: '#1E1E1E',
+                color: '#00FF00',
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                padding: 1,
+                marginX: 2,
+                marginBottom: 1,
+              }}
+            >
+              {debugLogs.length === 0 ? (
+                <Typography sx={{ color: '#666', fontFamily: 'monospace' }}>
+                  Aguardando logs de debug...
+                </Typography>
+              ) : (
+                debugLogs.map((log, index) => (
+                  <div key={index}>
+                    {`[${new Date().toLocaleTimeString()}] ${log}`}
+                  </div>
+                ))
+              )}
+            </Paper>
+          )}
+
+          {/* Input com Seletores */}
           <Paper sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+              {/* Seletor de Provider */}
               <FormControl sx={{ minWidth: 200 }}>
                 <InputLabel>Provider de IA</InputLabel>
                 <Select
@@ -246,7 +429,7 @@ export default function Chat() {
                   }}
                   label="Provider de IA"
                   size="small"
-                  disabled={!!currentChatProvider} // <-- Trava o dropdown
+                  disabled={!!currentChatProvider}
                 >
                   <MenuItem value="groq">Groq (LLaMA 3.1 - Gratuito)</MenuItem>
                   <MenuItem value="openai">OpenAI (GPT-3.5/4)</MenuItem>
@@ -257,7 +440,27 @@ export default function Chat() {
                 </Select>
               </FormControl>
 
-              {/* O FEEDBACK VISUAL (Chip do Provider Travado) */}
+              {/* Seletor de Estratégia de Contexto */}
+              <FormControl sx={{ minWidth: 250 }} size="small">
+                <InputLabel id="strategy-label">Estratégia de Contexto</InputLabel>
+                <Select
+                  labelId="strategy-label"
+                  value={contextStrategy}
+                  label="Estratégia de Contexto"
+                  onChange={(e) => setContextStrategy(e.target.value)}
+                >
+                  <MenuItem value="fast">
+                    ⚡ Rápido (últimas 10 msgs)
+                  </MenuItem>
+                  <MenuItem value="efficient">
+                    🧠 Eficiente ({formattedLimit} tokens)
+                  </MenuItem>
+                  <MenuItem value="intelligent_rag" disabled>
+                    🚀 Inteligente (RAG - em breve)
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
               {currentChatProvider && (
                 <Chip 
                   label={`Provider: ${currentChatProvider.toUpperCase()}`}
@@ -266,6 +469,19 @@ export default function Chat() {
                   size="small"
                 />
               )}
+
+              <Box sx={{ marginLeft: 'auto' }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={isDevMode}
+                      onChange={(e) => setIsDevMode(e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label="Modo Dev"
+                />
+              </Box>
             </Box>
             
             <Box sx={{ display: 'flex', gap: 1 }}>
@@ -290,6 +506,9 @@ export default function Chat() {
           </Paper>
         </Box>
       </Box>
+
+      {/* Renderizar Modal de Contexto */}
+      {renderPromptModal()}
     </MainLayout>
   );
 }
