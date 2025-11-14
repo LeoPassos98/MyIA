@@ -334,47 +334,84 @@ export default function Chat() {
                       color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
                     }}
                   >
+                    {/* Conteúdo da mensagem */}
                     <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
                       {msg.content}
                     </Typography>
 
-                    {/* Rodapé da mensagem (apenas para assistant) */}
-                    {msg.role === 'assistant' && (
-                      <Box sx={{ mt: 2, pt: 1, borderTop: 1, borderColor: 'divider' }}>
-                        {/* Telemetria */}
-                        {msg.model && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                            {msg.model} • {msg.tokensOut || 0} tokens • ${(msg.costInUSD || 0).toFixed(6)}
-                          </Typography>
+                    {/* --- O "Rodapé" V14 (Telemetria Detalhada - APENAS EM MODO DEV) --- */}
+                    {isDevMode && msg.role === 'assistant' && msg.model && (
+                      <Box 
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 1, 
+                          mt: 2, 
+                          pt: 1,
+                          borderTop: 1,
+                          borderColor: 'divider',
+                          opacity: 0.7,
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        
+                        {/* 1. O Botão "Caixa Preta" (V13) */}
+                        {msg.sentContext && (
+                          <IconButton 
+                            size="small"
+                            onClick={() => {
+                              const parsed = typeof msg.sentContext === 'string' 
+                                ? JSON.parse(msg.sentContext) 
+                                : msg.sentContext;
+                              setSelectedPrompt(parsed);
+                              setPromptModalOpen(true);
+                            }}
+                            title="Ver Contexto Enviado (Caixa Preta)"
+                            sx={{ 
+                              opacity: 0.7,
+                              '&:hover': { opacity: 1 },
+                              color: 'primary.main'
+                            }}
+                          >
+                            <CodeIcon fontSize="small" />
+                          </IconButton>
                         )}
 
-                        {/* Botão de Visualizar Contexto (APENAS EM MODO DEV) */}
-                        {isDevMode && msg.sentContext && (
-                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => {
-                                // PARSEAR o JSON string para array
-                                const parsed = typeof msg.sentContext === 'string' 
-                                  ? JSON.parse(msg.sentContext) 
-                                  : msg.sentContext;
-                                setSelectedPrompt(parsed);
-                                setPromptModalOpen(true);
-                              }}
-                              title="Ver Contexto Enviado ao Provider"
-                              sx={{ 
-                                opacity: 0.7,
-                                '&:hover': { opacity: 1 },
-                                color: 'primary.main'
-                              }}
-                            >
-                              <CodeIcon fontSize="small" />
-                            </IconButton>
-                            <Typography variant="caption" color="text.secondary">
-                              Ver prompt ({typeof msg.sentContext === 'string' ? JSON.parse(msg.sentContext).length : msg.sentContext?.length || 0} msgs)
-                            </Typography>
-                          </Box>
-                        )}
+                        {/* 2. O Modelo */}
+                        <Chip 
+                          label={msg.model} 
+                          size="small" 
+                          variant="outlined"
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+
+                        {/* 3. A Telemetria Detalhada (V14) */}
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            fontFamily: 'monospace', 
+                            fontSize: '0.7rem',
+                            color: 'text.secondary'
+                          }}
+                        >
+                          Input: {msg.tokensIn || 0} | 
+                          Output: {msg.tokensOut || 0} | 
+                          Total: {(msg.tokensIn || 0) + (msg.tokensOut || 0)}
+                        </Typography>
+
+                        {/* 4. O Custo */}
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            fontFamily: 'monospace', 
+                            fontSize: '0.7rem', 
+                            ml: 'auto',
+                            color: 'text.secondary'
+                          }}
+                        >
+                          Custo: ${(msg.costInUSD || 0).toFixed(6)}
+                        </Typography>
+                        
                       </Box>
                     )}
                   </Paper>
