@@ -1,6 +1,7 @@
 import axios from 'axios';
-import { ChatMessage, AiServiceResponse } from '../types';
+import { ChatMessage, AiServiceResponse, StreamChunk } from '../types';
 import { getProviderConfig } from '../utils/providerUtils';
+import { COST_PER_1M_TOKENS } from '../../../config/costMap';
 
 export async function callClaudeAPI(
   messages: ChatMessage[]
@@ -57,4 +58,171 @@ export async function callClaudeAPI(
     }
     throw error;
   }
+}
+
+// A NOVA FUNÇÃO DE CHAT COM STREAMING (usando fetch nativo)
+export async function* streamClaudeChat(
+  messages: any[]
+): AsyncGenerator<StreamChunk> {
+  
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  
+  if (!apiKey) {
+    yield { type: 'error', error: 'ANTHROPIC_API_KEY não configurada' };
+    return;
+  }
+
+  const model = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022';
+  const convertedMessages = convertMessages(messages);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        messages: convertedMessages.messages,
+        system: convertedMessages.system,
+        stream: true, // <-- Habilita streaming
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      yield { type: 'error', error: `Claude API error: ${response.status} - ${errorText}` };
+      return;
+    }
+
+    if (!response.body) {
+      yield { type: 'error', error: 'Response body vazio do Claude' };
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullResponse = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          
+          if (data === '[DONE]') continue;
+          
+          try {
+            const parsed = JSON.parse(data);
+            
+            // Claude envia chunks de conteúdo
+            if (parsed.type === 'content_block_delta') {
+              const content = parsed.delta?.text || '';
+              if (content) {
+                fullResponse += content;
+                yield { type: 'chunk', content };
+              }
+            }
+            
+            // Telemetria vem no evento 'message_stop'
+            if (parsed.type === 'message_stop' && parsed.message?.usage) {
+              inputTokens = parsed.message.usage.input_tokens || 0;
+              outputTokens = parsed.message.usage.output_tokens || 0;
+            }
+          } catch (parseError) {
+            console.warn('Erro ao parsear chunk do Claude:', parseError);
+          }
+        }
+      }
+    }
+
+    // Calcular custo
+    type CostMapKey = keyof typeof COST_PER_1M_TOKENS;
+    const costs = COST_PER_1M_TOKENS[model as CostMapKey] || { input: 0, output: 0 };
+    const totalCost = ((inputTokens / 1_000_000) * costs.input) + 
+                      ((outputTokens / 1_000_000) * costs.output);
+
+    // Enviar telemetria final
+    yield { 
+      type: 'telemetry', 
+      metrics: {
+        tokensIn: inputTokens,
+        tokensOut: outputTokens,
+        costInUSD: totalCost,
+        model: model,
+        provider: 'claude'
+      }
+    };
+
+  } catch (error: any) {
+    console.error('Erro no stream (Claude):', error);
+    yield { type: 'error', error: error.message || 'Erro desconhecido no stream Claude' };
+  }
+}
+
+// Função não-streaming para compatibilidade
+export async function chatClaude(
+  messages: any[]
+): Promise<{ response: string; tokensIn: number; tokensOut: number; model: string }> {
+  let fullResponse = "";
+  let metrics = { tokensIn: 0, tokensOut: 0, model: "", provider: "" };
+
+  for await (const chunk of streamClaudeChat(messages)) {
+    if (chunk.type === 'chunk') {
+      fullResponse += chunk.content;
+    } else if (chunk.type === 'telemetry') {
+      metrics = chunk.metrics;
+    } else if (chunk.type === 'error') {
+      throw new Error(chunk.error);
+    }
+  }
+
+  return {
+    response: fullResponse,
+    tokensIn: metrics.tokensIn,
+    tokensOut: metrics.tokensOut,
+    model: metrics.model
+  };
+}
+
+function convertMessages(messages: any[]) {
+  const systemMessage = messages.find((msg) => msg.role === 'system')?.content || '';
+  const userMessages = messages.filter((msg) => msg.role === 'user');
+  const assistantMessages = messages.filter((msg) => msg.role === 'assistant');
+
+  const converted: any = {
+    system: systemMessage,
+    messages: [],
+  };
+
+  userMessages.forEach((msg, index) => {
+    converted.messages.push({
+      role: 'user',
+      content: msg.content,
+    });
+
+    // Adiciona a resposta do assistente correspondente, se existir
+    const assistantMsg = assistantMessages[index];
+    if (assistantMsg) {
+      converted.messages.push({
+        role: 'assistant',
+        content: assistantMsg.content,
+      });
+    }
+  });
+
+  return converted;
 }

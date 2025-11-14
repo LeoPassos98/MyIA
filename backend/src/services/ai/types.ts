@@ -23,10 +23,25 @@ export interface TestResult {
   responseTime?: number;
 }
 
-// O "recibo" padronizado que CADA provider deve retornar
+// O "pacote" final de telemetria
+export interface TelemetryMetrics {
+  tokensIn: number;
+  tokensOut: number;
+  costInUSD: number;
+  model: string;
+  provider: string;
+}
+
+// O "protocolo" do gotejamento. Cada 'yield' será um destes.
+export type StreamChunk = 
+  | { type: 'chunk'; content: string } // Pedaço de texto
+  | { type: 'telemetry'; metrics: TelemetryMetrics } // O recibo final
+  | { type: 'error'; error: string }; // Se algo der errado
+
+// Manter AiServiceResponse para compatibilidade com código não-streaming
 export interface AiServiceResponse {
-  response: string;      // O texto puro
-  tokensIn: number;      // Tokens de prompt
-  tokensOut: number;     // Tokens de conclusão
-  model: string;         // O modelo exato usado (ex: 'gpt-4o')
+  response: string;
+  tokensIn: number;
+  tokensOut: number;
+  model?: string;
 }

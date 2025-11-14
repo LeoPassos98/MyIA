@@ -17,6 +17,7 @@ export interface Message {
   tokensIn?: number;
   tokensOut?: number;
   costInUSD?: number;
+  telemetry?: any; // Campo opcional de telemetria
 }
 
 export const chatHistoryService = {

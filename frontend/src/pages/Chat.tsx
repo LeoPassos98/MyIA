@@ -5,7 +5,7 @@ import MainLayout from '../components/Layout/MainLayout';
 import ChatSidebar from '../components/Chat/ChatSidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { chatService } from '../services/chatService';
+import { chatService, StreamChunk } from '../services/chatService';
 import { chatHistoryService, Chat as ChatType, Message } from '../services/chatHistoryService';
 
 export default function Chat() {
@@ -93,47 +93,92 @@ export default function Chat() {
     setInputMessage('');
     setIsLoading(true);
 
-    // Adiciona mensagem do usuário otimisticamente
+    // 1. Adiciona mensagem do usuário (otimisticamente)
+    const userMsgId = `temp-user-${Date.now()}`;
     const tempUserMessage: Message = {
-      id: 'temp-' + Date.now(),
+      id: userMsgId,
       role: 'user',
       content: userMessage,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, tempUserMessage]);
 
-    try {
-      // Usa o provider travado se existir, senão usa o selecionado
-      const providerToUse = currentChatProvider || selectedProvider;
-      const response = await chatService.sendMessage(userMessage, providerToUse, currentChatId);
-      
-      // Atualiza chatId e provider travado se foi criado um novo chat
-      if (response.chatId !== currentChatId) {
-        setCurrentChatId(response.chatId);
-        setCurrentChatProvider(response.provider); // Trava o provider
-        await loadChatHistory();
+    // 2. Prepara "bolha" vazia do assistente (para streaming)
+    const assistantMsgId = `temp-assistant-${Date.now()}`;
+    const tempAssistantMessage: Message = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '', // Começa vazia!
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempAssistantMessage]);
+
+    // 3. Inicia o Stream!
+    const providerToUse = currentChatProvider || selectedProvider;
+
+    await chatService.streamChat(
+      userMessage,
+      providerToUse,
+      currentChatId,
+
+      // --- Callback de Gotejamento (onChunk) ---
+      (chunk: StreamChunk) => {
+        if (chunk.type === 'chunk') {
+          // Atualiza a última mensagem (balão do assistente) em tempo real
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? { ...msg, content: msg.content + chunk.content }
+                : msg
+            )
+          );
+        } else if (chunk.type === 'telemetry') {
+          // "Recibo" chegou - atualiza com métricas
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? {
+                    ...msg,
+                    provider: chunk.metrics.provider,
+                    model: chunk.metrics.model,
+                    tokensIn: chunk.metrics.tokensIn,
+                    tokensOut: chunk.metrics.tokensOut,
+                    costInUSD: chunk.metrics.costInUSD,
+                  }
+                : msg
+            )
+          );
+        } else if (chunk.type === 'error') {
+          console.error('Erro no stream:', chunk.error);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? { ...msg, content: `❌ Erro: ${chunk.error}` }
+                : msg
+            )
+          );
+        }
+      },
+
+      // --- Callback de Conclusão (onComplete) ---
+      () => {
+        setIsLoading(false);
+        // Atualizar sidebar se foi criado novo chat
+        if (!currentChatId) {
+          loadChatHistory();
+        }
+      },
+
+      // --- Callback de Erro (onError) ---
+      (error: string) => {
+        console.error('Erro fatal no stream:', error);
+        setIsLoading(false);
+        // Remove mensagem temporária do assistente
+        setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
+        // Mostrar erro para usuário
+        alert(`Erro ao enviar mensagem: ${error}`);
       }
-
-      // Adiciona resposta da IA
-      const assistantMessage: Message = {
-        id: 'temp-ai-' + Date.now(),
-        role: 'assistant',
-        content: response.response,
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages((prev) => {
-        // Remove mensagem temporária e adiciona as reais
-        const withoutTemp = prev.filter((m) => m.id !== tempUserMessage.id);
-        return [...withoutTemp, tempUserMessage, assistantMessage];
-      });
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      // Remove mensagem temporária em caso de erro
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserMessage.id));
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   if (!isAuthenticated) {
