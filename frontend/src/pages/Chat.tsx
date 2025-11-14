@@ -54,11 +54,12 @@ export default function Chat() {
       setMessages(chatMessages);
       setCurrentChatId(chatId);
       
-      // Buscar provider travado do chat selecionado
+      // --- A LÓGICA DE TRAVAMENTO ---
       const selectedChat = chatHistory.find(c => c.id === chatId);
       if (selectedChat) {
         setCurrentChatProvider(selectedChat.provider);
       }
+      // --- FIM DA LÓGICA ---
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
     } finally {
@@ -70,7 +71,7 @@ export default function Chat() {
     setCurrentChatId(null);
     setMessages([]);
     setInputMessage('');
-    setCurrentChatProvider(null); // Libera seleção de provider
+    setCurrentChatProvider(null); // <-- Limpa o lock de provider
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -153,21 +154,6 @@ export default function Chat() {
 
         {/* Área de Chat */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {/* Cabeçalho com Provider Travado */}
-          {currentChatProvider && (
-            <Paper sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                Provider travado:
-              </Typography>
-              <Chip 
-                label={currentChatProvider.toUpperCase()} 
-                size="small" 
-                color="primary" 
-                variant="outlined"
-              />
-            </Paper>
-          )}
-
           {/* Mensagens */}
           <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
             {isLoading && messages.length === 0 ? (
@@ -203,7 +189,7 @@ export default function Chat() {
 
           {/* Input com Seletor de Provider */}
           <Paper sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
               <FormControl sx={{ minWidth: 200 }}>
                 <InputLabel>Provider de IA</InputLabel>
                 <Select
@@ -215,7 +201,7 @@ export default function Chat() {
                   }}
                   label="Provider de IA"
                   size="small"
-                  disabled={!!currentChatProvider} // Desabilita se chat já existe
+                  disabled={!!currentChatProvider} // <-- Trava o dropdown
                 >
                   <MenuItem value="groq">Groq (LLaMA 3.1 - Gratuito)</MenuItem>
                   <MenuItem value="openai">OpenAI (GPT-3.5/4)</MenuItem>
@@ -225,10 +211,15 @@ export default function Chat() {
                   <MenuItem value="mistral">Mistral</MenuItem>
                 </Select>
               </FormControl>
+
+              {/* O FEEDBACK VISUAL (Chip do Provider Travado) */}
               {currentChatProvider && (
-                <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                  (Travado para este chat)
-                </Typography>
+                <Chip 
+                  label={`Provider: ${currentChatProvider.toUpperCase()}`}
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                />
               )}
             </Box>
             

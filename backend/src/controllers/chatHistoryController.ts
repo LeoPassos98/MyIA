@@ -14,7 +14,12 @@ export const chatHistoryController = {
       const chats = await prisma.chat.findMany({
         where: { userId: req.userId },
         orderBy: { updatedAt: 'desc' },
-        select: { id: true, title: true, updatedAt: true }
+        select: { 
+          id: true, 
+          title: true, 
+          updatedAt: true,
+          provider: true // Campo provider incluído
+        }
       });
       return res.json(chats);
     } catch (error) {
