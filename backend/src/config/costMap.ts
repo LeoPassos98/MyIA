@@ -1,3 +1,10 @@
+/**
+ * Mapa de custos por modelo de IA.
+ * 
+ * NOTA: Limites de contexto agora estão em providerMap.ts
+ * Este arquivo mantém apenas informações de custo para compatibilidade.
+ */
+
 export const COST_PER_1M_TOKENS = {
   // Groq (gratuito)
   'llama-3.1-8b-instant': { input: 0.00, output: 0.00 },
@@ -27,4 +34,6 @@ export const COST_PER_1M_TOKENS = {
   'mistral-small': { input: 1.00, output: 3.00 },
   'mistral-medium': { input: 2.70, output: 8.10 },
   'mistral-large': { input: 8.00, output: 24.00 },
-};
+} as const;
+
+export type CostMapKey = keyof typeof COST_PER_1M_TOKENS;

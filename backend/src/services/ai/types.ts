@@ -36,7 +36,8 @@ export interface TelemetryMetrics {
 export type StreamChunk = 
   | { type: 'chunk'; content: string } // Pedaço de texto
   | { type: 'telemetry'; metrics: TelemetryMetrics } // O recibo final
-  | { type: 'error'; error: string }; // Se algo der errado
+  | { type: 'error'; error: string } // Se algo der errado
+  | { type: 'debug'; log: string }; // <-- A "CÂMERA DE SEGURANÇA"
 
 // Manter AiServiceResponse para compatibilidade com código não-streaming
 export interface AiServiceResponse {
