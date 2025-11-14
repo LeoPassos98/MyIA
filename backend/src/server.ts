@@ -10,6 +10,7 @@ import aiRoutes from './routes/aiRoutes';
 import userSettingsRoutes from './routes/userSettingsRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 import userRoutes from './routes/userRoutes';
+import chatHistoryRoutes from './routes/chatHistoryRoutes';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/settings', userSettingsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/chat-history', chatHistoryRoutes);
 
 // Rota 404
 app.use((_req, res) => {

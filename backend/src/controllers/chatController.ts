@@ -1,6 +1,5 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
-import { contextService } from '../services/contextService';
 import { aiService } from '../services/ai';
 import { ProviderName } from '../services/ai/types';
 import { logger } from '../utils/logger';
@@ -15,17 +14,17 @@ function countWords(str: string): number {
   return str.split(/\s+/).filter(Boolean).length;
 }
 
-// Tipo para a chave do nosso mapa de custos (CORRIGE O ERRO 1)
+// Tipo para a chave do nosso mapa de custos
 type CostMapKey = keyof typeof COST_PER_1M_TOKENS;
 
 export const chatController = {
   async sendMessage(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       if (!req.userId) {
-        return next(new AppError('Unauthorized', 401));
+        return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const { message, provider } = req.body;
+      const { message, provider, chatId } = req.body;
 
       // Validar provider se fornecido
       const validProviders: ProviderName[] = ['openai', 'groq', 'together', 'perplexity', 'mistral', 'claude'];
@@ -36,43 +35,81 @@ export const chatController = {
         });
       }
 
-      // Adicionar mensagem do usuário ao contexto
-      contextService.addMessage(req.userId, 'user', message);
+      // --- 1. Encontrar ou Criar a Conversa (Chat) ---
+      let currentChat;
+      if (chatId) {
+        currentChat = await prisma.chat.findUnique({ 
+          where: { id: chatId, userId: req.userId }
+        });
+      } else {
+        // Se não tem ID, é um chat novo
+        currentChat = await prisma.chat.create({
+          data: {
+            userId: req.userId,
+            title: `Conversa: ${message.substring(0, 20)}...`
+          }
+        });
+      }
 
-      // Pegar histórico de mensagens
-      const contextMessages = contextService.getMessages(req.userId);
+      if (!currentChat) {
+        throw new AppError('Conversa não encontrada', 404);
+      }
 
-      // Formatar para OpenAI
-      const openaiMessages = contextMessages.map(msg => ({
-        role: msg.role,
+      // --- 2. Salvar a Mensagem do Usuário ---
+      await prisma.message.create({
+        data: {
+          role: 'user',
+          content: message,
+          chatId: currentChat.id,
+        }
+      });
+
+      // --- 3. Preparar o Histórico para a IA ---
+      const historyMessages = await prisma.message.findMany({
+        where: { chatId: currentChat.id },
+        orderBy: { createdAt: 'asc' },
+        take: 10, // Últimas 10 mensagens
+      });
+
+      const formattedMessages = historyMessages.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
         content: msg.content,
       }));
 
-      // --- 1. Calcular Métricas de ENTRADA ---
+      // --- 4. Calcular Métricas de ENTRADA ---
       const inputBytes = Buffer.byteLength(message, 'utf8');
       const inputWords = countWords(message);
 
-      // --- 2. Obter resposta da IA (O OBJETO) ---
-      const aiResponseObject = await aiService.chat(openaiMessages, provider);
-
-      // --- 3. DESEMPACOTAR a resposta ---
+      // --- 5. Obter resposta da IA ---
+      const aiResponseObject = await aiService.chat(formattedMessages, provider);
       const responseText = aiResponseObject.response;
-      
-      // --- 4. Adicionar resposta (SÓ O TEXTO) ao contexto ---
-      contextService.addMessage(req.userId, 'assistant', responseText);
 
-      // --- 5. Calcular Métricas de SAÍDA e Custo ---
+      // --- 6. Calcular Métricas de SAÍDA e Custo ---
       const outputBytes = Buffer.byteLength(responseText, 'utf8');
       const outputWords = countWords(responseText);
       
-      // --- CORREÇÃO DO ERRO 'ANY' (Erro 1) ---
       const modelKey = (aiResponseObject.model || provider) as CostMapKey;
       const costs = COST_PER_1M_TOKENS[modelKey] || { input: 0, output: 0 };
       
       const totalCost = ((aiResponseObject.tokensIn / 1_000_000) * costs.input) + 
                         ((aiResponseObject.tokensOut / 1_000_000) * costs.output);
 
-      // --- 6. LOG DE ANALYTICS (Fire-and-forget) ---
+      // --- 7. Salvar a Resposta da IA (O "Histórico Inteligente") ---
+      await prisma.message.create({
+        data: {
+          role: 'assistant',
+          content: responseText,
+          chatId: currentChat.id,
+          // Telemetria "Inteligente"
+          provider: provider,
+          model: modelKey,
+          tokensIn: aiResponseObject.tokensIn,
+          tokensOut: aiResponseObject.tokensOut,
+          costInUSD: totalCost,
+        }
+      });
+
+      // --- 8. Salvar o Log de Analytics (para os gráficos globais) ---
       prisma.apiCallLog.create({
         data: {
           userId: req.userId,
@@ -92,32 +129,14 @@ export const chatController = {
 
       logger.info(`Chat message processed for user: ${req.userId}${provider ? ` using ${provider}` : ''}`);
 
-      // --- 7. Enviar resposta (SÓ O TEXTO) ao frontend ---
-      res.status(200).json({
+      // --- 9. Enviar a resposta (e o ID da conversa) ao frontend ---
+      return res.status(200).json({
         response: responseText,
-        contextSize: contextService.getContextSize(req.userId),
+        chatId: currentChat.id,
         provider: provider || 'default',
       });
     } catch (error) {
-      next(error);
-    }
-  },
-
-  async clearContext(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      if (!req.userId) {
-        return next(new AppError('Unauthorized', 401));
-      }
-
-      contextService.clearContext(req.userId);
-
-      logger.info(`Context cleared for user: ${req.userId}`);
-
-      res.status(200).json({
-        message: 'Context cleared successfully',
-      });
-    } catch (error) {
-      next(error);
+      return next(error);
     }
   },
 };

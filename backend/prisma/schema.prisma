@@ -26,6 +26,8 @@ model User {
   // Link para os logs de chamadas (Relação 1-para-N)
   apiCalls  ApiCallLog[]
 
+  chats        Chat[]
+
   @@map("users")
 }
 
@@ -70,4 +72,39 @@ model ApiCallLog {
   user       User     @relation(fields: [userId], references: [id])
 
   @@map("api_call_logs")
+}
+
+// Modelo 1: A Conversa (Um "título" para o chat)
+model Chat {
+  id        String    @id @default(uuid())
+  title     String    @default("Nova Conversa") // Título (ex: "Resumo sobre IA")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+
+  messages  Message[] // Link para as mensagens
+
+  @@map("chats")
+}
+
+// Modelo 2: A Mensagem (O "Histórico Inteligente")
+model Message {
+  id        String   @id @default(uuid())
+  role      String   // "user" ou "assistant"
+  content   String   // O texto da mensagem
+  createdAt DateTime @default(now())
+
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+
+  // --- TELEMETRIA "INTELIGENTE" (só para 'assistant') ---
+  provider  String?
+  model     String?
+  tokensIn  Int?
+  tokensOut Int?
+  costInUSD Float?
+
+  @@map("messages")
 }
