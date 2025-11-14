@@ -35,17 +35,23 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - [POST /api/auth/register](#post-apiauthregister) - Criar nova conta
 - [POST /api/auth/login](#post-apiauthlogin) - Fazer login
 - [GET /api/auth/me](#get-apiauthme) - Dados do usuário logado
+- [POST /api/auth/change-password](#post-apiauthchange-password) - Alterar senha
 
 ### Chat
 - [POST /api/chat/message](#post-apichatmessage) - Enviar mensagem
-- [DELETE /api/chat/context](#delete-apichatcontext) - Limpar histórico
+- [GET /api/chat-history](#get-apichat-history) - Listar conversas
+- [GET /api/chat-history/:chatId](#get-apichat-historychatid) - Mensagens de uma conversa
+- [DELETE /api/chat-history/:chatId](#delete-apichat-historychatid) - Deletar conversa
 
-### AI Providers
-- [GET /api/ai/providers](#get-apiaiproviders) - Listar providers disponíveis
-- [POST /api/ai/test/:provider](#post-apiaitestprovider) - Testar conexão com provider
+### Configurações
+- [GET /api/settings](#get-apisettings) - Buscar configurações do usuário
+- [PUT /api/settings](#put-apisettings) - Atualizar configurações
 
-### Utilitários
-- [GET /health](#get-health) - Status do servidor
+### Analytics
+- [GET /api/analytics](#get-apianalytics) - Dados de analytics e telemetria
+
+### Perfil
+- [PUT /api/user/profile](#put-apiuserprofile) - Atualizar nome do usuário
 
 ---
 
@@ -228,7 +234,7 @@ curl http://localhost:3001/api/auth/me \
 
 ### POST /api/chat/message
 
-Envia uma mensagem para a IA e recebe a resposta.
+Envia uma mensagem para a IA e recebe a resposta. **Agora com suporte a histórico persistente.**
 
 #### Request
 
@@ -242,13 +248,15 @@ Authorization: Bearer <seu-token-jwt>
 ```json
 {
   "message": "Olá, como você está?",
-  "provider": "claude"
+  "provider": "groq",
+  "chatId": "uuid-da-conversa-ou-null"
 }
 ```
 
 **Validações:**
 - `message`: obrigatório, não vazio, máximo 2000 caracteres
 - `provider`: opcional, valores válidos: openai, groq, together, perplexity, mistral, claude
+- `chatId`: opcional, UUID de conversa existente ou null para nova conversa
 
 #### Response
 
@@ -256,62 +264,29 @@ Authorization: Bearer <seu-token-jwt>
 ```json
 {
   "response": "Estou bem, obrigado por perguntar! Como posso ajudar você hoje?",
-  "contextSize": 2,
+  "chatId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "provider": "groq"
 }
 ```
 
 **Campos:**
 - `response`: Resposta da IA
-- `contextSize`: Número de mensagens no contexto atual
+- `chatId`: ID da conversa (novo ou existente)
 - `provider`: Provider de IA utilizado
-
-**Erro - Mensagem vazia (400 Bad Request):**
-```json
-{
-  "error": "Message cannot be empty",
-  "status": 400
-}
-```
-
-**Erro - Não autenticado (401 Unauthorized):**
-```json
-{
-  "error": "No token provided",
-  "status": 401
-}
-```
-
-**Erro - Falha no Provider (500 Internal Server Error):**
-```json
-{
-  "error": "Failed to get AI response",
-  "status": 500
-}
-```
 
 #### Comportamento
 
-- Mantém contexto das últimas **15 mensagens**
-- Se a chave do provider selecionado (ou o padrão do .env) não estiver configurada, retorna resposta mock
-- Adiciona automaticamente mensagem do usuário e da IA ao contexto
-
-#### Exemplo cURL
-
-```bash
-curl -X POST http://localhost:3001/api/chat/message \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGc..." \
-  -d '{
-    "message": "Conte-me uma piada"
-  }'
-```
+- Se `chatId` for null, cria nova conversa
+- Se `chatId` existir, adiciona ao histórico existente
+- Mantém contexto das últimas **10 mensagens**
+- Salva telemetria completa em cada mensagem
+- Retorna `chatId` para uso subsequente
 
 ---
 
-### DELETE /api/chat/context
+### GET /api/chat-history
 
-Limpa o histórico de conversa do usuário.
+Lista todas as conversas do usuário autenticado.
 
 #### Request
 
@@ -320,143 +295,218 @@ Limpa o histórico de conversa do usuário.
 Authorization: Bearer <seu-token-jwt>
 ```
 
-**Body:** Nenhum
-
 #### Response
 
 **Sucesso (200 OK):**
 ```json
-{
-  "message": "Context cleared successfully"
-}
-```
-
-**Erro - Não autenticado (401 Unauthorized):**
-```json
-{
-  "error": "No token provided",
-  "status": 401
-}
-```
-
-#### Comportamento
-
-- Remove todas as mensagens do contexto do usuário
-- Não afeta o histórico de outros usuários
-- Próxima mensagem inicia um novo contexto
-
-#### Exemplo cURL
-
-```bash
-curl -X DELETE http://localhost:3001/api/chat/context \
-  -H "Authorization: Bearer eyJhbGc..."
+[
+  {
+    "id": "uuid-1",
+    "title": "Conversa: Olá, como você está?...",
+    "updatedAt": "2025-11-14T12:34:56.789Z"
+  },
+  {
+    "id": "uuid-2",
+    "title": "Nova Conversa",
+    "updatedAt": "2025-11-13T10:20:30.123Z"
+  }
+]
 ```
 
 ---
 
-## 🤖 AI Providers
+### GET /api/chat-history/:chatId
 
-### GET /api/ai/providers
-
-Lista todos os providers de IA disponíveis e seu status de configuração.
+Busca todas as mensagens de uma conversa específica.
 
 #### Request
 
-**Headers:** Nenhum  
-**Body:** Nenhum
+**Headers:**
+```http
+Authorization: Bearer <seu-token-jwt>
+```
+
+**URL Params:**
+- `chatId`: UUID da conversa
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+[
+  {
+    "id": "msg-1",
+    "role": "user",
+    "content": "Olá!",
+    "createdAt": "2025-11-14T12:30:00.000Z"
+  },
+  {
+    "id": "msg-2",
+    "role": "assistant",
+    "content": "Olá! Como posso ajudar?",
+    "createdAt": "2025-11-14T12:30:05.000Z",
+    "provider": "groq",
+    "model": "llama-3.1-8b-instant",
+    "tokensIn": 10,
+    "tokensOut": 15,
+    "costInUSD": 0.0
+  }
+]
+```
+
+---
+
+### DELETE /api/chat-history/:chatId
+
+Deleta uma conversa e todas as suas mensagens.
+
+#### Request
+
+**Headers:**
+```http
+Authorization: Bearer <seu-token-jwt>
+```
+
+**URL Params:**
+- `chatId`: UUID da conversa
 
 #### Response
 
 **Sucesso (200 OK):**
 ```json
 {
-  "providers": [
-    {
-      "name": "openai",
-      "configured": false,
-      "model": "gpt-3.5-turbo"
-    },
-    {
-      "name": "groq",
-      "configured": true,
-      "model": "llama-3.1-8b-instant"
-    },
-    {
-      "name": "together",
-      "configured": false,
-      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
-    },
-    {
-      "name": "perplexity",
-      "configured": false,
-      "model": "llama-3.1-sonar-small-128k-online"
-    },
-    {
-      "name": "mistral",
-      "configured": false,
-      "model": "mistral-small-latest"
-    },
-    {
-      "name": "claude",
-      "configured": false,
-      "model": "claude-3-5-sonnet-20241022"
-    }
+  "message": "Conversa deletada"
+}
+```
+
+---
+
+### POST /api/auth/change-password
+
+Altera a senha do usuário autenticado.
+
+#### Request
+
+**Headers:**
+```http
+Content-Type: application/json
+Authorization: Bearer <seu-token-jwt>
+```
+
+**Body:**
+```json
+{
+  "oldPassword": "senha123",
+  "newPassword": "novaSenha456"
+}
+```
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "message": "Senha atualizada com sucesso"
+}
+```
+
+---
+
+### GET /api/settings
+
+Busca as configurações do usuário (tema, chaves de API).
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "id": "uuid",
+  "theme": "dark",
+  "openaiApiKey": "sk-...1234",
+  "groqApiKey": "gsk_...5678",
+  "claudeApiKey": null
+}
+```
+
+**Nota:** Chaves de API retornam apenas placeholders (ex: `sk-...1234`)
+
+---
+
+### PUT /api/settings
+
+Atualiza configurações do usuário.
+
+#### Request
+
+**Body:**
+```json
+{
+  "theme": "dark",
+  "groqApiKey": "gsk_nova_chave_completa"
+}
+```
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "id": "uuid",
+  "theme": "dark",
+  "groqApiKey": "gsk_...nova"
+}
+```
+
+---
+
+### GET /api/analytics
+
+Retorna dados de analytics e telemetria.
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "costOverTime": [
+    { "date": "2025-11-01", "cost": 0.02 },
+    { "date": "2025-11-02", "cost": 0.03 }
   ],
-  "total": 6,
-  "configured": 1
+  "costEfficiency": [
+    { "provider": "groq", "costPer1kTokens": 0.0 },
+    { "provider": "openai", "costPer1kTokens": 0.002 }
+  ],
+  "loadMap": [
+    { "provider": "groq", "tokensIn": 100, "tokensOut": 150 }
+  ]
 }
-```
-
-#### Exemplo cURL
-
-```bash
-curl http://localhost:3001/api/ai/providers
 ```
 
 ---
 
-### POST /api/ai/test/:provider
+### PUT /api/user/profile
 
-Testa a conexão com um provider específico.
+Atualiza o nome do usuário.
 
 #### Request
 
-**Headers:** Nenhum  
-**URL Params:** `provider` - Nome do provider (openai, groq, together, perplexity, mistral, claude)  
-**Body:** Nenhum
+**Body:**
+```json
+{
+  "name": "Novo Nome"
+}
+```
 
 #### Response
 
-**Sucesso - Configurado (200 OK):**
+**Sucesso (200 OK):**
 ```json
 {
-  "provider": "groq",
-  "success": true,
-  "message": "Connection successful",
-  "responseTime": 245
+  "id": "uuid",
+  "email": "user@example.com",
+  "name": "Novo Nome"
 }
-```
-
-**Sucesso - Não Configurado (200 OK):**
-```json
-{
-  "provider": "groq",
-  "success": false,
-  "message": "API key not configured. Set GROQ_API_KEY in .env file"
-}
-```
-
-**Erro - Provider Inválido (400 Bad Request):**
-```json
-{
-  "error": "Invalid provider. Valid options: openai, groq, together, perplexity, mistral, claude"
-}
-```
-
-#### Exemplo cURL
-
-```bash
-curl -X POST http://localhost:3001/api/ai/test/groq
 ```
 
 ---

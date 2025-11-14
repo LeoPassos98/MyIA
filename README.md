@@ -12,16 +12,18 @@
 - **Proteção de rotas** no frontend e backend
 - **Middleware de autenticação** para todas as rotas protegidas
 
-### 💬 Chat Multi-Provider
-- **6 provedores de IA suportados**: OpenAI, Groq, Together AI, Perplexity, Mistral, Claude (Anthropic)
-- **Contexto de conversação persistente** por sessão de usuário
-- **Seleção dinâmica de provider** por requisição
-- **Fallback para mock responses** quando chaves de API não estão configuradas
+### 💬 Chat Persistente
+- **Histórico permanente** - Mensagens salvas no banco de dados
+- **Múltiplas conversas** - Gerencie vários chats simultâneos
+- **Barra lateral** - Lista de conversas com busca rápida
+- **Seletor de IA** - Escolha entre 6 providers por mensagem
+- **Telemetria por mensagem** - Rastreamento detalhado de custo e tokens
 
 ### 🎨 Personalização
 - **Modo Escuro/Claro** com persistência no banco de dados
 - **Sincronização automática** de preferências entre dispositivos
 - **Tema Material-UI** totalmente responsivo
+- **Gerenciamento de chaves de API** criptografadas (6 providers)
 
 ### 📊 Analytics & Telemetria
 - **Telemetria Financeira**: Rastreamento de custos por token (entrada/saída)
@@ -129,8 +131,10 @@ MISTRAL_API_KEY="..."
 
 **Modelos do Banco de Dados** (veja em `backend/prisma/schema.prisma`):
 - `User` - Usuários do sistema
-- `UserSettings` - Preferências (tema, etc)
+- `UserSettings` - Preferências (tema, chaves de API criptografadas)
 - `ApiCallLog` - Telemetria de chamadas de IA
+- `Chat` - Conversas do usuário (múltiplas conversas por usuário)
+- `Message` - Histórico de mensagens com telemetria integrada (persistente)
 
 ### 4️⃣ Configuração do Banco de Dados
 

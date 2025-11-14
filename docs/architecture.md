@@ -132,27 +132,100 @@ model User {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  settings  UserSettings?
+  apiCalls  ApiCallLog[]
+  chats     Chat[]
 
   @@map("users")
 }
 ```
 
-### **Message (Memória - não persistido)**
+### **UserSettings**
 
-```typescript
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
+```prisma
+model UserSettings {
+  id        String   @id @default(uuid())
+  theme     String   @default("light")
+  
+  // Chaves de API (criptografadas)
+  openaiApiKey     String?
+  groqApiKey       String?
+  claudeApiKey     String?
+  togetherApiKey   String?
+  perplexityApiKey String?
+  mistralApiKey    String?
+  
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("user_settings")
 }
+```
 
-interface ChatContext {
-  userId: string;
-  messages: Message[];
-  lastActivity: Date;
+### **Chat (Persistente)**
+
+```prisma
+model Chat {
+  id        String    @id @default(uuid())
+  title     String    @default("Nova Conversa")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
+
+  @@map("chats")
 }
+```
 
-// Armazenado em: Map<userId, ChatContext>
+### **Message (Histórico Inteligente)**
+
+```prisma
+model Message {
+  id        String   @id @default(uuid())
+  role      String   // "user" ou "assistant"
+  content   String
+  createdAt DateTime @default(now())
+  
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  
+  // Telemetria (apenas para 'assistant')
+  provider  String?
+  model     String?
+  tokensIn  Int?
+  tokensOut Int?
+  costInUSD Float?
+
+  @@map("messages")
+}
+```
+
+### **ApiCallLog (Analytics Global)**
+
+```prisma
+model ApiCallLog {
+  id         String   @id @default(uuid())
+  timestamp  DateTime @default(now())
+  provider   String
+  model      String?
+  
+  tokensIn   Int      @default(0)
+  tokensOut  Int      @default(0)
+  costInUSD  Float    @default(0.0)
+  
+  wordsIn    Int      @default(0)
+  wordsOut   Int      @default(0)
+  bytesIn    Int      @default(0)
+  bytesOut   Int      @default(0)
+  
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@map("api_call_logs")
+}
 ```
 
 ---
@@ -185,25 +258,35 @@ interface ChatContext {
 
 ---
 
-## 💬 Fluxo de Chat com Contexto
+## 💬 Fluxo de Chat com Persistência
 
 ```
-[Frontend]           [Backend]              [AI Provider]    [Map Memory]
+[Frontend]           [Backend]              [AI Provider]    [SQLite/PostgreSQL]
     |                    |                      |                 |
     |-- POST /message -->|                      |                 |
-    | { message: "Oi" }  |                      |                 |
-    |                    |--- get context ----->|                 |
-    |                    |<-- last 15 msgs -----|                 |
+    | { message: "Oi",   |                      |                 |
+    |   chatId: null }   |                      |                 |
+    |                    |--- 1. Criar Chat --->|                 |
     |                    |                      |                 |
-    |                    |--- Seleciona provider e chama API --->|
+    |                    |<-- Chat criado ------|                 |
+    |                    |                      |                 |
+    |                    |--- 2. Salvar msg ---->|                 |
+    |                    |    do usuário        |                 |
+    |                    |                      |                 |
+    |                    |--- 3. Buscar -------->|                 |
+    |                    |    últimas 10 msgs   |                 |
+    |                    |<-- Histórico ---------|                 |
+    |                    |                      |                 |
+    |                    |--- 4. Chamar IA ---->|                 |
     |                    |                      |                 |
     |                    |<-- AI response ------|                 |
     |                    |                      |                 |
-    |                    |--- update context -->|                 |
-    |                    | (add user + AI msg)  |                 |
-    |<-- AI response ----|                      |                 |
+    |                    |--- 5. Salvar -------->|                 |
+    |                    |    resposta + telemetria             |
     |                    |                      |                 |
-    | (display message)  |                      |                 |
+    |<-- { response, ----|                      |                 |
+    |     chatId }       |                      |                 |
+    |                    |                      |                 |
 ```
 
 ---
@@ -217,13 +300,35 @@ interface ChatContext {
 | POST | `/api/auth/register` | Criar usuário | Não | Zod schema |
 | POST | `/api/auth/login` | Login | Não | Zod schema |
 | GET | `/api/auth/me` | Dados do usuário | Sim | JWT |
+| POST | `/api/auth/change-password` | Alterar senha | Sim | Zod + JWT |
 
-### **Chat**
+### **Chat Persistente**
 
 | Método | Endpoint | Descrição | Auth | Validação |
 |--------|----------|-----------|------|-----------|
-| POST | `/api/chat/message` | Enviar mensagem | Sim | Zod schema + JWT |
-| DELETE | `/api/chat/context` | Limpar contexto | Sim | JWT |
+| POST | `/api/chat/message` | Enviar mensagem | Sim | Zod + JWT |
+| GET | `/api/chat-history` | Listar conversas | Sim | JWT |
+| GET | `/api/chat-history/:chatId` | Mensagens de um chat | Sim | JWT |
+| DELETE | `/api/chat-history/:chatId` | Deletar conversa | Sim | JWT |
+
+### **Configurações**
+
+| Método | Endpoint | Descrição | Auth |
+|--------|----------|-----------|------|
+| GET | `/api/settings` | Buscar configurações | Sim |
+| PUT | `/api/settings` | Atualizar configurações | Sim |
+
+### **Analytics**
+
+| Método | Endpoint | Descrição | Auth |
+|--------|----------|-----------|------|
+| GET | `/api/analytics` | Dados de telemetria | Sim |
+
+### **Perfil**
+
+| Método | Endpoint | Descrição | Auth |
+|--------|----------|-----------|------|
+| PUT | `/api/user/profile` | Atualizar nome | Sim |
 
 ### **Utilitários**
 
@@ -308,17 +413,14 @@ Authorization: Bearer <jwt-token>
 
 ---
 
-### **POST /api/chat/message**
-
-**Headers:**
-```
-Authorization: Bearer <jwt-token>
-```
+### **POST /api/chat/message** (Atualizado)
 
 **Request:**
 ```json
 {
-  "message": "Olá, como você está?"
+  "message": "Olá, como você está?",
+  "provider": "groq",
+  "chatId": "uuid-ou-null"
 }
 ```
 
@@ -326,17 +428,21 @@ Authorization: Bearer <jwt-token>
 ```json
 {
   "response": "Estou bem, obrigado! Como posso ajudar?",
-  "contextSize": 2
+  "chatId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "provider": "groq"
 }
 ```
 
-**Validações:**
-- Mensagem não vazia
-- Máximo 2000 caracteres
+**Comportamento:**
+- Se `chatId` for null, cria nova conversa
+- Se `chatId` existir, adiciona ao histórico
+- Mantém últimas **10 mensagens** para contexto
+- Salva telemetria em cada mensagem
+- Retorna `chatId` para uso subsequente
 
 ---
 
-### **DELETE /api/chat/context**
+### **GET /api/chat-history** (Novo)
 
 **Headers:**
 ```
@@ -345,10 +451,57 @@ Authorization: Bearer <jwt-token>
 
 **Response (200):**
 ```json
+[
+  {
+    "id": "uuid-1",
+    "title": "Conversa: Olá, como você está?...",
+    "updatedAt": "2025-11-14T12:34:56.789Z"
+  }
+]
+```
+
+---
+
+### **GET /api/chat-history/:chatId** (Novo)
+
+**Response (200):**
+```json
+[
+  {
+    "id": "msg-1",
+    "role": "user",
+    "content": "Olá!",
+    "createdAt": "2025-11-14T12:30:00.000Z"
+  },
+  {
+    "id": "msg-2",
+    "role": "assistant",
+    "content": "Olá! Como posso ajudar?",
+    "createdAt": "2025-11-14T12:30:05.000Z",
+    "provider": "groq",
+    "model": "llama-3.1-8b-instant",
+    "tokensIn": 10,
+    "tokensOut": 15,
+    "costInUSD": 0.0
+  }
+]
+```
+
+---
+
+### **DELETE /api/chat-history/:chatId** (Novo)
+
+**Response (200):**
+```json
 {
-  "message": "Context cleared successfully"
+  "message": "Conversa deletada"
 }
 ```
+
+**Comportamento:**
+- Deleta todas as mensagens em cascata
+- Remove conversa do banco
+- Validação de ownership (userId)
 
 ---
 
