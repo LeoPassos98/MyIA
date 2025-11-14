@@ -24,12 +24,12 @@ export const chatController = {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const { message, provider, chatId } = req.body;
+      const { message, provider: requestProvider, chatId } = req.body;
 
       // Validar provider se fornecido
       const validProviders: ProviderName[] = ['openai', 'groq', 'together', 'perplexity', 'mistral', 'claude'];
       
-      if (provider && !validProviders.includes(provider)) {
+      if (requestProvider && !validProviders.includes(requestProvider)) {
         return res.status(400).json({ 
           error: `Invalid provider. Valid options: ${validProviders.join(', ')}` 
         });
@@ -37,22 +37,33 @@ export const chatController = {
 
       // --- 1. Encontrar ou Criar a Conversa (Chat) ---
       let currentChat;
+      let lockedProvider: ProviderName;
+
       if (chatId) {
+        // Chat existente: busca e usa o provider travado
         currentChat = await prisma.chat.findUnique({ 
           where: { id: chatId, userId: req.userId }
         });
+        
+        if (!currentChat) {
+          throw new AppError('Conversa não encontrada', 404);
+        }
+        
+        // Usa o provider travado do chat (IGNORA o requestProvider)
+        lockedProvider = currentChat.provider as ProviderName;
       } else {
-        // Se não tem ID, é um chat novo
+        // Novo chat: cria com o provider escolhido (que será travado)
+        const providerToLock: ProviderName = requestProvider || 'groq';
+        
         currentChat = await prisma.chat.create({
           data: {
             userId: req.userId,
-            title: `Conversa: ${message.substring(0, 20)}...`
+            title: `Conversa: ${message.substring(0, 20)}...`,
+            provider: providerToLock // TRAVA o provider
           }
         });
-      }
-
-      if (!currentChat) {
-        throw new AppError('Conversa não encontrada', 404);
+        
+        lockedProvider = providerToLock;
       }
 
       // --- 2. Salvar a Mensagem do Usuário ---
@@ -68,7 +79,7 @@ export const chatController = {
       const historyMessages = await prisma.message.findMany({
         where: { chatId: currentChat.id },
         orderBy: { createdAt: 'asc' },
-        take: 10, // Últimas 10 mensagens
+        take: 10,
       });
 
       const formattedMessages = historyMessages.map(msg => ({
@@ -80,28 +91,27 @@ export const chatController = {
       const inputBytes = Buffer.byteLength(message, 'utf8');
       const inputWords = countWords(message);
 
-      // --- 5. Obter resposta da IA ---
-      const aiResponseObject = await aiService.chat(formattedMessages, provider);
+      // --- 5. Obter resposta da IA (usando provider travado) ---
+      const aiResponseObject = await aiService.chat(formattedMessages, lockedProvider);
       const responseText = aiResponseObject.response;
 
       // --- 6. Calcular Métricas de SAÍDA e Custo ---
       const outputBytes = Buffer.byteLength(responseText, 'utf8');
       const outputWords = countWords(responseText);
       
-      const modelKey = (aiResponseObject.model || provider) as CostMapKey;
+      const modelKey = (aiResponseObject.model || lockedProvider) as CostMapKey;
       const costs = COST_PER_1M_TOKENS[modelKey] || { input: 0, output: 0 };
       
       const totalCost = ((aiResponseObject.tokensIn / 1_000_000) * costs.input) + 
                         ((aiResponseObject.tokensOut / 1_000_000) * costs.output);
 
-      // --- 7. Salvar a Resposta da IA (O "Histórico Inteligente") ---
+      // --- 7. Salvar a Resposta da IA ---
       await prisma.message.create({
         data: {
           role: 'assistant',
           content: responseText,
           chatId: currentChat.id,
-          // Telemetria "Inteligente"
-          provider: provider,
+          provider: lockedProvider,
           model: modelKey,
           tokensIn: aiResponseObject.tokensIn,
           tokensOut: aiResponseObject.tokensOut,
@@ -109,11 +119,11 @@ export const chatController = {
         }
       });
 
-      // --- 8. Salvar o Log de Analytics (para os gráficos globais) ---
+      // --- 8. Salvar o Log de Analytics ---
       prisma.apiCallLog.create({
         data: {
           userId: req.userId,
-          provider: provider,
+          provider: lockedProvider,
           model: modelKey,
           tokensIn: aiResponseObject.tokensIn || 0,
           tokensOut: aiResponseObject.tokensOut || 0,
@@ -127,13 +137,13 @@ export const chatController = {
         console.error("Falha ao salvar log de analytics:", err);
       });
 
-      logger.info(`Chat message processed for user: ${req.userId}${provider ? ` using ${provider}` : ''}`);
+      logger.info(`Chat message processed for user: ${req.userId} using locked provider: ${lockedProvider}`);
 
-      // --- 9. Enviar a resposta (e o ID da conversa) ao frontend ---
+      // --- 9. Enviar a resposta (com provider travado) ---
       return res.status(200).json({
         response: responseText,
         chatId: currentChat.id,
-        provider: provider || 'default',
+        provider: lockedProvider, // Retorna o provider travado
       });
     } catch (error) {
       return next(error);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Select, MenuItem, FormControl, InputLabel, Chip } from '@mui/material';
 import { Send as SendIcon } from '@mui/icons-material';
 import MainLayout from '../components/Layout/MainLayout';
 import ChatSidebar from '../components/Chat/ChatSidebar';
@@ -19,6 +19,7 @@ export default function Chat() {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<string>('groq');
   const [isLoading, setIsLoading] = useState(false);
+  const [currentChatProvider, setCurrentChatProvider] = useState<string | null>(null);
 
   // Proteger rota
   useEffect(() => {
@@ -52,6 +53,12 @@ export default function Chat() {
       const chatMessages = await chatHistoryService.getChatMessages(chatId);
       setMessages(chatMessages);
       setCurrentChatId(chatId);
+      
+      // Buscar provider travado do chat selecionado
+      const selectedChat = chatHistory.find(c => c.id === chatId);
+      if (selectedChat) {
+        setCurrentChatProvider(selectedChat.provider);
+      }
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
     } finally {
@@ -63,6 +70,7 @@ export default function Chat() {
     setCurrentChatId(null);
     setMessages([]);
     setInputMessage('');
+    setCurrentChatProvider(null); // Libera seleção de provider
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -94,12 +102,15 @@ export default function Chat() {
     setMessages((prev) => [...prev, tempUserMessage]);
 
     try {
-      const response = await chatService.sendMessage(userMessage, selectedProvider, currentChatId);
+      // Usa o provider travado se existir, senão usa o selecionado
+      const providerToUse = currentChatProvider || selectedProvider;
+      const response = await chatService.sendMessage(userMessage, providerToUse, currentChatId);
       
-      // Atualiza chatId se foi criado um novo chat
+      // Atualiza chatId e provider travado se foi criado um novo chat
       if (response.chatId !== currentChatId) {
         setCurrentChatId(response.chatId);
-        await loadChatHistory(); // Atualiza sidebar
+        setCurrentChatProvider(response.provider); // Trava o provider
+        await loadChatHistory();
       }
 
       // Adiciona resposta da IA
@@ -142,6 +153,21 @@ export default function Chat() {
 
         {/* Área de Chat */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Cabeçalho com Provider Travado */}
+          {currentChatProvider && (
+            <Paper sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Provider travado:
+              </Typography>
+              <Chip 
+                label={currentChatProvider.toUpperCase()} 
+                size="small" 
+                color="primary" 
+                variant="outlined"
+              />
+            </Paper>
+          )}
+
           {/* Mensagens */}
           <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
             {isLoading && messages.length === 0 ? (
@@ -181,10 +207,15 @@ export default function Chat() {
               <FormControl sx={{ minWidth: 200 }}>
                 <InputLabel>Provider de IA</InputLabel>
                 <Select
-                  value={selectedProvider}
-                  onChange={(e) => setSelectedProvider(e.target.value)}
+                  value={currentChatProvider || selectedProvider}
+                  onChange={(e) => {
+                    if (!currentChatProvider) {
+                      setSelectedProvider(e.target.value);
+                    }
+                  }}
                   label="Provider de IA"
                   size="small"
+                  disabled={!!currentChatProvider} // Desabilita se chat já existe
                 >
                   <MenuItem value="groq">Groq (LLaMA 3.1 - Gratuito)</MenuItem>
                   <MenuItem value="openai">OpenAI (GPT-3.5/4)</MenuItem>
@@ -194,6 +225,11 @@ export default function Chat() {
                   <MenuItem value="mistral">Mistral</MenuItem>
                 </Select>
               </FormControl>
+              {currentChatProvider && (
+                <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                  (Travado para este chat)
+                </Typography>
+              )}
             </Box>
             
             <Box sx={{ display: 'flex', gap: 1 }}>

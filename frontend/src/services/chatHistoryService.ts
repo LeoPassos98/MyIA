@@ -3,6 +3,7 @@ import { api } from './api';
 export interface Chat {
   id: string;
   title: string;
+  provider: string; // Provider travado
   updatedAt: string;
 }
 
