@@ -6,6 +6,7 @@ import { streamOpenAIChat } from './client/openaiClient';
 import { streamClaudeChat } from './client/claudeClient';
 import { handleChat } from './handlers/chatHandler';
 import { getConfiguredProviders, testProvider } from './handlers/providerHandler';
+import { getEmbedding, getEmbeddingsBatch, EmbeddingResponse } from './client/azureEmbeddingClient';
 
 export const aiService = {
   /**
@@ -51,6 +52,22 @@ export const aiService = {
     return handleChat(messages, provider);
   },
 
+  /**
+   * Modo "TRADUTOR/CONTADOR" (V9.2)
+   * Converte texto em vetor + retorna custo calculado
+   */
+  async embed(text: string): Promise<EmbeddingResponse | null> {
+    return getEmbedding(text);
+  },
+
+  /**
+   * Modo "TRADUTOR EM LOTE" (V9.2)
+   * Converte múltiplos textos em vetores + retorna custos
+   */
+  async embedBatch(texts: string[]): Promise<EmbeddingResponse[]> {
+    return getEmbeddingsBatch(texts);
+  },
+
   getConfiguredProviders() {
     return getConfiguredProviders();
   },
@@ -59,5 +76,8 @@ export const aiService = {
     return testProvider(provider);
   },
 };
+
+// Exportar interface para uso externo
+export type { EmbeddingResponse };
 
 export * from './types';

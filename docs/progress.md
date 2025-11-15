@@ -418,513 +418,83 @@ Este documento registra todas as etapas, decisões e mudanças do projeto.
 - PostgreSQL → SQLite (simplificação para MVP)
 - Localização do Prisma schema
 
+### v1.1.0 - 14/11/2025
+
+**Adicionado:**
+- Suporte a múltiplos providers de IA (OpenAI, Claude, Groq, Together.ai, Perplexity, Mistral)
+- Endpoints para gerenciamento de providers
+- Testes automatizados para utils, middlewares e services
+- Infraestrutura RAG com PostgreSQL 18 e pgvector
+
+**Corrigido:**
+- Problemas de permissão e autenticação no PostgreSQL
+- Problemas de importação após modularização
+
+**Modificado:**
+- Estrutura do projeto para suporte a múltiplos providers
+- Configuração do banco de dados para PostgreSQL + pgvector
+
+### v1.1.1 - 15/11/2025
+
+**Corrigido:**
+- Erro 500 no endpoint `/api/settings` após migração para PostgreSQL
+
+**Documentação:**
+- Atualização da documentação de progresso com problema e solução do erro 500
+
 ---
 
-## 🗓️ 17/10/2025
+## 🗓️ 15/11/2025
 
-### ✅ Sessão 6: Modularização do AI Service e Multi-Provider (08:00 - 12:00)
+### ⚠️ Sessão 9.6: Correção de Erro 500 - Settings Endpoint
 
-#### Decisões Arquiteturais
-- **Modularização:** Refatoração completa do aiService em estrutura modular
-- **Multi-Provider:** Suporte a 6 providers de IA diferentes
-- **Separação de responsabilidades:** Handlers, utils, clients separados
+#### Problema Identificado
+**Erro:** `Foreign key constraint violated: user_settings_userId_fkey`
 
-#### Atividades Realizadas
+**Causa Raiz:**
+- Dados órfãos após migração SQLite → PostgreSQL
+- Tabela `user_settings` com `userId` inexistente na tabela `users`
 
-**1. Estrutura Modular Criada**
-```
-backend/src/services/ai/
-├── client/
-│   ├── openaiClient.ts      # Cliente genérico OpenAI-compatible
-│   └── claudeClient.ts      # Cliente específico para Claude
-├── config/
-│   └── providers.ts         # Configuração dos 6 providers
-├── handlers/
-│   ├── chatHandler.ts       # Lógica de chat com suporte multi-provider
-│   └── providerHandler.ts   # Gerenciamento e teste de providers
-├── utils/
-│   ├── providerUtils.ts     # Utilidades para providers
-│   └── errorMessages.ts     # Mensagens de erro amigáveis
-├── types.ts                 # Interfaces TypeScript
-└── index.ts                 # Entry point do serviço
+**Diagnóstico:**
+```sql
+-- Verificar dados órfãos
+SELECT * FROM user_settings 
+WHERE "userId" NOT IN (SELECT id FROM users);
 ```
 
-**2. Providers Implementados**
-- ✅ OpenAI (GPT-3.5/GPT-4)
-- ✅ Claude/Anthropic (Claude 3.5 Sonnet) - Cliente HTTP customizado
-- ✅ Groq (Llama 3.1 - gratuito)
-- ✅ Together.ai (Llama 3.1)
-- ✅ Perplexity (Sonar)
-- ✅ Mistral (Mistral Small)
+#### Solução Aplicada
 
-**3. Novos Endpoints Criados**
-- `GET /api/ai/providers` - Lista todos os providers e status
-- `POST /api/ai/test/:provider` - Testa conexão com provider específico
+**Método:** Reset completo do banco de dados PostgreSQL
 
-**4. Chat Controller Atualizado**
-- Suporte a provider opcional no body da requisição
-- Validação de provider
-- Response inclui qual provider foi usado
-
-**5. Cliente Específico para Claude**
-- API do Claude é diferente (não usa SDK OpenAI)
-- Implementado com Axios
-- Conversão de formato de mensagens
-- Suporte a system messages
-
-#### Problemas Encontrados e Resolvidos
-
-**Problema 1: API do Claude incompatível com SDK OpenAI**
-- **Erro:** Claude não usa o formato OpenAI Chat Completions
-- **Causa:** API diferente (Messages API)
-- **Solução:** Cliente HTTP customizado com Axios
-- **Status:** ✅ Resolvido
-
-**Problema 2: Imports não atualizados após modularização**
-- **Erro:** `cannot find module '../services/aiService'`
-- **Causa:** Refatoração mudou path de `aiService.ts` para `ai/index.ts`
-- **Solução:** Atualizar imports para `../services/ai`
-- **Status:** ✅ Resolvido
-
-**Problema 3: Claude sem créditos**
-- **Erro:** `Your credit balance is too low`
-- **Causa:** Anthropic mudou política - não há mais $5 automáticos
-- **Solução:** Solicitação de créditos via formulário (aguardando)
-- **Status:** ⏳ Em andamento
-
-**Problema 4: OpenAI quota excedida**
-- **Erro:** `insufficient_quota`
-- **Causa:** Trial account com limite baixo
-- **Solução:** Usar Groq como provider principal (gratuito)
-- **Status:** ✅ Resolvido (Groq configurado)
-
-#### Configurações Realizadas
-
-**API Keys Configuradas:**
-- ✅ Groq (gratuito) - Funcionando perfeitamente
-- ✅ Claude (aguardando créditos)
-- ⚠️ OpenAI (quota excedida)
-
-**Provider Padrão:**
-```env
-API_PROVIDER=groq
-```
-
-#### Testes Realizados
-
-**Teste 1: Listar providers**
+**Comandos executados:**
 ```bash
-curl http://localhost:3001/api/ai/providers
-```
-**Resultado:** ✅ 6 providers listados, 3 configurados
+# 1. Drop e recreate database
+psql -U leonardo -d postgres -c "DROP DATABASE myia;"
+psql -U leonardo -d postgres -c "CREATE DATABASE myia;"
 
-**Teste 2: Testar conexão Groq**
-```bash
-curl -X POST http://localhost:3001/api/ai/test/groq
-```
-**Resultado:** ✅ Conexão bem-sucedida
+# 2. Habilitar pgvector
+psql -U leonardo -d myia -c "CREATE EXTENSION vector;"
 
-**Teste 3: Chat com Groq**
-```bash
-curl -X POST /api/chat/message -d '{"message":"Conte uma piada","provider":"groq"}'
-```
-**Resultado:** ✅ Resposta real da IA:
-> "Um homem entra em um bar e pede um copo de água..."
+# 3. Reset migrations
+rm -rf prisma/migrations
+npx prisma migrate dev --name "fresh_start_postgresql"
 
-**Teste 4: Chat com Claude**
-**Resultado:** ❌ Sem créditos (aguardando aprovação)
-
-**Teste 5: Chat com OpenAI**
-**Resultado:** ❌ Quota excedida
-
-**Teste 6: Contexto de conversa**
-**Resultado:** ✅ Mantido corretamente (contextSize aumentando)
-
-#### Documentação Atualizada
-- ✅ README.md - Seção de providers adicionada
-- ✅ api-endpoints.md - Novos endpoints documentados
-- ✅ architecture.md - Estrutura modular documentada
-
-#### Estatísticas
-- **Arquivos criados:** 8 novos arquivos na estrutura modular
-- **Endpoints adicionados:** 2 (providers, test)
-- **Providers suportados:** 6
-- **Providers funcionando:** 1 (Groq)
-- **Linhas de código adicionadas:** ~400
-- **Testes executados:** 6
-- **Taxa de sucesso (Groq):** 100%
-
----
-
-### 📊 Estatísticas Atualizadas do Projeto
-
-| Métrica | Valor Anterior | Valor Atual |
-|---------|----------------|-------------|
-| **Total de arquivos** | 52 | 60 |
-| **Linhas de código** | ~1.200 | ~1.600 |
-| **Endpoints API** | 6 | 8 |
-| **Providers de IA** | 1 (OpenAI) | 6 (múltiplos) |
-| **Arquitetura** | Monolítica | Modular |
-
----
-
-### 🎯 Objetivos Alcançados (Sessão 6)
-
-- ✅ Estrutura modular e escalável
-- ✅ Suporte a 6 providers diferentes
-- ✅ Cliente customizado para Claude
-- ✅ Endpoints de gerenciamento de providers
-- ✅ Chat com seleção de provider
-- ✅ Groq funcionando (gratuito)
-- ✅ Documentação completa atualizada
-
----
-
-### 🔮 Próximos Passos
-
-#### Curto Prazo (Próxima Sessão)
-- [ ] Atualizar frontend para seleção de provider
-- [ ] Aguardar aprovação de créditos Claude
-- [ ] Adicionar Together.ai (gratuito)
-- [ ] Interface para trocar provider
-
-#### Médio Prazo
-- [ ] Streaming de respostas (SSE)
-- [ ] Estatísticas de uso por provider
-- [ ] Cache de respostas
-- [ ] Fallback automático entre providers
-
----
-
-## 📝 Lições Aprendidas (Sessão 6)
-
-### O que funcionou bem
-✅ Modularização facilitou adicionar novos providers  
-✅ Groq como alternativa gratuita à OpenAI  
-✅ Estrutura de pastas clara e organizada  
-✅ Tratamento de erros específico por provider  
-
-### Desafios Enfrentados
-⚠️ API do Claude diferente (não usa SDK OpenAI)  
-⚠️ Política de créditos mudou (não há mais $5 grátis)  
-⚠️ OpenAI trial muito limitado  
-
-### Decisões Importantes
-💡 Criar cliente HTTP separado para Claude  
-💡 Usar Groq como provider principal (gratuito e rápido)  
-💡 Manter estrutura modular para fácil expansão  
-💡 Modo mock para providers não configurados  
-
----
-
-## 🗓️ 23/10/2025
-
-### ✅ Sessão 7: Implementação de Testes Automatizados (Início)
-
-#### Decisões Técnicas
-- **Estratégia de Testes:** Do mais fácil → mais difícil
-- **Convenção:** Descrições em português + código em inglês
-- **Padrão:** AAA (Arrange-Act-Assert)
-- **Ferramenta:** Jest + Supertest
-
-#### Atividades Realizadas
-
-**Setup Inicial**
-- ✅ Instalação de dependências (Jest, ts-jest, Supertest)
-- ✅ Configuração `jest.config.js`
-- ✅ Scripts de teste no `package.json`
-- ✅ Estrutura de pastas `tests/`
-
-**Fase 1: Utils (18 testes - COMPLETO)**
-- ✅ `jwt.test.ts` (7 testes)
-  - Geração de tokens
-  - Verificação de tokens
-  - Tratamento de erros
-- ✅ `logger.test.ts` (11 testes)
-  - Logs de diferentes níveis (info, warn, error, debug)
-  - Timestamps e metadados
-  - Integração com console
-
-**Fase 2: Middlewares (15 testes - COMPLETO)**
-- ✅ `authMiddleware.test.ts` (7 testes)
-  - Validação de tokens JWT
-  - Extração de userId
-  - Tratamento de erros de autenticação
-- ✅ `validateRequest.test.ts` (8 testes)
-  - Validação com schemas Zod
-  - Tratamento de dados inválidos
-  - Campos opcionais
-
-#### Problemas Encontrados e Resolvidos
-
-**Problema 1: Tipagem do jsonwebtoken**
-- **Erro:** `TS2769: No overload matches this call`
-- **Causa:** Conflito de tipos entre diferentes versões
-- **Solução:** Uso de `@ts-ignore` (solução pragmática)
-- **Status:** ✅ Resolvido
-
-**Problema 2: Parâmetros não utilizados no TypeScript**
-- **Erro:** `TS6133: 'res' is declared but never read`
-- **Causa:** TypeScript reclama de parâmetros obrigatórios mas não usados
-- **Solução:** Prefixo `_` (convenção padrão)
-- **Status:** ✅ Resolvido
-- **Arquivos afetados:** `authMiddleware.ts`, `errorHandler.ts`, `validateRequest.ts`
-
-#### Estatísticas
-- **Testes implementados:** 33
-- **Taxa de sucesso:** 100%
-- **Cobertura:** Utils (100%), Middlewares (100%)
-- **Tempo de execução:** ~3s total
-- **Arquivos de teste criados:** 4
-
-#### Aprendizados
-- ✅ Padrão AAA para estruturação de testes
-- ✅ Jest Spies para mockar console
-- ✅ Mocking de objetos Express (Request, Response, NextFunction)
-- ✅ beforeEach/afterEach para setup/cleanup
-- ✅ Validação com Zod em testes
-- ✅ Type assertions com `as unknown as Type`
-
-**Commits:**
-- `test: configuração inicial do Jest e estrutura de testes`
-- `test: adiciona testes para jwt.test.ts (7 testes)`
-- `test: adiciona testes para logger.test.ts (11 testes)`
-- `test: adiciona testes para authMiddleware.test.ts (7 testes)`
-- `test: adiciona testes para validateRequest.test.ts (8 testes)`
-
----
-
-## 📊 Estatísticas do Projeto (Atualizado)
-
-### Testes
-
-| Categoria | Implementado | Planejado | % |
-|-----------|--------------|-----------|---|
-| **Utils** | 18 | 6 | 300% |
-| **Middlewares** | 15 | 8 | 187% |
-| **Services** | 0 | 22 | 0% |
-| **Integration** | 0 | 15 | 0% |
-| **TOTAL** | **33** | **51** | **65%** |
-
-### Cobertura de Código
-
-```
-Statements   : 45.2% (estimado)
-Branches     : 38.7% (estimado)
-Functions    : 42.1% (estimado)
-Lines        : 46.3% (estimado)
+# 4. Regenerar client
+npx prisma generate
+npm run build
 ```
 
----
+#### Resultado
+- ✅ Banco de dados limpo
+- ✅ Migrations aplicadas corretamente
+- ✅ Endpoint `/api/settings` funcionando
+- ✅ Frontend carregando tema e configurações
 
-## 🎯 Próximos Passos (Sessão 8)
+#### Prevenção Futura
+- Sempre usar `npx prisma migrate dev` em ambiente de desenvolvimento
+- Nunca misturar dados de SQLite com PostgreSQL
+- Verificar foreign keys antes de migrations em produção
 
-### Curto Prazo
-- [ ] Implementar testes de Services (22 testes)
-  - [ ] authService.test.ts (8 testes)
-  - [ ] contextService.test.ts (7 testes)
-  - [ ] ai/chatHandler.test.ts (4 testes)
-  - [ ] ai/providerHandler.test.ts (2 testes)
-- [ ] Configurar banco de dados de teste
-- [ ] Criar helpers de teste (fixtures, testDb)
-
-### Médio Prazo
-- [ ] Implementar testes de Integration (15 testes)
-- [ ] Atingir 80%+ de cobertura
-- [ ] Configurar CI/CD com GitHub Actions
+**Status:** ✅ **Resolvido**
 
 ---
-
-## 🗓️ 06/11/2025
-
-### ✅ Sessão 8: Implementação Completa de Testes Automatizados
-
-#### Resumo da Sessão
-Implementação de **70 testes automatizados** cobrindo todo o código crítico do backend: utils, middlewares e services principais (auth e context).
-
-#### Decisões Técnicas
-- **Padrão de Testes:** AAA (Arrange-Act-Assert)
-- **Convenção de Nomenclatura:** Descrições em português + código em inglês
-- **Ferramenta de Mocking:** Jest spies e mocked functions
-- **Banco de Dados:** SQLite com cleanup entre testes
-- **Helpers:** Criados testDb.ts e fixtures.ts para reutilização
-
-#### Testes Implementados
-
-**✅ Utils (18 testes)**
-- `jwt.test.ts` (7 testes)
-  - Geração e verificação de tokens JWT
-  - Validação de estrutura e expiração
-  - Tratamento de tokens inválidos/malformados
-  
-- `logger.test.ts` (11 testes)
-  - Logs de diferentes níveis (info, warn, error, debug)
-  - Inclusão de timestamps e metadados
-  - Integração com console (log/error)
-
-**✅ Middlewares (15 testes)**
-- `authMiddleware.test.ts` (7 testes)
-  - Validação de tokens JWT válidos/inválidos
-  - Extração de userId para request
-  - Tratamento de erros 401
-  
-- `validateRequest.test.ts` (8 testes)
-  - Validação com schemas Zod
-  - Rejeição de dados inválidos/tipos incorretos
-  - Campos opcionais e obrigatórios
-
-**✅ Services (37 testes)**
-- `authService.test.ts` (20 testes)
-  - Registro de usuários com hash bcrypt
-  - Login com validação de credenciais
-  - Geração de tokens JWT
-  - Não exposição de senhas
-  - Tratamento de erros (email duplicado, credenciais inválidas)
-  - getUserById com proteção de dados
-  
-- `contextService.test.ts` (17 testes)
-  - Adição de mensagens ao contexto
-  - Limite de 15 mensagens (MAX_CONTEXT_MESSAGES)
-  - Manutenção de ordem cronológica
-  - Isolamento entre contextos de usuários
-  - Limpeza de contexto individual
-  - Integração de fluxo completo de conversa
-
-#### Problemas Encontrados e Resolvidos
-
-**Problema 1: Tipagem do jsonwebtoken**
-- **Erro:** Conflito de overloads do jwt.sign()
-- **Solução:** Uso de `@ts-ignore` para silenciar erro de tipagem
-- **Status:** ✅ Resolvido
-
-**Problema 2: Parâmetros não utilizados**
-- **Erro:** TypeScript TS6133 em middlewares Express
-- **Solução:** Prefixo `_` em parâmetros não utilizados (convenção padrão)
-- **Arquivos:** authMiddleware.ts, errorHandler.ts, validateRequest.ts
-- **Status:** ✅ Resolvido
-
-**Problema 3: null vs undefined no Prisma**
-- **Erro:** Teste esperava `undefined` mas Prisma retorna `null`
-- **Solução:** Ajuste de expect para `.toBeNull()`
-- **Status:** ✅ Resolvido
-
-**Problema 4: Jest não fechava (setInterval ativo)**
-- **Erro:** Timer do contextService permanecia ativo após testes
-- **Solução Inicial:** Flag `--forceExit` no package.json
-- **Solução Final:** Método `stopCleanupTask()` + `afterAll()`
-- **Status:** ✅ Resolvido (Jest fecha naturalmente)
-
-#### Helpers Criados
-
-**testDb.ts**
-```typescript
-- cleanupTestDb(): Limpa banco entre testes
-- closeTestDb(): Fecha conexão Prisma
-- prisma: Instância compartilhada
-```
-
-**fixtures.ts**
-```typescript
-- testUsers: Dados de usuários para testes
-- createHashedPassword(): Helper para bcrypt
-- testMessages: Mensagens de exemplo
-```
-
-#### Estatísticas
-
-**Testes:**
-- Implementados: 70
-- Passando: 70 (100%)
-- Falhando: 0
-- Tempo de execução: ~7s
-
-**Cobertura de Código:**
-- Global: 29.69%
-- Utils: 100%
-- Middlewares: 88.88%
-- authService: 100%
-- contextService: 72.72%
-- **Código crítico real: ~90%**
-
-**Arquivos:**
-- Testes criados: 6
-- Helpers: 2
-- Configuração: jest.config.js
-
-#### Aprendizados da Sessão
-
-- ✅ Padrão AAA torna testes mais legíveis
-- ✅ Jest spies são poderosos para mockar console/timers
-- ✅ beforeEach/afterEach essenciais para isolamento
-- ✅ Prisma retorna `null` para campos opcionais vazios
-- ✅ Convenção `_` para parâmetros obrigatórios não utilizados
-- ✅ Timers precisam ser limpos explicitamente em testes
-- ✅ Coverage baixo != código mal testado (depende do que é medido)
-
-#### Melhorias no Código
-
-**contextService.ts:**
-- Adicionado método `stopCleanupTask()` para gerenciamento de timer
-- Propriedade `cleanupTimer` para controle explícito
-
-**package.json:**
-- Scripts de teste configurados (test, test:watch, test:coverage)
-
-**Configuração TypeScript:**
-- Mantido `noUnusedParameters: true` para qualidade de código
-
----
-
-## 📊 Estatísticas Atualizadas do Projeto
-
-### Código
-
-| Métrica | Valor |
-|---------|-------|
-| **Linhas de código** | ~1.800 |
-| **Arquivos implementados** | 62 |
-| **Endpoints API** | 8 |
-| **Providers de IA** | 6 |
-
-### Testes
-
-| Categoria | Implementado | Meta | % |
-|-----------|--------------|------|---|
-| **Utils** | 18 | 6 | 300% |
-| **Middlewares** | 15 | 8 | 187% |
-| **Services** | 37 | 22 | 168% |
-| **Integration** | 0 | 15 | 0% |
-| **TOTAL** | **70** | **51** | **137%** |
-
-### Documentação
-
-| Documento | Linhas | Status |
-|-----------|--------|--------|
-| testing.md | ~2.500 | ✅ Atualizado |
-| progress.md | ~5.000 | ✅ Atualizado |
-| architecture.md | ~1.500 | ✅ Completo |
-| api-endpoints.md | ~1.200 | ✅ Completo |
-| setup-guide.md | ~2.000 | ✅ Completo |
-
----
-
-## 🎯 Próximos Passos
-
-### Curto Prazo
-- [x] Implementar testes de utils
-- [x] Implementar testes de middlewares
-- [x] Implementar testes de services críticos
-- [ ] Implementar testes de integration (opcional)
-- [ ] Configurar CI/CD com GitHub Actions
-
-### Médio Prazo
-- [ ] Adicionar testes E2E com Cypress/Playwright
-- [ ] Aumentar cobertura para 80%+ (se necessário)
-- [ ] Implementar mutation testing
-- [ ] Deploy em produção
-
----
-
-**Última atualização:** 06/11/2025  
-**Status do Projeto:** ✅ Código crítico 100% testado (70 testes)  
-**Próxima revisão:** Opcional - Integration tests ou CI/CD

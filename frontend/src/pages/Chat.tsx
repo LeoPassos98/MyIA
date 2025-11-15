@@ -15,6 +15,7 @@ export default function Chat() {
 
   const [chatHistory, setChatHistory] = useState<ChatType[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<string>('groq');
@@ -26,7 +27,8 @@ export default function Chat() {
 
   // --- Novos Estados para Modal de Contexto ---
   const [promptModalOpen, setPromptModalOpen] = useState(false);
-  const [selectedPrompt, setSelectedPrompt] = useState<Array<{ role: string; content: string }>>([]);
+  // [V22] selectedPrompt pode ser relatório ou lista
+  const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
 
   // Proteger rota
   useEffect(() => {
@@ -60,7 +62,7 @@ export default function Chat() {
       const chatMessages = await chatHistoryService.getChatMessages(chatId);
       setMessages(chatMessages);
       setCurrentChatId(chatId);
-      
+
       // --- A LÓGICA DE TRAVAMENTO ---
       const selectedChat = chatHistory.find(c => c.id === chatId);
       if (selectedChat) {
@@ -101,6 +103,13 @@ export default function Chat() {
     setInputMessage('');
     setIsLoading(true);
 
+    // 🔍 DEBUG: Verificar estado atual
+    console.log('🐛 Estado antes de enviar:', {
+      currentChatId,
+      currentChatProvider,
+      selectedProvider
+    });
+
     // 1. Adiciona mensagem do usuário (otimisticamente)
     const userMsgId = `temp-user-${Date.now()}`;
     const tempUserMessage: Message = {
@@ -131,8 +140,7 @@ export default function Chat() {
       providerToUse,
       currentChatId,
       contextStrategy,
-      
-      // --- Callback de Gotejamento (onChunk) ---
+
       (chunk: StreamChunk) => {
         if (chunk.type === 'chunk') {
           setMessages((prev) =>
@@ -143,6 +151,13 @@ export default function Chat() {
             )
           );
         } else if (chunk.type === 'telemetry') {
+          const hasChatId = !!chunk.metrics.chatId && typeof chunk.metrics.chatId === 'string';
+
+          if (hasChatId) {
+            newChatId = chunk.metrics.chatId || null;
+            newProvider = chunk.metrics.provider;
+          }
+
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -153,17 +168,16 @@ export default function Chat() {
                     tokensIn: chunk.metrics.tokensIn,
                     tokensOut: chunk.metrics.tokensOut,
                     costInUSD: chunk.metrics.costInUSD,
-                    sentContext: chunk.metrics.sentContext // <-- CAPTURA sentContext
+                    sentContext: chunk.metrics.sentContext
                   }
                 : msg
             )
           );
-          
-          // IMPORTANTE: Capturar chatId da telemetria
-          newChatId = chunk.metrics.chatId || null;
-          newProvider = chunk.metrics.provider;
+
+          if (chunk.metrics.provider) {
+            newProvider = chunk.metrics.provider;
+          }
         } else if (chunk.type === 'error') {
-          console.error('Erro no stream:', chunk.error);
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -174,97 +188,149 @@ export default function Chat() {
           setDebugLogs((prev) => [...prev, `❌ ERRO: ${chunk.error}`]);
         } else if (chunk.type === 'debug') {
           setDebugLogs((prev) => [...prev, chunk.log]);
+
+          // --- Fallback V20.2: Extrair chatId e provider do log ---
+          try {
+            const log = chunk.log || '';
+            const chatIdMatch = log.match(/Chat criado:\s*([0-9a-fA-F-]{36})/i);
+            if (chatIdMatch) {
+              const parsedId = chatIdMatch[1];
+              if (!newChatId || newChatId !== parsedId) {
+                newChatId = parsedId;
+              }
+            }
+            const providerMatch = log.match(/\(provider:\s*([a-z0-9_-]+)\)/i);
+            if (providerMatch) {
+              const parsedProvider = providerMatch[1];
+              if (!newProvider) {
+                newProvider = parsedProvider;
+              }
+            }
+          } catch {
+            // noop
+          }
         }
       },
 
-      // --- Callback de Conclusão (onComplete) ---
       () => {
         setIsLoading(false);
-        
-        // ATUALIZAR currentChatId E currentChatProvider
-        if (newChatId && newChatId !== currentChatId) {
-          console.log(`🔄 Atualizando chatId: ${currentChatId} → ${newChatId}`);
-          setCurrentChatId(newChatId);
-          
-          if (newProvider && !currentChatProvider) {
-            console.log(`🔒 Travando provider: ${newProvider}`);
-            setCurrentChatProvider(newProvider);
+        setCurrentChatId((prevChatId) => {
+          if (newChatId && newChatId !== prevChatId) {
+            if (newProvider && !currentChatProvider) {
+              setCurrentChatProvider(newProvider);
+            }
+            loadChatHistory();
+            return newChatId;
           }
-          
-          loadChatHistory(); // Atualiza sidebar
-        }
+          return prevChatId;
+        });
       },
 
-      // --- Callback de Erro (onError) ---
       (error: string) => {
-        console.error('Erro fatal no stream:', error);
+        console.error('Erro fatal:', error);
         setIsLoading(false);
         setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
-        alert(`Erro ao enviar mensagem: ${error}`);
+        alert(`Erro: ${error}`);
       }
     );
   };
 
   // --- Modal do Visualizador de Prompt ---
-  const renderPromptModal = () => (
-    <Modal 
-      open={promptModalOpen} 
-      onClose={() => setPromptModalOpen(false)}
-      sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-    >
-      <Paper sx={{ 
-        maxWidth: '80vw', 
-        maxHeight: '80vh', 
-        overflow: 'auto',
-        p: 3,
-        backgroundColor: 'background.paper'
-      }}>
-        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CodeIcon /> Contexto Enviado ao Provider
-        </Typography>
-        
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-          Este é o prompt exato (histórico) que foi enviado à IA para gerar a resposta.
-        </Typography>
+  // [V22] Modal inteligente
+  const renderPromptModal = () => {
+    if (!selectedPrompt) return null;
 
-        <Box sx={{ 
-          maxHeight: '60vh', 
-          overflow: 'auto', 
-          backgroundColor: '#1E1E1E',
-          borderRadius: 1,
-          p: 2
-        }}>
-          {selectedPrompt.map((msg, index) => (
-            <Box key={index} sx={{ mb: 3 }}>
-              <Chip 
-                label={msg.role.toUpperCase()} 
-                color={msg.role === 'user' ? 'primary' : 'secondary'} 
-                size="small"
-                sx={{ mb: 1 }}
-              />
-              <Typography sx={{ 
-                whiteSpace: 'pre-wrap', 
-                fontFamily: 'monospace', 
-                color: '#00FF00',
-                fontSize: '12px',
-                lineHeight: 1.6
-              }}>
-                {msg.content}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
+    const isRagReport = selectedPrompt && selectedPrompt.finalContext;
+    const isFastMode = Array.isArray(selectedPrompt);
 
-        <Box sx={{ mt: 2, textAlign: 'right' }}>
-          <Chip 
-            label={`Total: ${selectedPrompt.length} mensagens`} 
-            size="small" 
-            variant="outlined"
+    let relevantMessages: Message[] = [];
+    let recentMessages: Message[] = [];
+    let finalContext: Message[] = [];
+
+    if (isRagReport) {
+      relevantMessages = selectedPrompt.relevantMessages || [];
+      recentMessages = selectedPrompt.recentMessages || [];
+      finalContext = selectedPrompt.finalContext || [];
+    } else if (isFastMode) {
+      finalContext = selectedPrompt;
+    }
+
+    const renderList = (messages: Message[]) => (
+      messages.map((msg, index) => (
+        <Box key={index} sx={{ mb: 3 }}>
+          <Chip
+            label={msg.role.toUpperCase()}
+            color={msg.role === 'user' ? 'primary' : 'secondary'}
+            size="small"
+            sx={{ mb: 1 }}
           />
+          <Typography sx={{
+            whiteSpace: 'pre-wrap',
+            fontFamily: 'monospace',
+            color: '#00FF00',
+            fontSize: '12px',
+            lineHeight: 1.6
+          }}>
+            {msg.content}
+          </Typography>
         </Box>
-      </Paper>
-    </Modal>
-  );
+      ))
+    );
+
+    return (
+      <Modal
+        open={promptModalOpen}
+        onClose={() => setPromptModalOpen(false)}
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Paper sx={{
+          maxWidth: '80vw',
+          maxHeight: '80vh',
+          overflow: 'auto',
+          p: 3,
+          backgroundColor: 'background.paper'
+        }}>
+          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CodeIcon /> Contexto Enviado (V22 - Detalhado)
+          </Typography>
+
+          <Box sx={{
+            maxHeight: '60vh',
+            overflow: 'auto',
+            backgroundColor: '#1E1E1E',
+            borderRadius: 1,
+            p: 2
+          }}>
+            {/* --- A PROVA DO V9.4 (RAG) --- */}
+            {isRagReport && (
+              <>
+                <Chip label={`🧠 Memória Relevante (RAG V9.4) - ${relevantMessages.length} msgs`} sx={{ mb: 2, backgroundColor: 'secondary.main', color: 'white' }} />
+                {renderList(relevantMessages)}
+
+                <Chip label={`⚡ Memória Recente (V7) - ${recentMessages.length} msgs`} sx={{ mb: 2, mt: 2, backgroundColor: 'primary.main', color: 'white' }} />
+                {renderList(recentMessages)}
+              </>
+            )}
+
+            {/* --- O "MOTOR RÁPIDO" V7 --- */}
+            {isFastMode && (
+              <>
+                <Chip label={`⚡ Contexto Rápido (V7) - ${finalContext.length} msgs`} sx={{ mb: 2, backgroundColor: 'primary.main', color: 'white' }} />
+                {renderList(finalContext)}
+              </>
+            )}
+          </Box>
+
+          <Chip
+            label={`Total Enviado (V12): ${finalContext.length} msgs`}
+            size="small"
+            variant="outlined"
+            sx={{ mt: 2, float: 'right' }}
+          />
+        </Paper>
+      </Modal>
+    );
+  };
 
   // Mapa de limites de contexto por provider
   const providerContextLimits: Record<string, number> = {
@@ -356,12 +422,12 @@ export default function Chat() {
                       >
                         
                         {/* 1. O Botão "Caixa Preta" (V13) */}
-                        {msg.sentContext && (
+                        {msg.sentContext && msg.sentContext.length > 0 && (
                           <IconButton 
                             size="small"
                             onClick={() => {
-                              const parsed = typeof msg.sentContext === 'string' 
-                                ? JSON.parse(msg.sentContext) 
+                              const parsed = typeof msg.sentContext === 'string'
+                                ? JSON.parse(msg.sentContext)
                                 : msg.sentContext;
                               setSelectedPrompt(parsed);
                               setPromptModalOpen(true);
@@ -487,13 +553,10 @@ export default function Chat() {
                   onChange={(e) => setContextStrategy(e.target.value)}
                 >
                   <MenuItem value="fast">
-                    ⚡ Rápido (últimas 10 msgs)
+                    ⚡ Rápido (Últimas 10)
                   </MenuItem>
                   <MenuItem value="efficient">
-                    🧠 Eficiente ({formattedLimit} tokens)
-                  </MenuItem>
-                  <MenuItem value="intelligent_rag" disabled>
-                    🚀 Inteligente (RAG - em breve)
+                    🧠 Inteligente ({formattedLimit} tokens)
                   </MenuItem>
                 </Select>
               </FormControl>

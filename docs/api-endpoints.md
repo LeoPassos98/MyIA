@@ -668,6 +668,87 @@ O backend loga automaticamente:
 | `Invalid token` | Token expirado ou inválido | Faça login novamente |
 | `CORS error` | Origem não permitida | Ajuste `CORS_ORIGIN` no .env |
 | `Failed to get AI response` | Problema com OpenAI | Verifique `OPENAI_API_KEY` |
+| **`500 Internal Server Error` no `/api/settings`** | **Erro após migração PostgreSQL** | **Veja solução abaixo** |
+
+### 🆕 Solução: Erro 500 no `/api/settings`
+
+**Problema:** Endpoint retorna 500 após migração SQLite → PostgreSQL
+
+**Causa Raiz:** Dados órfãos (foreign key constraint violation)
+
+**Diagnóstico Completo:**
+
+1. **Verificar logs do backend:**
+```bash
+cat logs/backend.err.log | grep "Foreign key constraint"
+```
+
+2. **Verificar dados órfãos no PostgreSQL:**
+```sql
+-- Conectar ao banco
+psql -U leonardo -d myia
+
+-- Verificar settings órfãos
+SELECT * FROM user_settings 
+WHERE "userId" NOT IN (SELECT id FROM users);
+
+-- Ver todos os usuários
+SELECT id, email FROM users;
+```
+
+**Solução Permanente (Reset Completo):**
+
+```bash
+cd backend
+
+# 1. Drop banco
+psql -U leonardo -d postgres -c "DROP DATABASE myia;"
+
+# 2. Recriar
+psql -U leonardo -d postgres -c "CREATE DATABASE myia;"
+psql -U leonardo -d myia -c "CREATE EXTENSION vector;"
+
+# 3. Reset migrations
+rm -rf prisma/migrations
+npx prisma migrate dev --name "fresh_start"
+
+# 4. Regenerar
+npx prisma generate
+npm run build
+npm run dev
+```
+
+**Solução Rápida (Limpar Órfãos):**
+
+```sql
+-- Deletar apenas dados órfãos
+DELETE FROM user_settings 
+WHERE "userId" NOT IN (SELECT id FROM users);
+
+-- Depois: regenerar client e reiniciar
+```
+
+**Verificação Final:**
+
+```bash
+# 1. Criar novo usuário via frontend
+# 2. Testar endpoint
+curl -H "Authorization: Bearer TOKEN" \
+  http://localhost:3001/api/settings
+
+# Deve retornar 200 OK com:
+{
+  "id": "uuid",
+  "theme": "light",
+  "openaiApiKey": null,
+  ...
+}
+```
+
+**Prevenção:**
+- Nunca misturar dados de SQLite com PostgreSQL
+- Sempre usar migrations em ordem
+- Verificar foreign keys antes de deploy
 
 ---
 

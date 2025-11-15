@@ -86,6 +86,23 @@ export const PROVIDER_MAP: Record<string, ProviderInfo> = {
     costOut: 6.0,
     contextLimit: 128000,
   },
+
+  // --- Modelos de Embedding (V9.2) ---
+  'text-embedding-3-small': {
+    costIn: 0.02,  // $0.02 por 1M tokens (só entrada)
+    costOut: 0.0,
+    contextLimit: 8191 // Limite de tokens do modelo
+  },
+  'text-embedding-3-large': {
+    costIn: 0.13,  // $0.13 por 1M tokens
+    costOut: 0.0,
+    contextLimit: 8191
+  },
+  'text-embedding-ada-002': {
+    costIn: 0.10,  // $0.10 por 1M tokens
+    costOut: 0.0,
+    contextLimit: 8191
+  }
 };
 
 // Fallback seguro para modelos não mapeados

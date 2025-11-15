@@ -3,11 +3,13 @@
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
 }
 
 model User {
@@ -93,8 +95,8 @@ model Chat {
 // Modelo 2: A Mensagem (O "Histórico Inteligente")
 model Message {
   id        String   @id @default(uuid())
-  role      String   // "user" ou "assistant"
-  content   String   // O texto da mensagem
+  role      String
+  content   String
   createdAt DateTime @default(now())
 
   chatId    String
@@ -108,7 +110,10 @@ model Message {
   costInUSD Float?
 
   // --- A "CAIXA PRETA" (A V13) ---
-  sentContext String? // JSON serializado: '[{role, content}, ...]'
+  sentContext String?
+
+  // --- O "ARQUIVO" V9 (RAG) ---
+  vector Unsupported("vector(1536)")?
 
   @@map("messages")
 }

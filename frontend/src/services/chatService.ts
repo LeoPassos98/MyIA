@@ -31,7 +31,7 @@ export const chatService = {
   async streamChat(
     message: string,
     provider: string,
-    chatId: string | null,
+    chatId: string | null, // <-- Deve estar aqui!
     contextStrategy: string, // <-- O NOVO PARÂMETRO
     // Callbacks para o "gotejamento"
     onChunk: (chunk: StreamChunk) => void,
@@ -39,26 +39,22 @@ export const chatService = {
     onError: (error: string) => void
   ) {
     try {
-      // 1. Pegar o Token do localStorage
+      // 🔥 FIX: Usar fetch() direto ao invés de axios para SSE
       const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('Token não encontrado. Faça login novamente.');
-      }
-
-      // 2. Usar 'fetch' (NÃO AXIOS) para SSE
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      
       const response = await fetch(`${apiUrl}/chat/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Accept': 'text/event-stream',
+          'Authorization': token ? `Bearer ${token}` : '',
         },
-        body: JSON.stringify({ 
-          message, 
-          provider, 
-          chatId, 
-          contextStrategy // <-- ADICIONE AQUI
+        body: JSON.stringify({
+          message,
+          provider,
+          chatId,
+          contextStrategy,
         }),
       });
 
@@ -75,37 +71,155 @@ export const chatService = {
       const decoder = new TextDecoder();
       let buffer = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) {
-          onComplete(); // Stream terminou
-          break;
-        }
+      // --- HOTFIX V20: parser SSE por bloco (event/data) com flush final ---
+      const processBuffer = () => {
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop() || '';
 
-        // Decodificar chunk
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Processar linhas completas (SSE usa \n\n como separador)
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || ''; // Última linha incompleta volta pro buffer
+        for (const block of blocks) {
+          const trimmedBlock = block.trim();
+          if (!trimmedBlock) continue;
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.substring(6); // Remove 'data: '
-            if (data.trim()) {
-              try {
-                const parsedChunk = JSON.parse(data) as StreamChunk;
-                onChunk(parsedChunk); // Goteja o chunk para a UI!
-              } catch (e) {
-                console.error("Erro ao parsear chunk SSE:", data, e);
+          const lines = trimmedBlock.split('\n');
+          let eventType: string | undefined;
+          let dataPayload = '';
+
+          for (const rawLine of lines) {
+            const line = rawLine.trimEnd();
+            if (!line) continue;
+
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim();
+              continue;
+            }
+            if (line.startsWith('data:')) {
+              const part = line.slice(5).trimStart();
+              dataPayload += (dataPayload ? '\n' : '') + part;
+              continue;
+            }
+          }
+
+          if (!dataPayload) continue;
+
+          try {
+            const parsed = JSON.parse(dataPayload) as any;
+
+            if (parsed && typeof parsed === 'object' && parsed.type) {
+              onChunk(parsed as StreamChunk);
+
+              // --- Fallback existente: "✅ Chat criado: <uuid> (provider: ...)" ---
+              if (parsed.type === 'debug' && typeof parsed.log === 'string') {
+                const log: string = parsed.log;
+                const createdMatch = log.match(/Chat criado:\s*([0-9a-fA-F-]{36})\s*\(provider:\s*([^)]+)\)/i);
+                if (createdMatch) {
+                  const syntheticId = createdMatch[1];
+                  const syntheticProvider = createdMatch[2];
+                  onChunk({
+                    type: 'telemetry',
+                    metrics: {
+                      tokensIn: 0, tokensOut: 0, costInUSD: 0,
+                      model: '', provider: syntheticProvider, chatId: syntheticId, sentContext: undefined
+                    }
+                  });
+                }
+
+                // --- NOVO Fallback: "💬 Chat ID: <uuid>" (chat existente) ---
+                const existingMatch = log.match(/Chat ID:\s*([0-9a-fA-F-]{36})/i);
+                if (existingMatch) {
+                  const syntheticId = existingMatch[1];
+                  onChunk({
+                    type: 'telemetry',
+                    metrics: {
+                      tokensIn: 0, tokensOut: 0, costInUSD: 0,
+                      model: '', provider, chatId: syntheticId, sentContext: undefined
+                    }
+                  });
+                }
               }
+              continue;
+            }
+
+            switch (eventType) {
+              case 'telemetry':
+                onChunk({ type: 'telemetry', metrics: parsed });
+                break;
+              case 'chunk': {
+                const content = typeof parsed === 'string' ? parsed : parsed?.content ?? '';
+                onChunk({ type: 'chunk', content });
+                break;
+              }
+              case 'error': {
+                const err = typeof parsed === 'string' ? parsed : parsed?.error ?? JSON.stringify(parsed);
+                onChunk({ type: 'error', error: err });
+                break;
+              }
+              case 'debug': {
+                const log = typeof parsed === 'string' ? parsed : parsed?.log ?? JSON.stringify(parsed);
+                onChunk({ type: 'debug', log });
+
+                // --- Fallback existente: "✅ Chat criado: <uuid> (provider: ...)" ---
+                if (typeof log === 'string') {
+                  const createdMatch = log.match(/Chat criado:\s*([0-9a-fA-F-]{36})\s*\(provider:\s*([^)]+)\)/i);
+                  if (createdMatch) {
+                    const syntheticId = createdMatch[1];
+                    const syntheticProvider = createdMatch[2];
+                    onChunk({
+                      type: 'telemetry',
+                      metrics: {
+                        tokensIn: 0, tokensOut: 0, costInUSD: 0,
+                        model: '', provider: syntheticProvider, chatId: syntheticId, sentContext: undefined
+                      }
+                    });
+                  }
+
+                  // --- NOVO Fallback: "💬 Chat ID: <uuid>" (chat existente) ---
+                  const existingMatch = log.match(/Chat ID:\s*([0-9a-fA-F-]{36})/i);
+                  if (existingMatch) {
+                    const syntheticId = existingMatch[1];
+                    onChunk({
+                      type: 'telemetry',
+                      metrics: {
+                        tokensIn: 0, tokensOut: 0, costInUSD: 0,
+                        model: '', provider, chatId: syntheticId, sentContext: undefined
+                      }
+                    });
+                  }
+                }
+                break;
+              }
+              default: {
+                // Heurística de telemetria
+                if (parsed && typeof parsed === 'object' && ('tokensIn' in parsed || 'tokensOut' in parsed || 'model' in parsed || 'provider' in parsed)) {
+                  onChunk({ type: 'telemetry', metrics: parsed });
+                }
+                break;
+              }
+            }
+          } catch (e) {
+            // Ignorar sinais especiais não-JSON (ex.: [DONE])
+            if (dataPayload.trim() === '[DONE]') {
+              continue;
             }
           }
         }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          processBuffer(); // processa a cada chunk recebido
+        }
+
+        if (done) {
+          buffer += decoder.decode(); // flush final do TextDecoder
+          processBuffer();            // processa qualquer resíduo (ex.: telemetria final)
+          onComplete();               // somente após o último processamento
+          break;
+        }
       }
     } catch (err: any) {
-      console.error("Erro fatal no fetch stream:", err);
       onError(err.message || 'Erro desconhecido no stream');
     }
   },

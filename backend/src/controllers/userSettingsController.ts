@@ -4,19 +4,22 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { encryptionService } from '../services/encryptionService';
 
+// Helper: Encontrar ou criar configurações
 async function findOrCreateSettings(userId: string) {
   let settings = await prisma.userSettings.findUnique({
     where: { userId },
   });
 
   if (!settings) {
+    // Criar configurações padrão se não existir
     settings = await prisma.userSettings.create({
       data: {
-        userId: userId,
+        userId,
         theme: 'light',
-      },
+      }
     });
   }
+
   return settings;
 }
 
@@ -34,9 +37,10 @@ export const userSettingsController = {
   getSettings: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.userId) {
-        throw new AppError('Usuário não autenticado', 401);
+        res.status(401).json({ error: 'Unauthorized' });
+        return; // <-- FIX: Adicionar return explícito
       }
-      
+
       const settings = await findOrCreateSettings(req.userId);
 
       // --- LÓGICA DO COFRE (GET) ---

@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 
 export const aiController = {
   // GET /api/ai/providers - Listar todos os providers
-  async listProviders(req: Request, res: Response, next: NextFunction) {
+  async listProviders(_req: Request, res: Response, next: NextFunction) {
     try {
       const providers = aiService.getConfiguredProviders();
       
@@ -16,7 +16,7 @@ export const aiController = {
       res.status(200).json({
         providers,
         total: providers.length,
-        configured: providers.filter(p => p.configured).length,
+        configured: providers.filter(p => p.isConfigured).length, // <-- CORRIGIDO
       });
     } catch (error) {
       next(error);
@@ -41,12 +41,10 @@ export const aiController = {
       
       const result = await aiService.testProvider(provider as ProviderName);
       
-      res.status(200).json({
-        provider,
-        ...result,
-      });
+      return res.json(result);
     } catch (error) {
       next(error);
+      return;
     }
   },
 };
