@@ -25,6 +25,7 @@ interface Message {
   role: string;
   content: string;
   createdAt: Date;
+  sentContext?: any; // <-- Corrige TS2339 (opcional)
 }
 
 // Helper: conta palavras
@@ -114,10 +115,18 @@ async function getHybridRagHistory(
   });
 
   // [V22] Retorna o relatório completo
+  // [A CURA V27] Limpa sentContext das listas do relatório
+  const cleanMessages = (msgs: Message[]): Message[] => {
+    return msgs.map(msg => {
+      const { sentContext, ...cleanedMsg } = msg;
+      return cleanedMsg as Message;
+    });
+  };
+
   return {
-    finalContext: finalContextHistory.reverse(),
-    relevantMessages: relevantMessages as Message[],
-    recentMessages: recentMessages as Message[]
+    finalContext: cleanMessages(finalContextHistory.reverse()),
+    relevantMessages: cleanMessages(relevantMessages),
+    recentMessages: cleanMessages(recentMessages)
   };
 }
 
@@ -254,52 +263,76 @@ export const chatController = {
       writeSSE({ type: 'debug', log: `⚙️ Estratégia de Contexto: ${contextStrategy || 'fast'}` });
 
       // --- O "DISTRIBUIDOR" V22 (Atualizado) ---
-      
       const providerConfig = getProviderConfig(lockedProvider);
       const providerModel = providerConfig.defaultModel;
-
       writeSSE({ type: 'debug', log: `🤖 Provider: ${lockedProvider}, Modelo: ${providerModel}` });
 
-      // [V22] Declare as variáveis para o relatório
+      // [V22/V23] Variáveis base
       let historyReport: HybridHistoryReport | null = null;
+      let historyMessages: Message[] = []; // O 'sentContext' (V13/V27)
       let formattedMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
 
       if (contextStrategy === 'efficient') {
         const providerInfo = getProviderInfo(providerModel);
-        writeSSE({ 
-          type: 'debug', 
-          log: `🧠 Motor Híbrido RAG (V9.4): Limite ${providerInfo.contextLimit} tokens, Buffer 2000` 
-        });
-        
-        // [V22] Use o relatório estruturado
+        writeSSE({ type: 'debug', log: `🧠 Motor Híbrido RAG (V9.4): Limite ${providerInfo.contextLimit} tokens, Buffer 2000` });
         historyReport = await getHybridRagHistory(
-          currentChat.id, 
-          message, 
+          currentChat.id,
+          message,
           providerModel,
           writeSSE
         );
-        
-        // Formata apenas o finalContext para enviar à IA
-        formattedMessages = historyReport.finalContext.map(msg => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-        }));
+        historyMessages = historyReport.finalContext;
       } else {
         writeSSE({ type: 'debug', log: '⚡ Motor Rápido (V7 - take: 10)...' });
-        const historyMessages = await getFastHistory(currentChat.id);
-        formattedMessages = historyMessages.map(msg => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-        }));
+        historyMessages = await getFastHistory(currentChat.id);
       }
-      // --- FIM DO DISTRIBUIDOR V22 ---
 
+      formattedMessages = historyMessages.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      }));
       writeSSE({ type: 'debug', log: `📖 Histórico carregado: ${formattedMessages.length} mensagens` });
+
+      // --- A "CURA" V31 (O "Anti-Eco") ---
+      // O V23 (Payload) é *APENAS* o histórico V27/V12
+      const payloadForIA = [
+        ...historyMessages.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }))
+        // REMOVIDO: { role: 'user', content: message }
+        // (causava o "Eco V31")
+      ];
+      // --- FIM DA CURA V31 ---
+
+      // --- A "CURA" V31 (O "Anti-400") ---
+      // Se o "Fiscal V12" cortou tudo, force apenas a nova mensagem
+      if (payloadForIA.length === 0) {
+        payloadForIA.push({ role: 'user', content: message });
+        writeSSE({ type: 'debug', log: '⚠️ V31: Fiscal V12 cortou tudo. Forçando apenas nova mensagem.' });
+      }
+      // --- FIM DA CURA V31 ---
+
+      // --- A "CURA" V30 (O "DEBUG PERFEITO") ---
+      const reportV22 = historyReport 
+        ? historyReport 
+        : historyMessages;
+
+      const contextToSave = {
+        debugReport_V22: reportV22,
+        payloadSent_V23: payloadForIA // V31: agora sem duplicata
+      };
+      // --- FIM DA CURA V30 ---
+
+      // 3. A "Chamada de Stream" (V12/V31)
+      const stream = aiService.stream(
+        payloadForIA,
+        lockedProvider
+      );
 
       // --- O NOVO MOTOR (Streaming com WATCHDOG) ---
       let watchdogTimer: NodeJS.Timeout | undefined;
       const WATCHDOG_TIMEOUT_MS = 60000;
-
       const resetWatchdog = () => {
         if (watchdogTimer) clearTimeout(watchdogTimer);
         watchdogTimer = setTimeout(() => {
@@ -312,7 +345,7 @@ export const chatController = {
 
       try {
         writeSSE({ type: 'debug', log: `🤖 Iniciando stream com ${lockedProvider}...` });
-        const stream = aiService.stream(formattedMessages, lockedProvider);
+        // [V23] usar payloadForIA em vez de formattedMessages
         resetWatchdog();
         writeSSE({ type: 'debug', log: '⏰ Watchdog ativado (60s)' });
 
@@ -320,7 +353,6 @@ export const chatController = {
         let finalMetrics: TelemetryMetrics | null = null;
         let chunkCount = 0;
 
-        // "Sugue" o gotejamento do aiService
         for await (const chunk of stream) {
           resetWatchdog();
 
@@ -347,7 +379,6 @@ export const chatController = {
         if (watchdogTimer) clearTimeout(watchdogTimer);
         writeSSE({ type: 'debug', log: `✅ Stream finalizado! Total: ${chunkCount} chunks` });
 
-        // --- O STREAM TERMINOU ---
         if (finalMetrics) {
           writeSSE({ type: 'debug', log: '💾 Salvando resposta completa no banco...' });
 
@@ -374,12 +405,7 @@ export const chatController = {
           }
           // --- FIM DA INDEXAÇÃO V9.3 (Assistente) ---
 
-          // [V22] Salve o relatório estruturado
-          const contextToSave = historyReport
-            ? historyReport              // Salva relatório completo (efficient)
-            : formattedMessages;         // Salva lista simples (fast)
-
-          // Salvar resposta completa do Assistente
+          // Cria a mensagem do assistente
           const assistantMessage = await prisma.message.create({
             data: {
               role: 'assistant',
@@ -390,7 +416,7 @@ export const chatController = {
               tokensIn: finalMetrics.tokensIn,
               tokensOut: finalMetrics.tokensOut,
               costInUSD: finalMetrics.costInUSD,
-              sentContext: JSON.stringify(contextToSave), // [V22] Salva relatório ou lista
+              sentContext: JSON.stringify(contextToSave) // [V30] Usa o objeto estruturado declarado antes
             }
           });
 
@@ -408,8 +434,6 @@ export const chatController = {
               writeSSE({ type: 'debug', log: '⚠️ Falha ao salvar vetor (não-crítico)' });
             }
           }
-
-          writeSSE({ type: 'debug', log: '✅ Resposta salva (com vetor)!' });
 
           // Calcular métricas de engenharia
           const outputWords = countWords(fullAssistantResponse);
@@ -520,17 +544,18 @@ export const chatController = {
           })();
         }
 
-      } catch (error: any) {
-        if (watchdogTimer) clearTimeout(watchdogTimer);
-        writeSSE({ type: 'debug', log: `💥 ERRO FATAL: ${error.message}` });
-        console.error("Erro fatal no stream:", error);
-        writeSSE({ type: 'error', error: error.message || 'Erro no servidor' });
-      } finally {
-        if (watchdogTimer) clearTimeout(watchdogTimer);
-        writeSSE({ type: 'debug', log: '🏁 Encerrando conexão SSE' });
-        res.end();
-      }
+      } catch (error) {
+        // --- A "CURA" V25 ---
+        const translatedError = translateProviderError(error);
 
+        writeSSE({ 
+          type: 'error', 
+          error: translatedError
+        });
+
+        next(error);
+        // --- FIM DA CURA V25 ---
+      }
     } catch (error) {
       // Se erro acontecer antes do streaming começar
       if (!res.headersSent) {
@@ -542,3 +567,27 @@ export const chatController = {
     }
   },
 };
+
+/**
+ * O "Tradutor de Erros" V25
+ */
+function translateProviderError(error: any): string {
+  const msg = error.message || String(error);
+
+  // (O "Bug V23" - O Erro 400 de array vazio)
+  if (msg.includes("minimum number of items is 1")) {
+    return "Erro V23: O 'payload' enviado à IA estava vazio (0 mensagens). (O 'Fiscal V12' cortou tudo E o 'Hotfix V23' falhou).";
+  }
+
+  // (O "Bug V24" - O Erro 413 de mensagem longa)
+  if (msg.includes("413") || msg.includes("Request too large")) {
+    return "Erro V24: A 'carga' (Histórico + Nova Mensagem) estourou o limite de tokens do provider (Erro 413).";
+  }
+
+  // (O "Bug V12" - O Erro 400 do Groq (Limite Real))
+  if (msg.includes("400") && msg.includes("context_length_exceeded")) {
+    return "Erro V12: O 'contexto' (Histórico) estourou o limite real do provider (Groq 6k).";
+  }
+
+  return msg;
+}

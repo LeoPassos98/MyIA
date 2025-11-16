@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Select, MenuItem, FormControl, InputLabel, Chip, Switch, FormControlLabel, Modal } from '@mui/material';
-import { Send as SendIcon, Code as CodeIcon } from '@mui/icons-material';
+import { Send as SendIcon, Code as CodeIcon, DataObject as DataObjectIcon } from '@mui/icons-material';
 import MainLayout from '../components/Layout/MainLayout';
 import ChatSidebar from '../components/Chat/ChatSidebar';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,6 +29,10 @@ export default function Chat() {
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   // [V22] selectedPrompt pode ser relatório ou lista
   const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
+
+  // --- O "INSPETOR" V26 ---
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [inspectorData, setInspectorData] = useState<any>(null);
 
   // Proteger rota
   useEffect(() => {
@@ -100,17 +104,18 @@ export default function Chat() {
     if (!inputMessage.trim() || isLoading) return;
 
     const userMessage = inputMessage;
+
+    // Prossegue normalmente
     setInputMessage('');
     setIsLoading(true);
 
-    // 🔍 DEBUG: Verificar estado atual
     console.log('🐛 Estado antes de enviar:', {
       currentChatId,
       currentChatProvider,
       selectedProvider
     });
 
-    // 1. Adiciona mensagem do usuário (otimisticamente)
+    // 1. Mensagem do usuário (optimista)
     const userMsgId = `temp-user-${Date.now()}`;
     const tempUserMessage: Message = {
       id: userMsgId,
@@ -120,17 +125,17 @@ export default function Chat() {
     };
     setMessages((prev) => [...prev, tempUserMessage]);
 
-    // 2. Prepara "bolha" vazia do assistente (para streaming)
+    // 2. Bolha vazia do assistente
     const assistantMsgId = `temp-assistant-${Date.now()}`;
     const tempAssistantMessage: Message = {
       id: assistantMsgId,
       role: 'assistant',
-      content: '', // Começa vazia!
+      content: '',
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, tempAssistantMessage]);
 
-    // 3. Inicia o Stream!
+    // 3. Inicia o Stream (definir providerToUse aqui)
     const providerToUse = currentChatProvider || selectedProvider;
     let newChatId: string | null = null;
     let newProvider: string | null = null;
@@ -140,7 +145,6 @@ export default function Chat() {
       providerToUse,
       currentChatId,
       contextStrategy,
-
       (chunk: StreamChunk) => {
         if (chunk.type === 'chunk') {
           setMessages((prev) =>
@@ -236,46 +240,77 @@ export default function Chat() {
   };
 
   // --- Modal do Visualizador de Prompt ---
-  // [V22] Modal inteligente
+  // [V25] Modal de-duplicado pelo finalContext (V12)
   const renderPromptModal = () => {
     if (!selectedPrompt) return null;
 
     const isRagReport = selectedPrompt && selectedPrompt.finalContext;
     const isFastMode = Array.isArray(selectedPrompt);
 
-    let relevantMessages: Message[] = [];
-    let recentMessages: Message[] = [];
-    let finalContext: Message[] = [];
+    let relevantMessages_RAW: Message[] = []; // RAG (matéria-prima)
+    let recentMessages_RAW: Message[] = [];   // V7 (matéria-prima)
+    let finalContext_V12: Message[] = [];     // O "corte" V12 (fonte da verdade)
 
     if (isRagReport) {
-      relevantMessages = selectedPrompt.relevantMessages || [];
-      recentMessages = selectedPrompt.recentMessages || [];
-      finalContext = selectedPrompt.finalContext || [];
+      relevantMessages_RAW = selectedPrompt.relevantMessages || [];
+      recentMessages_RAW = selectedPrompt.recentMessages || [];
+      finalContext_V12 = selectedPrompt.finalContext || [];
     } else if (isFastMode) {
-      finalContext = selectedPrompt;
+      finalContext_V12 = selectedPrompt;
     }
 
-    const renderList = (messages: Message[]) => (
-      messages.map((msg, index) => (
-        <Box key={index} sx={{ mb: 3 }}>
-          <Chip
-            label={msg.role.toUpperCase()}
-            color={msg.role === 'user' ? 'primary' : 'secondary'}
-            size="small"
-            sx={{ mb: 1 }}
-          />
-          <Typography sx={{
+    // --- FILTRO V25: finalContext é a fonte da verdade + de-duplicação ---
+    const finalContextIDs = new Set(finalContext_V12.map(msg => msg.id));
+
+    // V7 filtrado pelo V12
+    const recentMessages_FILTERED = recentMessages_RAW.filter(msg =>
+      finalContextIDs.has(msg.id)
+    );
+    const recentMessages_FILTERED_IDs = new Set(recentMessages_FILTERED.map(msg => msg.id));
+
+    // RAG filtrado pelo V12 e removendo duplicatas presentes no V7
+    const relevantMessages_FILTERED = relevantMessages_RAW.filter(msg =>
+      finalContextIDs.has(msg.id) && !recentMessages_FILTERED_IDs.has(msg.id)
+    );
+
+    const renderList = (messages: Message[]) =>
+      messages.length === 0 ? (
+        <Typography
+          sx={{
             whiteSpace: 'pre-wrap',
             fontFamily: 'monospace',
-            color: '#00FF00',
+            color: '#888',
             fontSize: '12px',
-            lineHeight: 1.6
-          }}>
-            {msg.content}
-          </Typography>
-        </Box>
-      ))
-    );
+            lineHeight: 1.6,
+            fontStyle: 'italic',
+            mb: 2
+          }}
+        >
+          (Nenhuma mensagem única encontrada nesta categoria)
+        </Typography>
+      ) : (
+        messages.map((msg, index) => (
+          <Box key={index} sx={{ mb: 3 }}>
+            <Chip
+              label={msg.role.toUpperCase()}
+              color={msg.role === 'user' ? 'primary' : 'secondary'}
+              size="small"
+              sx={{ mb: 1 }}
+            />
+            <Typography
+              sx={{
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace',
+                color: '#00FF00',
+                fontSize: '12px',
+                lineHeight: 1.6
+              }}
+            >
+              {msg.content}
+            </Typography>
+          </Box>
+        ))
+      );
 
     return (
       <Modal
@@ -283,46 +318,65 @@ export default function Chat() {
         onClose={() => setPromptModalOpen(false)}
         sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
-        <Paper sx={{
-          maxWidth: '80vw',
-          maxHeight: '80vh',
-          overflow: 'auto',
-          p: 3,
-          backgroundColor: 'background.paper'
-        }}>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CodeIcon /> Contexto Enviado (V22 - Detalhado)
+        <Paper
+          sx={{
+            maxWidth: '80vw',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            p: 3,
+            backgroundColor: 'background.paper'
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}
+          >
+            <CodeIcon /> Contexto Enviado (V25 - De-duplicado)
           </Typography>
 
-          <Box sx={{
-            maxHeight: '60vh',
-            overflow: 'auto',
-            backgroundColor: '#1E1E1E',
-            borderRadius: 1,
-            p: 2
-          }}>
-            {/* --- A PROVA DO V9.4 (RAG) --- */}
+          <Box
+            sx={{
+              maxHeight: '60vh',
+              overflow: 'auto',
+              backgroundColor: '#1E1E1E',
+              borderRadius: 1,
+              p: 2
+            }}
+          >
+            {/* RAG e V7 (apenas no relatório estruturado) */}
             {isRagReport && (
               <>
-                <Chip label={`🧠 Memória Relevante (RAG V9.4) - ${relevantMessages.length} msgs`} sx={{ mb: 2, backgroundColor: 'secondary.main', color: 'white' }} />
-                {renderList(relevantMessages)}
+                <Chip
+                  label={`🧠 Memória Relevante (RAG V9.4) - ${relevantMessages_FILTERED.length} msgs`}
+                  sx={{ mb: 2, backgroundColor: 'secondary.main', color: 'white' }}
+                  size="small"
+                />
+                {renderList(relevantMessages_FILTERED)}
 
-                <Chip label={`⚡ Memória Recente (V7) - ${recentMessages.length} msgs`} sx={{ mb: 2, mt: 2, backgroundColor: 'primary.main', color: 'white' }} />
-                {renderList(recentMessages)}
+                <Chip
+                  label={`⚡ Memória Recente (V7) - ${recentMessages_FILTERED.length} msgs`}
+                  sx={{ mb: 2, mt: 2, backgroundColor: 'primary.main', color: 'white' }}
+                  size="small"
+                />
+                {renderList(recentMessages_FILTERED)}
               </>
             )}
 
-            {/* --- O "MOTOR RÁPIDO" V7 --- */}
+            {/* Modo Rápido (V7) */}
             {isFastMode && (
               <>
-                <Chip label={`⚡ Contexto Rápido (V7) - ${finalContext.length} msgs`} sx={{ mb: 2, backgroundColor: 'primary.main', color: 'white' }} />
-                {renderList(finalContext)}
+                <Chip
+                  label={`⚡ Contexto Rápido (V7) - ${finalContext_V12.length} msgs`}
+                  sx={{ mb: 2, backgroundColor: 'primary.main', color: 'white' }}
+                  size="small"
+                />
+                {renderList(finalContext_V12)}
               </>
             )}
           </Box>
 
           <Chip
-            label={`Total Enviado (V12): ${finalContext.length} msgs`}
+            label={`Total Enviado (V12): ${finalContext_V12.length} msgs`}
             size="small"
             variant="outlined"
             sx={{ mt: 2, float: 'right' }}
@@ -332,14 +386,55 @@ export default function Chat() {
     );
   };
 
+  // --- O "INSPETOR" V26 (O NOVO MODAL) ---
+  const renderJsonInspectorModal = () => (
+    <Modal
+      open={isInspectorOpen}
+      onClose={() => setIsInspectorOpen(false)}
+      sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Paper sx={{ 
+        maxWidth: '80vw', 
+        maxHeight: '80vh', 
+        overflow: 'auto',
+        p: 3,
+        backgroundColor: 'background.paper'
+      }}>
+        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DataObjectIcon /> Inspetor de JSON (V26 - Bruto)
+        </Typography>
+
+        <Box sx={{ 
+          backgroundColor: '#1E1E1E',
+          borderRadius: 1,
+          p: 2,
+          maxHeight: '60vh', 
+          overflow: 'auto', 
+        }}>
+          <pre style={{ 
+            whiteSpace: 'pre-wrap', 
+            fontFamily: 'monospace', 
+            color: '#00FF00',
+            fontSize: '12px',
+            lineHeight: 1.6
+          }}>
+            {inspectorData 
+              ? JSON.stringify(inspectorData, null, 2) 
+              : '(Nenhum dado selecionado)'}
+          </pre>
+        </Box>
+      </Paper>
+    </Modal>
+  );
+
   // Mapa de limites de contexto por provider
   const providerContextLimits: Record<string, number> = {
-    'groq': 4000,        // 6000 - 2000 buffer
-    'openai': 126000,    // 128000 - 2000 buffer
-    'claude': 198000,    // 200000 - 2000 buffer
-    'together': 129072,  // 131072 - 2000 buffer
-    'perplexity': 125000, // 127000 - 2000 buffer
-    'mistral': 30000,    // 32000 - 2000 buffer
+    'groq': 4000,
+    'openai': 126000,
+    'claude': 198000,
+    'together': 129072,
+    'perplexity': 125000,
+    'mistral': 30000,
   };
 
   // Função para formatar número com k/M
@@ -421,18 +516,20 @@ export default function Chat() {
                         }}
                       >
                         
-                        {/* 1. O Botão "Caixa Preta" (V13) */}
+                        {/* 1. O Botão "Caixa Preta" (V25 - O Visual) */}
                         {msg.sentContext && msg.sentContext.length > 0 && (
                           <IconButton 
                             size="small"
                             onClick={() => {
-                              const parsed = typeof msg.sentContext === 'string'
-                                ? JSON.parse(msg.sentContext)
+                              const parsed = typeof msg.sentContext === 'string' 
+                                ? JSON.parse(msg.sentContext) 
                                 : msg.sentContext;
-                              setSelectedPrompt(parsed);
+                              
+                              // [A CURA V30]
+                              setSelectedPrompt(parsed.debugReport_V22);
                               setPromptModalOpen(true);
                             }}
-                            title="Ver Contexto Enviado (Caixa Preta)"
+                            title="Ver Contexto Enviado (V25 - Visual)"
                             sx={{ 
                               opacity: 0.7,
                               '&:hover': { opacity: 1 },
@@ -443,7 +540,50 @@ export default function Chat() {
                           </IconButton>
                         )}
 
-                        {/* 2. O Modelo */}
+                        {/* 2. Botão "JSON Enviado" (Bruto V26) */}
+                        {msg.sentContext && msg.sentContext.length > 0 && (
+                          <IconButton 
+                            size="small"
+                            onClick={() => {
+                              const parsed = typeof msg.sentContext === 'string' 
+                                ? JSON.parse(msg.sentContext) 
+                                : msg.sentContext;
+                              
+                              // [A CURA V30]
+                              setInspectorData(parsed.payloadSent_V23);
+                              setIsInspectorOpen(true);
+                            }}
+                            title="Ver JSON Enviado (V26 - Bruto)"
+                            sx={{ 
+                              opacity: 0.7,
+                              '&:hover': { opacity: 1 },
+                              color: 'secondary.main'
+                            }}
+                          >
+                            <DataObjectIcon fontSize="small" />
+                          </IconButton>
+                        )}
+
+                        {/* 3. Botão "JSON Recebido" (Bruto V26) */}
+                        <IconButton 
+                          size="small"
+                          onClick={() => {
+                            const { sentContext, ...msgSemContexto } = msg;
+                            setInspectorData(msgSemContexto);
+                            setIsInspectorOpen(true);
+                          }}
+                          title="Ver JSON Recebido (V26 - Bruto)"
+                          sx={{ 
+                            opacity: 0.7,
+                            '&:hover': { opacity: 1 },
+                            color: 'secondary.main',
+                            ml: -1 
+                          }}
+                        >
+                          <DataObjectIcon fontSize="small" />
+                        </IconButton>
+
+                        {/* 4. O Modelo (V14) */}
                         <Chip 
                           label={msg.model} 
                           size="small" 
@@ -451,7 +591,7 @@ export default function Chat() {
                           sx={{ fontSize: '0.7rem' }}
                         />
 
-                        {/* 3. A Telemetria Detalhada (V14) */}
+                        {/* 5. A Telemetria Detalhada (V14) */}
                         <Typography 
                           variant="caption" 
                           sx={{ 
@@ -465,7 +605,7 @@ export default function Chat() {
                           Total: {(msg.tokensIn || 0) + (msg.tokensOut || 0)}
                         </Typography>
 
-                        {/* 4. O Custo */}
+                        {/* 6. O Custo */}
                         <Typography 
                           variant="caption" 
                           sx={{ 
@@ -607,8 +747,11 @@ export default function Chat() {
         </Box>
       </Box>
 
-      {/* Renderizar Modal de Contexto */}
+      {/* Renderizar Modal de Contexto (V25) */}
       {renderPromptModal()}
+
+      {/* Renderizar Modal de Inspeção (V26) */}
+      {renderJsonInspectorModal()}
     </MainLayout>
   );
 }
