@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Tabs,
@@ -64,7 +64,8 @@ export default function ControlPanel() {
   // Não ativar automaticamente mais - usuário controla via Switch
   // useEffect removido - controle manual via Switch
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  // Remover parâmetro não utilizado 'event' de handleTabChange
+  const handleTabChange = (_: unknown, newValue: number) => {
     setCurrentEditorTab(newValue);
   };
 

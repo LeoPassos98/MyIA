@@ -2,9 +2,9 @@ import { api } from './api';
 
 export interface Chat {
   id: string;
-  title: string;
-  provider: string; // Provider travado
-  updatedAt: string;
+  title: string | null;
+  createdAt: string; // Adicionado o campo createdAt
+  updatedAt?: string; // Campo opcional para futuras atualizações
 }
 
 export interface Message {
@@ -19,6 +19,9 @@ export interface Message {
   costInUSD?: number;
   sentContext?: string | Array<{ role: string; content: string }>; // <-- Aceita ambos
 }
+
+// Alias opcional para compatibilidade
+export type ChatSession = Chat;
 
 export const chatHistoryService = {
   getAllChats: async (): Promise<Chat[]> => {

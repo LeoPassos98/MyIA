@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { ChatConfig, ManualContextState, Message } from '../types/chat';
 
 interface LayoutContextType {
@@ -20,6 +20,10 @@ interface LayoutContextType {
   // Chat history snapshot (readonly mirror)
   chatHistorySnapshot: Message[];
   syncChatHistory: (messages: Message[]) => void;
+
+  // History drawer state
+  isHistoryOpen: boolean;
+  setIsHistoryOpen: (open: boolean) => void;
 }
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
@@ -32,6 +36,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   // Drawer states
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [currentEditorTab, setCurrentEditorTab] = useState(0);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Chat configuration with safe defaults
   const [chatConfig, setChatConfig] = useState<ChatConfig>({
@@ -107,6 +112,8 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     toggleMessageSelection,
     chatHistorySnapshot,
     syncChatHistory,
+    isHistoryOpen,
+    setIsHistoryOpen,
   };
 
   return (
