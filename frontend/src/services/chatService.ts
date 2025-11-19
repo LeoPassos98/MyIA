@@ -31,15 +31,13 @@ export const chatService = {
   async streamChat(
     message: string,
     provider: string,
-    chatId: string | null, // <-- Deve estar aqui!
-    contextStrategy: string, // <-- O NOVO PARÂMETRO
-    // Callbacks para o "gotejamento"
+    chatId: string | null,
+    contextStrategy: string,
     onChunk: (chunk: StreamChunk) => void,
     onComplete: () => void,
     onError: (error: string) => void
   ) {
     try {
-      // 🔥 FIX: Usar fetch() direto ao invés de axios para SSE
       const token = localStorage.getItem('token');
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       
@@ -50,12 +48,7 @@ export const chatService = {
           'Accept': 'text/event-stream',
           'Authorization': token ? `Bearer ${token}` : '',
         },
-        body: JSON.stringify({
-          message,
-          provider,
-          chatId,
-          contextStrategy,
-        }),
+        body: JSON.stringify({ message, provider, chatId, contextStrategy }),
       });
 
       if (!response.ok) {
@@ -66,161 +59,74 @@ export const chatService = {
         throw new Error('Stream não disponível (response body vazio).');
       }
 
-      // 3. Ler o "gotejamento" (ReadableStream)
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
 
-      // --- HOTFIX V20: parser SSE por bloco (event/data) com flush final ---
-      const processBuffer = () => {
-        const blocks = buffer.split('\n\n');
-        buffer = blocks.pop() || '';
-
-        for (const block of blocks) {
-          const trimmedBlock = block.trim();
-          if (!trimmedBlock) continue;
-
-          const lines = trimmedBlock.split('\n');
-          let eventType: string | undefined;
-          let dataPayload = '';
-
-          for (const rawLine of lines) {
-            const line = rawLine.trimEnd();
-            if (!line) continue;
-
-            if (line.startsWith('event:')) {
-              eventType = line.slice(6).trim();
-              continue;
-            }
-            if (line.startsWith('data:')) {
-              const part = line.slice(5).trimStart();
-              dataPayload += (dataPayload ? '\n' : '') + part;
-              continue;
-            }
-          }
-
-          if (!dataPayload) continue;
-
-          try {
-            const parsed = JSON.parse(dataPayload) as any;
-
-            if (parsed && typeof parsed === 'object' && parsed.type) {
-              onChunk(parsed as StreamChunk);
-
-              // --- Fallback existente: "✅ Chat criado: <uuid> (provider: ...)" ---
-              if (parsed.type === 'debug' && typeof parsed.log === 'string') {
-                const log: string = parsed.log;
-                const createdMatch = log.match(/Chat criado:\s*([0-9a-fA-F-]{36})\s*\(provider:\s*([^)]+)\)/i);
-                if (createdMatch) {
-                  const syntheticId = createdMatch[1];
-                  const syntheticProvider = createdMatch[2];
-                  onChunk({
-                    type: 'telemetry',
-                    metrics: {
-                      tokensIn: 0, tokensOut: 0, costInUSD: 0,
-                      model: '', provider: syntheticProvider, chatId: syntheticId, sentContext: undefined
-                    }
-                  });
-                }
-
-                // --- NOVO Fallback: "💬 Chat ID: <uuid>" (chat existente) ---
-                const existingMatch = log.match(/Chat ID:\s*([0-9a-fA-F-]{36})/i);
-                if (existingMatch) {
-                  const syntheticId = existingMatch[1];
-                  onChunk({
-                    type: 'telemetry',
-                    metrics: {
-                      tokensIn: 0, tokensOut: 0, costInUSD: 0,
-                      model: '', provider, chatId: syntheticId, sentContext: undefined
-                    }
-                  });
-                }
-              }
-              continue;
-            }
-
-            switch (eventType) {
-              case 'telemetry':
-                onChunk({ type: 'telemetry', metrics: parsed });
-                break;
-              case 'chunk': {
-                const content = typeof parsed === 'string' ? parsed : parsed?.content ?? '';
-                onChunk({ type: 'chunk', content });
-                break;
-              }
-              case 'error': {
-                const err = typeof parsed === 'string' ? parsed : parsed?.error ?? JSON.stringify(parsed);
-                onChunk({ type: 'error', error: err });
-                break;
-              }
-              case 'debug': {
-                const log = typeof parsed === 'string' ? parsed : parsed?.log ?? JSON.stringify(parsed);
-                onChunk({ type: 'debug', log });
-
-                // --- Fallback existente: "✅ Chat criado: <uuid> (provider: ...)" ---
-                if (typeof log === 'string') {
-                  const createdMatch = log.match(/Chat criado:\s*([0-9a-fA-F-]{36})\s*\(provider:\s*([^)]+)\)/i);
-                  if (createdMatch) {
-                    const syntheticId = createdMatch[1];
-                    const syntheticProvider = createdMatch[2];
-                    onChunk({
-                      type: 'telemetry',
-                      metrics: {
-                        tokensIn: 0, tokensOut: 0, costInUSD: 0,
-                        model: '', provider: syntheticProvider, chatId: syntheticId, sentContext: undefined
-                      }
-                    });
-                  }
-
-                  // --- NOVO Fallback: "💬 Chat ID: <uuid>" (chat existente) ---
-                  const existingMatch = log.match(/Chat ID:\s*([0-9a-fA-F-]{36})/i);
-                  if (existingMatch) {
-                    const syntheticId = existingMatch[1];
-                    onChunk({
-                      type: 'telemetry',
-                      metrics: {
-                        tokensIn: 0, tokensOut: 0, costInUSD: 0,
-                        model: '', provider, chatId: syntheticId, sentContext: undefined
-                      }
-                    });
-                  }
-                }
-                break;
-              }
-              default: {
-                // Heurística de telemetria
-                if (parsed && typeof parsed === 'object' && ('tokensIn' in parsed || 'tokensOut' in parsed || 'model' in parsed || 'provider' in parsed)) {
-                  onChunk({ type: 'telemetry', metrics: parsed });
-                }
-                break;
-              }
-            }
-          } catch (e) {
-            // Ignorar sinais especiais não-JSON (ex.: [DONE])
-            if (dataPayload.trim() === '[DONE]') {
-              continue;
-            }
-          }
-        }
-      };
-
       while (true) {
         const { done, value } = await reader.read();
-
+        
         if (value) {
           buffer += decoder.decode(value, { stream: true });
-          processBuffer(); // processa a cada chunk recebido
+          
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (!line.trim() || !line.startsWith('data: ')) continue;
+            
+            const dataPayload = line.slice(6).trim();
+            if (dataPayload === '[DONE]') continue;
+            
+            try {
+              const parsed = JSON.parse(dataPayload);
+              
+              if (parsed && typeof parsed === 'object' && parsed.type) {
+                onChunk(parsed as StreamChunk);
+                
+                if (parsed.type === 'debug' && typeof parsed.log === 'string') {
+                  const chatIdMatch = parsed.log.match(/Chat (?:criado|ID):\s*([0-9a-fA-F-]{36})/i);
+                  if (chatIdMatch) {
+                    onChunk({
+                      type: 'telemetry',
+                      metrics: {
+                        tokensIn: 0, tokensOut: 0, costInUSD: 0,
+                        model: '', provider, chatId: chatIdMatch[1], sentContext: undefined
+                      }
+                    });
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('Parse error:', e);
+            }
+          }
         }
-
+        
         if (done) {
-          buffer += decoder.decode(); // flush final do TextDecoder
-          processBuffer();            // processa qualquer resíduo (ex.: telemetria final)
-          onComplete();               // somente após o último processamento
+          if (buffer.trim()) {
+            const finalLine = buffer.trim();
+            if (finalLine.startsWith('data: ')) {
+              try {
+                const parsed = JSON.parse(finalLine.slice(6));
+                if (parsed?.type) onChunk(parsed as StreamChunk);
+              } catch (e) {
+                console.error('Final buffer parse error:', e);
+              }
+            }
+          }
+          
+          onComplete();
           break;
         }
       }
+      
+      return;
+      
     } catch (err: any) {
+      console.error('ERRO no streamChat:', err);
       onError(err.message || 'Erro desconhecido no stream');
+      return;
     }
   },
 

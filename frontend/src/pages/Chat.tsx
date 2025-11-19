@@ -1,20 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Select, MenuItem, FormControl, InputLabel, Chip, Switch, FormControlLabel, Modal } from '@mui/material';
 import { Send as SendIcon, Code as CodeIcon, DataObject as DataObjectIcon } from '@mui/icons-material';
-import MainLayout from '../components/Layout/MainLayout';
-import ChatSidebar from '../components/Chat/ChatSidebar';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { chatService, StreamChunk } from '../services/chatService';
-import { chatHistoryService, Chat as ChatType, Message } from '../services/chatHistoryService';
+import { chatHistoryService, Message } from '../services/chatHistoryService';
+import { useLayout } from '../contexts/LayoutContext';
 
 export default function Chat() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { isEditorOpen } = useLayout();
+  const { chatId } = useParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const [chatHistory, setChatHistory] = useState<ChatType[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -23,56 +21,46 @@ export default function Chat() {
   const [currentChatProvider, setCurrentChatProvider] = useState<string | null>(null);
   const [isDevMode, setIsDevMode] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [contextStrategy, setContextStrategy] = useState('fast'); // Padrão: rápido
+  const [contextStrategy, setContextStrategy] = useState('fast');
 
-  // --- Novos Estados para Modal de Contexto ---
   const [promptModalOpen, setPromptModalOpen] = useState(false);
-  // [V22] selectedPrompt pode ser relatório ou lista
   const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
-
-  // --- O "INSPETOR" V26 ---
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [inspectorData, setInspectorData] = useState<any>(null);
 
-  // Proteger rota
+  // ✨ NOVO: Armazenar o chatId criado para navegar depois
+  const newChatIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
 
-  // Carregar lista de conversas ao montar
   useEffect(() => {
-    loadChatHistory();
-  }, []);
+    if (chatId) {
+      loadChatMessages(chatId);
+    } else {
+      setMessages([]);
+      setCurrentChatProvider(null);
+    }
+  }, [chatId]);
 
-  // Auto-scroll ao adicionar mensagens
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const loadChatHistory = async () => {
-    try {
-      const chats = await chatHistoryService.getAllChats();
-      setChatHistory(chats);
-    } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
-    }
-  };
-
-  const handleSelectChat = async (chatId: string) => {
+  const loadChatMessages = async (id: string) => {
     try {
       setIsLoading(true);
-      const chatMessages = await chatHistoryService.getChatMessages(chatId);
+      const chatMessages = await chatHistoryService.getChatMessages(id);
       setMessages(chatMessages);
-      setCurrentChatId(chatId);
-
-      // --- A LÓGICA DE TRAVAMENTO ---
-      const selectedChat = chatHistory.find(c => c.id === chatId);
+      
+      const chats = await chatHistoryService.getAllChats();
+      const selectedChat = chats.find(c => c.id === id);
       if (selectedChat) {
         setCurrentChatProvider(selectedChat.provider);
       }
-      // --- FIM DA LÓGICA ---
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
     } finally {
@@ -80,176 +68,144 @@ export default function Chat() {
     }
   };
 
-  const handleNewChat = () => {
-    setCurrentChatId(null);
-    setMessages([]);
-    setInputMessage('');
-    setCurrentChatProvider(null);
-    setDebugLogs([]); // Limpa monitor de debug
-  };
+  const isSendingRef = useRef(false);
+  const chunkBufferRef = useRef<string>('');
+  const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleDeleteChat = async (chatId: string) => {
-    try {
-      await chatHistoryService.deleteChat(chatId);
-      if (currentChatId === chatId) {
-        handleNewChat();
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isLoading || isEditorOpen || isSendingRef.current) {
+      return;
+    }
+
+    isSendingRef.current = true;
+    
+    const userMsgText = inputMessage;
+    setInputMessage('');
+    setIsLoading(true);
+    setDebugLogs([]);
+    
+    chunkBufferRef.current = '';
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
+
+    // ✨ RESET: Limpar o chatId armazenado
+    newChatIdRef.current = null;
+
+    const userMsgId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const tempAiMsgId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const newUserMsg: Message = { id: userMsgId, role: 'user', content: userMsgText, createdAt: new Date().toISOString() };
+    const newAiMsg: Message = { id: tempAiMsgId, role: 'assistant', content: '', createdAt: new Date().toISOString(), costInUSD: 0 };
+
+    setMessages(prev => [...prev, newUserMsg, newAiMsg]);
+
+    const flushChunkBuffer = () => {
+      if (chunkBufferRef.current.length > 0) {
+        const contentToAdd = chunkBufferRef.current;
+        chunkBufferRef.current = '';
+        
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempAiMsgId 
+            ? { ...msg, content: msg.content + contentToAdd }
+            : msg
+        ));
       }
-      await loadChatHistory();
+    };
+
+    try {
+      const providerToUse = currentChatProvider || selectedProvider;
+
+      await chatService.streamChat(
+        userMsgText,
+        providerToUse,
+        chatId || null,
+        contextStrategy,
+        (chunk: StreamChunk) => {
+          try {
+            if (chunk.type === 'chunk') {
+              chunkBufferRef.current += chunk.content;
+              
+              if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
+              
+              if (chunkBufferRef.current.length > 10) {
+                flushChunkBuffer();
+              } else {
+                flushTimeoutRef.current = setTimeout(flushChunkBuffer, 50);
+              }
+              
+            } else if (chunk.type === 'debug') {
+              setDebugLogs(prevLogs => [...prevLogs, chunk.log]);
+              
+            } else if (chunk.type === 'telemetry') {
+              flushChunkBuffer();
+              
+              // ✨ CORREÇÃO: Apenas armazenar o chatId, não navegar ainda
+              if (!chatId && chunk.metrics.chatId) {
+                console.log(`[V46] Chat criado: ${chunk.metrics.chatId} - Navegação será feita após stream`);
+                newChatIdRef.current = chunk.metrics.chatId;
+                
+                if (chunk.metrics.provider) {
+                  setCurrentChatProvider(chunk.metrics.provider);
+                }
+              }
+              
+              setMessages(prev => prev.map(msg => {
+                if (msg.id !== tempAiMsgId) return msg;
+                
+                return {
+                  ...msg,
+                  costInUSD: chunk.metrics.costInUSD,
+                  model: chunk.metrics.model,
+                  provider: chunk.metrics.provider,
+                  tokensIn: chunk.metrics.tokensIn,
+                  tokensOut: chunk.metrics.tokensOut,
+                  sentContext: chunk.metrics.sentContext || msg.sentContext
+                };
+              }));
+            }
+          } catch (err) {
+            console.error('Erro no onChunk:', err);
+          }
+        },
+        () => { 
+          flushChunkBuffer();
+          isSendingRef.current = false;
+          setIsLoading(false);
+          
+          // ✨ CORREÇÃO: Navegar APENAS após o stream terminar
+          if (newChatIdRef.current && !chatId) {
+            console.log(`[V46] Stream finalizado, navegando para: ${newChatIdRef.current}`);
+            navigate(`/chat/${newChatIdRef.current}`, { replace: true });
+            newChatIdRef.current = null;
+          }
+        },
+        (err) => { 
+          console.error('streamChat.onError', err);
+          flushChunkBuffer();
+          setMessages(prev => prev.map(msg => msg.id === tempAiMsgId ? { ...msg, content: msg.content + "\n[Erro]" } : msg));
+          isSendingRef.current = false;
+          setIsLoading(false);
+        }
+      );
+      
     } catch (error) {
-      console.error('Erro ao deletar conversa:', error);
+      console.error("Erro Fatal:", error);
+    } finally {
+      if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
-
-    const userMessage = inputMessage;
-
-    // Prossegue normalmente
-    setInputMessage('');
-    setIsLoading(true);
-
-    console.log('🐛 Estado antes de enviar:', {
-      currentChatId,
-      currentChatProvider,
-      selectedProvider
-    });
-
-    // 1. Mensagem do usuário (optimista)
-    const userMsgId = `temp-user-${Date.now()}`;
-    const tempUserMessage: Message = {
-      id: userMsgId,
-      role: 'user',
-      content: userMessage,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, tempUserMessage]);
-
-    // 2. Bolha vazia do assistente
-    const assistantMsgId = `temp-assistant-${Date.now()}`;
-    const tempAssistantMessage: Message = {
-      id: assistantMsgId,
-      role: 'assistant',
-      content: '',
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, tempAssistantMessage]);
-
-    // 3. Inicia o Stream (definir providerToUse aqui)
-    const providerToUse = currentChatProvider || selectedProvider;
-    let newChatId: string | null = null;
-    let newProvider: string | null = null;
-
-    await chatService.streamChat(
-      userMessage,
-      providerToUse,
-      currentChatId,
-      contextStrategy,
-      (chunk: StreamChunk) => {
-        if (chunk.type === 'chunk') {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMsgId
-                ? { ...msg, content: msg.content + chunk.content }
-                : msg
-            )
-          );
-        } else if (chunk.type === 'telemetry') {
-          const hasChatId = !!chunk.metrics.chatId && typeof chunk.metrics.chatId === 'string';
-
-          if (hasChatId) {
-            newChatId = chunk.metrics.chatId || null;
-            newProvider = chunk.metrics.provider;
-          }
-
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMsgId
-                ? {
-                    ...msg,
-                    provider: chunk.metrics.provider,
-                    model: chunk.metrics.model,
-                    tokensIn: chunk.metrics.tokensIn,
-                    tokensOut: chunk.metrics.tokensOut,
-                    costInUSD: chunk.metrics.costInUSD,
-                    sentContext: chunk.metrics.sentContext
-                  }
-                : msg
-            )
-          );
-
-          if (chunk.metrics.provider) {
-            newProvider = chunk.metrics.provider;
-          }
-        } else if (chunk.type === 'error') {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMsgId
-                ? { ...msg, content: `❌ Erro: ${chunk.error}` }
-                : msg
-            )
-          );
-          setDebugLogs((prev) => [...prev, `❌ ERRO: ${chunk.error}`]);
-        } else if (chunk.type === 'debug') {
-          setDebugLogs((prev) => [...prev, chunk.log]);
-
-          // --- Fallback V20.2: Extrair chatId e provider do log ---
-          try {
-            const log = chunk.log || '';
-            const chatIdMatch = log.match(/Chat criado:\s*([0-9a-fA-F-]{36})/i);
-            if (chatIdMatch) {
-              const parsedId = chatIdMatch[1];
-              if (!newChatId || newChatId !== parsedId) {
-                newChatId = parsedId;
-              }
-            }
-            const providerMatch = log.match(/\(provider:\s*([a-z0-9_-]+)\)/i);
-            if (providerMatch) {
-              const parsedProvider = providerMatch[1];
-              if (!newProvider) {
-                newProvider = parsedProvider;
-              }
-            }
-          } catch {
-            // noop
-          }
-        }
-      },
-
-      () => {
-        setIsLoading(false);
-        setCurrentChatId((prevChatId) => {
-          if (newChatId && newChatId !== prevChatId) {
-            if (newProvider && !currentChatProvider) {
-              setCurrentChatProvider(newProvider);
-            }
-            loadChatHistory();
-            return newChatId;
-          }
-          return prevChatId;
-        });
-      },
-
-      (error: string) => {
-        console.error('Erro fatal:', error);
-        setIsLoading(false);
-        setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
-        alert(`Erro: ${error}`);
-      }
-    );
-  };
-
-  // --- Modal do Visualizador de Prompt ---
-  // [V25] Modal de-duplicado pelo finalContext (V12)
   const renderPromptModal = () => {
     if (!selectedPrompt) return null;
 
     const isRagReport = selectedPrompt && selectedPrompt.finalContext;
     const isFastMode = Array.isArray(selectedPrompt);
 
-    let relevantMessages_RAW: Message[] = []; // RAG (matéria-prima)
-    let recentMessages_RAW: Message[] = [];   // V7 (matéria-prima)
-    let finalContext_V12: Message[] = [];     // O "corte" V12 (fonte da verdade)
+    let relevantMessages_RAW: Message[] = [];
+    let recentMessages_RAW: Message[] = [];
+    let finalContext_V12: Message[] = [];
 
     if (isRagReport) {
       relevantMessages_RAW = selectedPrompt.relevantMessages || [];
@@ -259,16 +215,13 @@ export default function Chat() {
       finalContext_V12 = selectedPrompt;
     }
 
-    // --- FILTRO V25: finalContext é a fonte da verdade + de-duplicação ---
     const finalContextIDs = new Set(finalContext_V12.map(msg => msg.id));
 
-    // V7 filtrado pelo V12
     const recentMessages_FILTERED = recentMessages_RAW.filter(msg =>
       finalContextIDs.has(msg.id)
     );
     const recentMessages_FILTERED_IDs = new Set(recentMessages_FILTERED.map(msg => msg.id));
 
-    // RAG filtrado pelo V12 e removendo duplicatas presentes no V7
     const relevantMessages_FILTERED = relevantMessages_RAW.filter(msg =>
       finalContextIDs.has(msg.id) && !recentMessages_FILTERED_IDs.has(msg.id)
     );
@@ -343,7 +296,6 @@ export default function Chat() {
               p: 2
             }}
           >
-            {/* RAG e V7 (apenas no relatório estruturado) */}
             {isRagReport && (
               <>
                 <Chip
@@ -362,7 +314,6 @@ export default function Chat() {
               </>
             )}
 
-            {/* Modo Rápido (V7) */}
             {isFastMode && (
               <>
                 <Chip
@@ -386,7 +337,6 @@ export default function Chat() {
     );
   };
 
-  // --- O "INSPETOR" V26 (O NOVO MODAL) ---
   const renderJsonInspectorModal = () => (
     <Modal
       open={isInspectorOpen}
@@ -427,7 +377,6 @@ export default function Chat() {
     </Modal>
   );
 
-  // Mapa de limites de contexto por provider
   const providerContextLimits: Record<string, number> = {
     'groq': 4000,
     'openai': 126000,
@@ -437,7 +386,6 @@ export default function Chat() {
     'mistral': 30000,
   };
 
-  // Função para formatar número com k/M
   const formatTokens = (tokens: number): string => {
     if (tokens >= 1000000) {
       return `${(tokens / 1000000).toFixed(1)}M`;
@@ -447,7 +395,6 @@ export default function Chat() {
     return tokens.toString();
   };
 
-  // Pegar limite do provider atual
   const activeProvider = currentChatProvider || selectedProvider;
   const contextLimit = providerContextLimits[activeProvider] || 4000;
   const formattedLimit = formatTokens(contextLimit);
@@ -457,301 +404,302 @@ export default function Chat() {
   }
 
   return (
-    <MainLayout>
-      <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
-        {/* Barra Lateral */}
-        <ChatSidebar
-          chats={chatHistory}
-          currentChatId={currentChatId}
-          onSelectChat={handleSelectChat}
-          onDeleteChat={handleDeleteChat}
-          onNewChat={handleNewChat}
-        />
-
-        {/* Área de Chat */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {/* Mensagens */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            {isLoading && messages.length === 0 ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : messages.length === 0 ? (
-              <Box sx={{ textAlign: 'center', mt: 4 }}>
-                <Typography variant="h6" color="text.secondary">
-                  Envie uma mensagem para começar
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      
+      <Box sx={{ flex: 1, overflow: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {isLoading && messages.length === 0 ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : messages.length === 0 ? (
+          <Box sx={{ textAlign: 'center', mt: 4 }}>
+            <Typography variant="h6" color="text.secondary">
+              Envie uma mensagem para começar
+            </Typography>
+          </Box>
+        ) : (
+          messages.map((msg) => (
+            <Box key={msg.id} sx={{ mb: 2 }}>
+              <Paper
+                sx={{
+                  p: 2,
+                  maxWidth: '70%',
+                  ml: msg.role === 'user' ? 'auto' : 0,
+                  mr: msg.role === 'assistant' ? 'auto' : 0,
+                  bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
+                  color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                }}
+              >
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {msg.content}
                 </Typography>
-              </Box>
-            ) : (
-              messages.map((msg) => (
-                <Box key={msg.id} sx={{ mb: 2 }}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      maxWidth: '70%',
-                      ml: msg.role === 'user' ? 'auto' : 0,
-                      mr: msg.role === 'assistant' ? 'auto' : 0,
-                      bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
-                      color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
+
+                {isDevMode && msg.role === 'assistant' && msg.model && (
+                  <Box 
+                    sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1, 
+                      mt: 2, 
+                      pt: 1,
+                      borderTop: 1,
+                      borderColor: 'divider',
+                      opacity: 0.7,
+                      flexWrap: 'wrap'
                     }}
                   >
-                    {/* Conteúdo da mensagem */}
-                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {msg.content}
-                    </Typography>
-
-                    {/* --- O "Rodapé" V14 (Telemetria Detalhada - APENAS EM MODO DEV) --- */}
-                    {isDevMode && msg.role === 'assistant' && msg.model && (
-                      <Box 
+                    
+                    {msg.sentContext && msg.sentContext.length > 0 && (
+                      <IconButton 
+                        size="small"
+                        onClick={() => {
+                          let parsed: any = msg.sentContext;
+                          if (typeof msg.sentContext === 'string') {
+                            try {
+                              const trimmed = msg.sentContext.trim();
+                              if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                                parsed = JSON.parse(msg.sentContext);
+                              } else {
+                                alert('O contexto enviado não está em formato JSON. Conteúdo:\n\n' + msg.sentContext);
+                                return;
+                              }
+                            } catch (e) {
+                              alert('Erro ao decodificar o contexto enviado: ' + e + '\n\nConteúdo:\n' + msg.sentContext);
+                              return;
+                            }
+                          }
+                          setSelectedPrompt(parsed.debugReport_V22);
+                          setPromptModalOpen(true);
+                        }}
+                        title="Ver Contexto Enviado (V25 - Visual)"
                         sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: 1, 
-                          mt: 2, 
-                          pt: 1,
-                          borderTop: 1,
-                          borderColor: 'divider',
                           opacity: 0.7,
-                          flexWrap: 'wrap'
+                          '&:hover': { opacity: 1 },
+                          color: 'primary.main'
                         }}
                       >
-                        
-                        {/* 1. O Botão "Caixa Preta" (V25 - O Visual) */}
-                        {msg.sentContext && msg.sentContext.length > 0 && (
-                          <IconButton 
-                            size="small"
-                            onClick={() => {
-                              const parsed = typeof msg.sentContext === 'string' 
-                                ? JSON.parse(msg.sentContext) 
-                                : msg.sentContext;
-                              
-                              // [A CURA V30]
-                              setSelectedPrompt(parsed.debugReport_V22);
-                              setPromptModalOpen(true);
-                            }}
-                            title="Ver Contexto Enviado (V25 - Visual)"
-                            sx={{ 
-                              opacity: 0.7,
-                              '&:hover': { opacity: 1 },
-                              color: 'primary.main'
-                            }}
-                          >
-                            <CodeIcon fontSize="small" />
-                          </IconButton>
-                        )}
-
-                        {/* 2. Botão "JSON Enviado" (Bruto V26) */}
-                        {msg.sentContext && msg.sentContext.length > 0 && (
-                          <IconButton 
-                            size="small"
-                            onClick={() => {
-                              const parsed = typeof msg.sentContext === 'string' 
-                                ? JSON.parse(msg.sentContext) 
-                                : msg.sentContext;
-                              
-                              // [A CURA V30]
-                              setInspectorData(parsed.payloadSent_V23);
-                              setIsInspectorOpen(true);
-                            }}
-                            title="Ver JSON Enviado (V26 - Bruto)"
-                            sx={{ 
-                              opacity: 0.7,
-                              '&:hover': { opacity: 1 },
-                              color: 'secondary.main'
-                            }}
-                          >
-                            <DataObjectIcon fontSize="small" />
-                          </IconButton>
-                        )}
-
-                        {/* 3. Botão "JSON Recebido" (Bruto V26) */}
-                        <IconButton 
-                          size="small"
-                          onClick={() => {
-                            const { sentContext, ...msgSemContexto } = msg;
-                            setInspectorData(msgSemContexto);
-                            setIsInspectorOpen(true);
-                          }}
-                          title="Ver JSON Recebido (V26 - Bruto)"
-                          sx={{ 
-                            opacity: 0.7,
-                            '&:hover': { opacity: 1 },
-                            color: 'secondary.main',
-                            ml: -1 
-                          }}
-                        >
-                          <DataObjectIcon fontSize="small" />
-                        </IconButton>
-
-                        {/* 4. O Modelo (V14) */}
-                        <Chip 
-                          label={msg.model} 
-                          size="small" 
-                          variant="outlined"
-                          sx={{ fontSize: '0.7rem' }}
-                        />
-
-                        {/* 5. A Telemetria Detalhada (V14) */}
-                        <Typography 
-                          variant="caption" 
-                          sx={{ 
-                            fontFamily: 'monospace', 
-                            fontSize: '0.7rem',
-                            color: 'text.secondary'
-                          }}
-                        >
-                          Input: {msg.tokensIn || 0} | 
-                          Output: {msg.tokensOut || 0} | 
-                          Total: {(msg.tokensIn || 0) + (msg.tokensOut || 0)}
-                        </Typography>
-
-                        {/* 6. O Custo */}
-                        <Typography 
-                          variant="caption" 
-                          sx={{ 
-                            fontFamily: 'monospace', 
-                            fontSize: '0.7rem', 
-                            ml: 'auto',
-                            color: 'text.secondary'
-                          }}
-                        >
-                          Custo: ${(msg.costInUSD || 0).toFixed(6)}
-                        </Typography>
-                        
-                      </Box>
+                        <CodeIcon fontSize="small" />
+                      </IconButton>
                     )}
-                  </Paper>
-                </Box>
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </Box>
 
-          {/* Monitor de Debug (Terminal) */}
-          {isDevMode && (
-            <Paper
-              elevation={4}
-              sx={{
-                height: '200px',
-                overflowY: 'auto',
-                backgroundColor: '#1E1E1E',
-                color: '#00FF00',
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                padding: 1,
-                marginX: 2,
-                marginBottom: 1,
-              }}
-            >
-              {debugLogs.length === 0 ? (
-                <Typography sx={{ color: '#666', fontFamily: 'monospace' }}>
-                  Aguardando logs de debug...
-                </Typography>
-              ) : (
-                debugLogs.map((log, index) => (
-                  <div key={index}>
-                    {`[${new Date().toLocaleTimeString()}] ${log}`}
-                  </div>
-                ))
-              )}
-            </Paper>
-          )}
+                    {msg.sentContext && msg.sentContext.length > 0 && (
+                      <IconButton 
+                        size="small"
+                        onClick={() => {
+                          let parsed: any = msg.sentContext;
+                          if (typeof msg.sentContext === 'string') {
+                            try {
+                              const trimmed = msg.sentContext.trim();
+                              if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                                parsed = JSON.parse(msg.sentContext);
+                              } else {
+                                alert('O contexto enviado não está em formato JSON. Conteúdo:\n\n' + msg.sentContext);
+                                return;
+                              }
+                            } catch (e) {
+                              alert('Erro ao decodificar o contexto enviado: ' + e + '\n\nConteúdo:\n' + msg.sentContext);
+                              return;
+                            }
+                          }
+                          
+                          setInspectorData(parsed?.payloadSent_V23 || parsed);
+                          setIsInspectorOpen(true);
+                        }}
+                        title="Ver JSON Enviado (V26 - Bruto)"
+                        sx={{ 
+                          opacity: 0.7,
+                          '&:hover': { opacity: 1 },
+                          color: 'secondary.main'
+                        }}
+                      >
+                        <DataObjectIcon fontSize="small" />
+                      </IconButton>
+                    )}
 
-          {/* Input com Seletores */}
-          <Paper sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-            <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
-              {/* Seletor de Provider */}
-              <FormControl sx={{ minWidth: 200 }}>
-                <InputLabel>Provider de IA</InputLabel>
-                <Select
-                  value={currentChatProvider || selectedProvider}
-                  onChange={(e) => {
-                    if (!currentChatProvider) {
-                      setSelectedProvider(e.target.value);
-                    }
-                  }}
-                  label="Provider de IA"
-                  size="small"
-                  disabled={!!currentChatProvider}
-                >
-                  <MenuItem value="groq">Groq (LLaMA 3.1 - Gratuito)</MenuItem>
-                  <MenuItem value="openai">OpenAI (GPT-3.5/4)</MenuItem>
-                  <MenuItem value="claude">Claude (Anthropic)</MenuItem>
-                  <MenuItem value="together">Together.ai</MenuItem>
-                  <MenuItem value="perplexity">Perplexity</MenuItem>
-                  <MenuItem value="mistral">Mistral</MenuItem>
-                </Select>
-              </FormControl>
-
-              {/* Seletor de Estratégia de Contexto */}
-              <FormControl sx={{ minWidth: 250 }} size="small">
-                <InputLabel id="strategy-label">Estratégia de Contexto</InputLabel>
-                <Select
-                  labelId="strategy-label"
-                  value={contextStrategy}
-                  label="Estratégia de Contexto"
-                  onChange={(e) => setContextStrategy(e.target.value)}
-                >
-                  <MenuItem value="fast">
-                    ⚡ Rápido (Últimas 10)
-                  </MenuItem>
-                  <MenuItem value="efficient">
-                    🧠 Inteligente ({formattedLimit} tokens)
-                  </MenuItem>
-                </Select>
-              </FormControl>
-
-              {currentChatProvider && (
-                <Chip 
-                  label={`Provider: ${currentChatProvider.toUpperCase()}`}
-                  color="primary"
-                  variant="outlined"
-                  size="small"
-                />
-              )}
-
-              <Box sx={{ marginLeft: 'auto' }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={isDevMode}
-                      onChange={(e) => setIsDevMode(e.target.checked)}
+                    <IconButton 
                       size="small"
+                      onClick={() => {
+                        const { sentContext, ...msgSemContexto } = msg;
+                        setInspectorData(msgSemContexto);
+                        setIsInspectorOpen(true);
+                      }}
+                      title="Ver JSON Recebido (V26 - Bruto)"
+                      sx={{ 
+                        opacity: 0.7,
+                        '&:hover': { opacity: 1 },
+                        color: 'secondary.main',
+                        ml: -1 
+                      }}
+                    >
+                      <DataObjectIcon fontSize="small" />
+                    </IconButton>
+
+                    <Chip 
+                      label={msg.model} 
+                      size="small" 
+                      variant="outlined"
+                      sx={{ fontSize: '0.7rem' }}
                     />
-                  }
-                  label="Modo Dev"
-                />
-              </Box>
+
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontFamily: 'monospace', 
+                        fontSize: '0.7rem',
+                        color: 'text.secondary'
+                      }}
+                    >
+                      Input: {msg.tokensIn || 0} | 
+                      Output: {msg.tokensOut || 0} | 
+                      Total: {(msg.tokensIn || 0) + (msg.tokensOut || 0)}
+                    </Typography>
+
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontFamily: 'monospace', 
+                        fontSize: '0.7rem', 
+                        ml: 'auto',
+                        color: 'text.secondary'
+                      }}
+                    >
+                      Custo: ${(msg.costInUSD || 0).toFixed(6)}
+                    </Typography>
+                    
+                  </Box>
+                )}
+              </Paper>
             </Box>
-            
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <TextField
-                fullWidth
-                placeholder="Digite sua mensagem..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                disabled={isLoading}
-                multiline
-                maxRows={4}
-              />
-              <IconButton
-                color="primary"
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isLoading}
-              >
-                <SendIcon />
-              </IconButton>
-            </Box>
-          </Paper>
-        </Box>
+          ))
+        )}
+        <div ref={messagesEndRef} />
       </Box>
 
-      {/* Renderizar Modal de Contexto (V25) */}
-      {renderPromptModal()}
+      {isDevMode && (
+        <Paper
+          elevation={4}
+          sx={{
+            height: '200px',
+            overflowY: 'auto',
+            backgroundColor: '#1E1E1E',
+            color: '#00FF00',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            padding: 1,
+            marginX: 2,
+            marginBottom: 1,
+          }}
+        >
+          {debugLogs.length === 0 ? (
+            <Typography sx={{ color: '#666', fontFamily: 'monospace' }}>
+              Aguardando logs de debug...
+            </Typography>
+          ) : (
+            debugLogs.map((log, index) => (
+              <div key={index}>
+                {`[${new Date().toLocaleTimeString()}] ${log}`}
+              </div>
+            ))
+          )}
+        </Paper>
+      )}
 
-      {/* Renderizar Modal de Inspeção (V26) */}
+      <Paper sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Provider de IA</InputLabel>
+            <Select
+              value={currentChatProvider || selectedProvider}
+              onChange={(e) => {
+                if (!currentChatProvider) {
+                  setSelectedProvider(e.target.value);
+                }
+              }}
+              label="Provider de IA"
+              size="small"
+              disabled={!!currentChatProvider}
+            >
+              <MenuItem value="groq">Groq (LLaMA 3.1 - Gratuito)</MenuItem>
+              <MenuItem value="openai">OpenAI (GPT-3.5/4)</MenuItem>
+              <MenuItem value="claude">Claude (Anthropic)</MenuItem>
+              <MenuItem value="together">Together.ai</MenuItem>
+              <MenuItem value="perplexity">Perplexity</MenuItem>
+              <MenuItem value="mistral">Mistral</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl sx={{ minWidth: 250 }} size="small">
+            <InputLabel id="strategy-label">Estratégia de Contexto</InputLabel>
+            <Select
+              labelId="strategy-label"
+              value={contextStrategy}
+              label="Estratégia de Contexto"
+              onChange={(e) => setContextStrategy(e.target.value)}
+            >
+              <MenuItem value="fast">
+                ⚡ Rápido (Últimas 10)
+              </MenuItem>
+              <MenuItem value="efficient">
+                🧠 Inteligente ({formattedLimit} tokens)
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+          {currentChatProvider && (
+            <Chip 
+              label={`Provider: ${currentChatProvider.toUpperCase()}`}
+              color="primary"
+              variant="outlined"
+              size="small"
+            />
+          )}
+
+          <Box sx={{ marginLeft: 'auto' }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isDevMode}
+                  onChange={(e) => setIsDevMode(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Modo Dev"
+            />
+          </Box>
+        </Box>
+        
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <TextField
+            fullWidth
+            placeholder="Digite sua mensagem..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            disabled={isLoading || isEditorOpen}
+            helperText={isEditorOpen ? "Feche o painel do editor para enviar." : ""}
+            multiline
+            maxRows={4}
+          />
+          <IconButton
+            color="primary"
+            onClick={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+            disabled={!inputMessage.trim() || isLoading || isEditorOpen}
+          >
+            <SendIcon />
+          </IconButton>
+        </Box>
+      </Paper>
+
+      {renderPromptModal()}
       {renderJsonInspectorModal()}
-    </MainLayout>
+    </Box>
   );
 }

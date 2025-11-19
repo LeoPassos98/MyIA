@@ -130,6 +130,9 @@ async function getHybridRagHistory(
   };
 }
 
+// [V33] PROTEÇÃO ANTI-DISPARO MÚLTIPLO (Idempotência CORRIGIDA)
+const processingRequests = new Set<string>();
+
 export const chatController = {
   async sendMessage(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -139,10 +142,41 @@ export const chatController = {
 
       const { message, provider: requestProvider, chatId, contextStrategy } = req.body;
 
+      // [V33] CRIAR ID ÚNICO DETERMINÍSTICO (sem timestamp!)
+      // Usa APENAS userId + chatId + hash da mensagem (ignora timestamp)
+      const crypto = require('crypto');
+      const messageHash = crypto.createHash('sha256').update(message).digest('hex').substring(0, 16);
+      const requestId = `${req.userId}-${chatId || 'novo'}-${messageHash}`;
+
+      // [V33] VERIFICAR SE REQUISIÇÃO JÁ ESTÁ SENDO PROCESSADA
+      if (processingRequests.has(requestId)) {
+        logger.warn(`[V33] ⛔ Requisição duplicada bloqueada: ${requestId}`);
+        return res.status(429).json({ 
+          error: 'Requisição duplicada detectada. Aguarde o processamento anterior.' 
+        });
+      }
+
+      // [V33] MARCAR REQUISIÇÃO COMO "EM PROCESSAMENTO"
+      processingRequests.add(requestId);
+
+      // [V33] GARANTIR LIMPEZA (mesmo em caso de erro)
+      const cleanup = () => {
+        processingRequests.delete(requestId);
+      };
+
+      // [V33] TIMEOUT AUTOMÁTICO (limpar após 60s mesmo se travar)
+      const timeoutCleanup = setTimeout(() => {
+        if (processingRequests.has(requestId)) {
+          cleanup();
+        }
+      }, 60000);
+
       // Validar provider se fornecido
       const validProviders: ProviderName[] = ['openai', 'groq', 'together', 'perplexity', 'mistral', 'claude'];
       
       if (requestProvider && !validProviders.includes(requestProvider)) {
+        clearTimeout(timeoutCleanup);
+        cleanup();
         return res.status(400).json({ 
           error: `Invalid provider. Valid options: ${validProviders.join(', ')}` 
         });
@@ -197,7 +231,6 @@ export const chatController = {
         currentChat = await prisma.chat.create({
           data: {
             userId: req.userId,
-            // Usa título padrão do schema - será substituído depois
             provider: providerToLock
           }
         });
@@ -207,7 +240,35 @@ export const chatController = {
         writeSSE({ type: 'debug', log: `✅ Chat criado: ${currentChat.id} (provider: ${lockedProvider})` });
       }
 
-      // --- 2. Salvar a Mensagem do Usuário ---
+      // [V43] BUSCAR HISTÓRICO **ANTES** DE SALVAR A NOVA MENSAGEM
+      writeSSE({ type: 'debug', log: '📚 Buscando histórico de mensagens...' });
+      writeSSE({ type: 'debug', log: `⚙️ Estratégia de Contexto: ${contextStrategy || 'fast'}` });
+
+      const providerConfig = getProviderConfig(lockedProvider);
+      const providerModel = providerConfig.defaultModel;
+      writeSSE({ type: 'debug', log: `🤖 Provider: ${lockedProvider}, Modelo: ${providerModel}` });
+
+      let historyReport: HybridHistoryReport | null = null;
+      let historyMessages: Message[] = [];
+
+      if (contextStrategy === 'efficient') {
+        const providerInfo = getProviderInfo(providerModel);
+        writeSSE({ type: 'debug', log: `🧠 Motor Híbrido RAG (V9.4): Limite ${providerInfo.contextLimit} tokens, Buffer 2000` });
+        historyReport = await getHybridRagHistory(
+          currentChat.id,
+          message,
+          providerModel,
+          writeSSE
+        );
+        historyMessages = historyReport.finalContext;
+      } else {
+        writeSSE({ type: 'debug', log: '⚡ Motor Rápido (V7 - take: 10)...' });
+        historyMessages = await getFastHistory(currentChat.id);
+      }
+
+      writeSSE({ type: 'debug', log: `📖 Histórico carregado: ${historyMessages.length} mensagens` });
+
+      // [V43] AGORA SIM: Salvar a Mensagem do Usuário (DEPOIS de buscar histórico)
       writeSSE({ type: 'debug', log: '💾 Salvando mensagem do usuário no banco...' });
       const userMessageRecord = await prisma.message.create({
         data: {
@@ -225,14 +286,12 @@ export const chatController = {
           const embedding = await aiService.embed(message);
           
           if (embedding) {
-            // Salva o vetor no DB usando raw SQL (pgvector)
             await prisma.$executeRaw`
               UPDATE messages 
               SET vector = ${embedding.vector}::vector 
               WHERE id = ${userMessageRecord.id}
             `;
 
-            // Salva o *custo* dessa "tradução"
             prisma.apiCallLog.create({
               data: {
                 userId: req.userId!,
@@ -255,80 +314,32 @@ export const chatController = {
           writeSSE({ type: 'debug', log: '⚠️ Falha ao indexar mensagem do usuário (não-crítico)' });
         }
       })();
-      // --- FIM DA INDEXAÇÃO V9.3 (Usuário) ---
 
-      // --- 3. Preparar o Histórico para a IA ---
-      writeSSE({ type: 'debug', log: '📚 Buscando histórico de mensagens...' });
-      
-      writeSSE({ type: 'debug', log: `⚙️ Estratégia de Contexto: ${contextStrategy || 'fast'}` });
-
-      // --- O "DISTRIBUIDOR" V22 (Atualizado) ---
-      const providerConfig = getProviderConfig(lockedProvider);
-      const providerModel = providerConfig.defaultModel;
-      writeSSE({ type: 'debug', log: `🤖 Provider: ${lockedProvider}, Modelo: ${providerModel}` });
-
-      // [V22/V23] Variáveis base
-      let historyReport: HybridHistoryReport | null = null;
-      let historyMessages: Message[] = []; // O 'sentContext' (V13/V27)
-      let formattedMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
-
-      if (contextStrategy === 'efficient') {
-        const providerInfo = getProviderInfo(providerModel);
-        writeSSE({ type: 'debug', log: `🧠 Motor Híbrido RAG (V9.4): Limite ${providerInfo.contextLimit} tokens, Buffer 2000` });
-        historyReport = await getHybridRagHistory(
-          currentChat.id,
-          message,
-          providerModel,
-          writeSSE
-        );
-        historyMessages = historyReport.finalContext;
-      } else {
-        writeSSE({ type: 'debug', log: '⚡ Motor Rápido (V7 - take: 10)...' });
-        historyMessages = await getFastHistory(currentChat.id);
-      }
-
-      formattedMessages = historyMessages.map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-      }));
-      writeSSE({ type: 'debug', log: `📖 Histórico carregado: ${formattedMessages.length} mensagens` });
-
-      // --- A "CURA" V31 (O "Anti-Eco") ---
-      // O V23 (Payload) é *APENAS* o histórico V27/V12
+      // [V43] MONTAR PAYLOAD: Histórico (ANTES de salvar) + Nova Mensagem
       const payloadForIA = [
         ...historyMessages.map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
-        }))
-        // REMOVIDO: { role: 'user', content: message }
-        // (causava o "Eco V31")
+        })),
+        { role: 'user' as const, content: message }
       ];
-      // --- FIM DA CURA V31 ---
 
-      // --- A "CURA" V31 (O "Anti-400") ---
-      // Se o "Fiscal V12" cortou tudo, force apenas a nova mensagem
+      writeSSE({ type: 'debug', log: `🔧 Payload montado: ${payloadForIA.length} mensagens (${historyMessages.length} histórico + 1 nova)` });
+
       if (payloadForIA.length === 0) {
-        payloadForIA.push({ role: 'user', content: message });
-        writeSSE({ type: 'debug', log: '⚠️ V31: Fiscal V12 cortou tudo. Forçando apenas nova mensagem.' });
+        writeSSE({ type: 'error', error: 'Erro crítico: Payload vazio!' });
+        res.end();
+        return;
       }
-      // --- FIM DA CURA V31 ---
 
-      // --- A "CURA" V30 (O "DEBUG PERFEITO") ---
-      const reportV22 = historyReport 
-        ? historyReport 
-        : historyMessages;
-
+      const reportV22 = historyReport ? historyReport : historyMessages;
       const contextToSave = {
         debugReport_V22: reportV22,
-        payloadSent_V23: payloadForIA // V31: agora sem duplicata
+        payloadSent_V23: payloadForIA
       };
-      // --- FIM DA CURA V30 ---
 
-      // 3. A "Chamada de Stream" (V12/V31)
-      const stream = aiService.stream(
-        payloadForIA,
-        lockedProvider
-      );
+      // 3. A "Chamada de Stream"
+      const stream = aiService.stream(payloadForIA, lockedProvider);
 
       // --- O NOVO MOTOR (Streaming com WATCHDOG) ---
       let watchdogTimer: NodeJS.Timeout | undefined;
@@ -416,7 +427,16 @@ export const chatController = {
               tokensIn: finalMetrics.tokensIn,
               tokensOut: finalMetrics.tokensOut,
               costInUSD: finalMetrics.costInUSD,
-              sentContext: JSON.stringify(contextToSave) // [V30] Usa o objeto estruturado declarado antes
+              sentContext: JSON.stringify(contextToSave)
+            }
+          });
+
+          // [V37] ENVIAR CONTEXTO VIA TELEMETRIA FINAL
+          writeSSE({
+            type: 'telemetry',
+            metrics: {
+              ...finalMetrics,
+              sentContext: JSON.stringify(contextToSave) // <-- ENVIAR AQUI
             }
           });
 
@@ -488,55 +508,63 @@ export const chatController = {
           writeSSE({ type: 'debug', log: '⚠️ Stream sem telemetria!' });
         }
 
+        // [V41] FECHAR STREAM EXPLICITAMENTE
+        writeSSE({ type: 'debug', log: '🏁 Encerrando stream...' });
+        res.end(); // <-- CRUCIAL: Fecha a conexão SSE
+        console.log('[V41] Stream SSE encerrado explicitamente');
+
         // --- Geração de Título (Fire-and-Forget com TIMEOUT) ---
         if (isNewChat && currentChat.title === "Nova Conversa") {
-          writeSSE({ type: 'debug', log: '🏷️ Iniciando geração de título (fire-and-forget)...' });
-          
+          // [V41] MOVIDO PARA FORA DO RES.END (executar após fechar stream)
           (async () => {
-            const groqModelName = 'llama-3.1-8b-instant';
-            type CostMapKey = keyof typeof import('../config/costMap').COST_PER_1M_TOKENS;
-            const { COST_PER_1M_TOKENS } = await import('../config/costMap');
-            const groqCosts = COST_PER_1M_TOKENS[groqModelName as CostMapKey] || { input: 99, output: 99 };
-            const isGroqFree = groqCosts.input === 0 && groqCosts.output === 0;
+            try {
+              const groqModelName = 'llama-3.1-8b-instant';
+              type CostMapKey = keyof typeof import('../config/costMap').COST_PER_1M_TOKENS;
+              const { COST_PER_1M_TOKENS } = await import('../config/costMap');
+              const groqCosts = COST_PER_1M_TOKENS[groqModelName as CostMapKey] || { input: 99, output: 99 };
+              const isGroqFree = groqCosts.input === 0 && groqCosts.output === 0;
 
-            let titleToSave: string;
+              let titleToSave: string;
 
-            if (isGroqFree) {
-              try {
-                const titlePrompt = `Gere um título curto e conciso (máximo 5 palavras) para esta conversa, baseado na primeira pergunta do usuário. Responda APENAS com o título, sem introdução. Pergunta: "${message}"`;
-                
-                // --- O "TIMEOUT" (A "CORRIDA") ---
-                const titleGeneration = aiService.chat(
-                  [{ role: 'user', content: titlePrompt }],
-                  'groq'
-                );
+              if (isGroqFree) {
+                try {
+                  const titlePrompt = `Gere um título curto e conciso (máximo 5 palavras) para esta conversa, baseado na primeira pergunta do usuário. Responda APENAS com o título, sem introdução. Pergunta: "${message}"`;
+                  
+                  // --- O "TIMEOUT" (A "CORRIDA") ---
+                  const titleGeneration = aiService.chat(
+                    [{ role: 'user', content: titlePrompt }],
+                    'groq'
+                  );
 
-                const timeout = createTimeout(5000, "Timeout: Geração de título demorou mais de 5s");
+                  const timeout = createTimeout(5000, "Timeout: Geração de título demorou mais de 5s");
 
-                const titleResponse = await Promise.race([
-                  titleGeneration,
-                  timeout
-                ]) as AiServiceResponse;
-                // --- FIM DO TIMEOUT ---
+                  const titleResponse = await Promise.race([
+                    titleGeneration,
+                    timeout
+                  ]) as AiServiceResponse;
+                  // --- FIM DO TIMEOUT ---
 
-                titleToSave = titleResponse.response.replace(/"/g, '').trim();
+                  titleToSave = titleResponse.response.replace(/"/g, '').trim();
 
-              } catch (err: any) {
-                console.warn("Falha ao gerar título (Timeout ou Erro de API):", err.message);
+                } catch (err: any) {
+                  console.warn("Falha ao gerar título (Timeout ou Erro de API):", err.message);
+                  titleToSave = `Conversa: ${message.substring(0, 20)}...`;
+                }
+              } else {
+                console.warn("Geração de título desabilitada (Groq não é mais grátis).");
                 titleToSave = `Conversa: ${message.substring(0, 20)}...`;
               }
-            } else {
-              console.warn("Geração de título desabilitada (Groq não é mais grátis).");
-              titleToSave = `Conversa: ${message.substring(0, 20)}...`;
-            }
 
-            try {
-              if (titleToSave && titleToSave.length > 0) {
-                await prisma.chat.update({
-                  where: { id: currentChat.id },
-                  data: { title: titleToSave }
-                });
-                logger.info(`Título gerado para chat ${currentChat.id}: "${titleToSave}"`);
+              try {
+                if (titleToSave && titleToSave.length > 0) {
+                  await prisma.chat.update({
+                    where: { id: currentChat.id },
+                    data: { title: titleToSave }
+                  });
+                  logger.info(`Título gerado para chat ${currentChat.id}: "${titleToSave}"`);
+                }
+              } catch (dbErr) {
+                console.error("Falha ao salvar título:", dbErr);
               }
             } catch (dbErr) {
               console.error("Falha ao salvar título:", dbErr);
@@ -553,8 +581,14 @@ export const chatController = {
           error: translatedError
         });
 
+        clearTimeout(timeoutCleanup); // [V33] Limpar timeout
+        cleanup(); // [V33] Limpar em caso de erro
         next(error);
         // --- FIM DA CURA V25 ---
+      } finally {
+        // [V33] GARANTIR LIMPEZA EM QUALQUER CENÁRIO
+        clearTimeout(timeoutCleanup);
+        cleanup();
       }
     } catch (error) {
       // Se erro acontecer antes do streaming começar
@@ -580,9 +614,9 @@ function translateProviderError(error: any): string {
   }
 
   // (O "Bug V24" - O Erro 413 de mensagem longa)
-  if (msg.includes("413") || msg.includes("Request too large")) {
-    return "Erro V24: A 'carga' (Histórico + Nova Mensagem) estourou o limite de tokens do provider (Erro 413).";
-  }
+  if (msg.includes("413") || msg.includes("Request too large")) {  return msg;
+    return "Erro V24: A 'carga' (Histórico + Nova Mensagem) estourou o limite de tokens do provider (Erro 413).";  }  // (O "Bug V12" - O Erro 400 do Groq (Limite Real))  if (msg.includes("400") && msg.includes("context_length_exceeded")) {    return "Erro V12: O 'contexto' (Histórico) estourou o limite real do provider (Groq 6k).";  }
+
 
   // (O "Bug V12" - O Erro 400 do Groq (Limite Real))
   if (msg.includes("400") && msg.includes("context_length_exceeded")) {

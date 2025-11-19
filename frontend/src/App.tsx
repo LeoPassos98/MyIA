@@ -4,6 +4,8 @@ import { CustomThemeProvider, useTheme } from './contexts/ThemeContext';
 import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { useMemo } from 'react';
+import { LayoutProvider } from './contexts/LayoutContext'; 
+import MainLayout from './components/Layout/MainLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
@@ -32,12 +34,18 @@ function ThemedRoutes() {
   return (
     <MuiThemeProvider theme={theme}>
       <CssBaseline />
+      
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
+
+        <Route element={<MainLayout />}>
+           <Route path="/chat" element={<Chat />} />
+           <Route path="/chat/:chatId" element={<Chat />} />
+           <Route path="/settings" element={<Settings />} />
+        </Route>
+
+        <Route path="/" element={<Navigate to="/chat" replace />} />
       </Routes>
     </MuiThemeProvider>
   );
@@ -53,7 +61,9 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <CustomThemeProvider>
-          <ThemedRoutes />
+          <LayoutProvider>
+            <ThemedRoutes />
+          </LayoutProvider>
         </CustomThemeProvider>
       </AuthProvider>
     </BrowserRouter>
