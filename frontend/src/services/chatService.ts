@@ -23,19 +23,29 @@ export interface SendMessageResponse {
   provider: string;
 }
 
+export interface ChatPayload {
+  prompt: string;
+  provider: string;
+  model?: string;
+  context?: string;
+  selectedMessageIds?: string[];
+  strategy?: string;
+  temperature?: number;
+  topK?: number;
+  memoryWindow?: number;
+  chatId?: string | null;
+}
+
 export const chatService = {
   /**
    * NOVA função de stream com SSE.
    * Usa callbacks para gotejar dados para a UI em tempo real.
    */
   async streamChat(
-    message: string,
-    provider: string,
-    chatId: string | null,
-    contextStrategy: string,
+    payload: ChatPayload,
     onChunk: (chunk: StreamChunk) => void,
     onComplete: () => void,
-    onError: (error: string) => void
+    onError: (error: any) => void
   ) {
     try {
       const token = localStorage.getItem('token');
@@ -48,7 +58,7 @@ export const chatService = {
           'Accept': 'text/event-stream',
           'Authorization': token ? `Bearer ${token}` : '',
         },
-        body: JSON.stringify({ message, provider, chatId, contextStrategy }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -91,7 +101,7 @@ export const chatService = {
                       type: 'telemetry',
                       metrics: {
                         tokensIn: 0, tokensOut: 0, costInUSD: 0,
-                        model: '', provider, chatId: chatIdMatch[1], sentContext: undefined
+                        model: '', provider: payload.provider, chatId: chatIdMatch[1], sentContext: undefined
                       }
                     });
                   }

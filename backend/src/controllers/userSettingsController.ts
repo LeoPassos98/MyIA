@@ -6,6 +6,16 @@ import { encryptionService } from '../services/encryptionService';
 
 // Helper: Encontrar ou criar configurações
 async function findOrCreateSettings(userId: string) {
+  // Primeiro, verificar se o usuário existe
+  const userExists = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true } // Apenas pegar o ID para economizar recursos
+  });
+
+  if (!userExists) {
+    throw new AppError('Usuário não encontrado. Token inválido ou usuário foi removido.', 401);
+  }
+
   let settings = await prisma.userSettings.findUnique({
     where: { userId },
   });

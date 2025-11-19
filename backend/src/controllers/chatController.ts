@@ -140,7 +140,31 @@ export const chatController = {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const { message, provider: requestProvider, chatId, contextStrategy } = req.body;
+      // Aceitar tanto 'message' (antigo) quanto 'prompt' (novo) para compatibilidade
+      const { 
+        message: legacyMessage, 
+        prompt, 
+        provider: requestProvider, 
+        chatId, 
+        contextStrategy,
+        model,
+        context,
+        selectedMessageIds,
+        strategy,
+        temperature,
+        topK,
+        memoryWindow
+      } = req.body;
+
+      // Usar prompt (novo) ou message (legado)
+      const message = prompt || legacyMessage;
+
+      // Validar que message existe
+      if (!message || typeof message !== 'string' || !message.trim()) {
+        return res.status(400).json({ 
+          error: 'Message/prompt is required and must be a non-empty string' 
+        });
+      }
 
       // [V33] CRIAR ID ÚNICO DETERMINÍSTICO (sem timestamp!)
       // Usa APENAS userId + chatId + hash da mensagem (ignora timestamp)
@@ -242,16 +266,43 @@ export const chatController = {
 
       // [V43] BUSCAR HISTÓRICO **ANTES** DE SALVAR A NOVA MENSAGEM
       writeSSE({ type: 'debug', log: '📚 Buscando histórico de mensagens...' });
-      writeSSE({ type: 'debug', log: `⚙️ Estratégia de Contexto: ${contextStrategy || 'fast'}` });
+      
+      // [V47] MODO MANUAL: Se context ou selectedMessageIds forem fornecidos
+      const isManualMode = context !== undefined || (selectedMessageIds && selectedMessageIds.length > 0);
+      
+      if (isManualMode) {
+        writeSSE({ type: 'debug', log: '✋ Modo MANUAL ativado (contexto customizado)' });
+      } else {
+        writeSSE({ type: 'debug', log: `⚙️ Estratégia de Contexto: ${strategy || contextStrategy || 'fast'}` });
+      }
 
       const providerConfig = getProviderConfig(lockedProvider);
-      const providerModel = providerConfig.defaultModel;
+      const providerModel = model || providerConfig.defaultModel;
       writeSSE({ type: 'debug', log: `🤖 Provider: ${lockedProvider}, Modelo: ${providerModel}` });
 
       let historyReport: HybridHistoryReport | null = null;
       let historyMessages: Message[] = [];
 
-      if (contextStrategy === 'efficient') {
+      if (isManualMode) {
+        // [V47] MODO MANUAL: Buscar apenas as mensagens selecionadas
+        if (selectedMessageIds && selectedMessageIds.length > 0) {
+          writeSSE({ type: 'debug', log: `🎯 Buscando ${selectedMessageIds.length} mensagens selecionadas...` });
+          historyMessages = await prisma.message.findMany({
+            where: {
+              id: { in: selectedMessageIds },
+              chatId: currentChat.id
+            },
+            orderBy: { createdAt: 'asc' }
+          });
+          writeSSE({ type: 'debug', log: `✅ ${historyMessages.length} mensagens encontradas` });
+        }
+        
+        // Se há contexto adicional, logar
+        if (context) {
+          const contextWords = countWords(context);
+          writeSSE({ type: 'debug', log: `📝 Contexto adicional: ${contextWords} palavras` });
+        }
+      } else if ((strategy || contextStrategy) === 'efficient') {
         const providerInfo = getProviderInfo(providerModel);
         writeSSE({ type: 'debug', log: `🧠 Motor Híbrido RAG (V9.4): Limite ${providerInfo.contextLimit} tokens, Buffer 2000` });
         historyReport = await getHybridRagHistory(
@@ -316,15 +367,27 @@ export const chatController = {
       })();
 
       // [V43] MONTAR PAYLOAD: Histórico (ANTES de salvar) + Nova Mensagem
-      const payloadForIA = [
+      // [V47] Se modo manual com contexto adicional, injeta como mensagem do sistema
+      const payloadForIA = [];
+      
+      if (isManualMode && context) {
+        // Adiciona contexto adicional como mensagem do sistema
+        payloadForIA.push({
+          role: 'system' as const,
+          content: context
+        });
+        writeSSE({ type: 'debug', log: '📝 Contexto adicional injetado como system message' });
+      }
+      
+      payloadForIA.push(
         ...historyMessages.map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
         })),
         { role: 'user' as const, content: message }
-      ];
+      );
 
-      writeSSE({ type: 'debug', log: `🔧 Payload montado: ${payloadForIA.length} mensagens (${historyMessages.length} histórico + 1 nova)` });
+      writeSSE({ type: 'debug', log: `🔧 Payload montado: ${payloadForIA.length} mensagens (${historyMessages.length} histórico + 1 nova${isManualMode && context ? ' + contexto' : ''})` });
 
       if (payloadForIA.length === 0) {
         writeSSE({ type: 'error', error: 'Erro crítico: Payload vazio!' });
@@ -335,10 +398,24 @@ export const chatController = {
       const reportV22 = historyReport ? historyReport : historyMessages;
       const contextToSave = {
         debugReport_V22: reportV22,
-        payloadSent_V23: payloadForIA
+        payloadSent_V23: payloadForIA,
+        // [V47] Metadados de configuração usados
+        config_V47: isManualMode ? {
+          mode: 'manual',
+          selectedMessages: selectedMessageIds?.length || 0,
+          hasAdditionalContext: !!context
+        } : {
+          mode: 'automatic',
+          strategy: strategy || contextStrategy || 'fast',
+          temperature: temperature,
+          topK: topK,
+          memoryWindow: memoryWindow
+        }
       };
 
       // 3. A "Chamada de Stream"
+      // TODO [V47]: Passar temperature, topK para aiService quando suportado
+      // Ex: aiService.stream(payloadForIA, lockedProvider, { temperature, topK })
       const stream = aiService.stream(payloadForIA, lockedProvider);
 
       // --- O NOVO MOTOR (Streaming com WATCHDOG) ---

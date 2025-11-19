@@ -1,36 +1,126 @@
-import { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { ChatConfig, ManualContextState, Message } from '../types/chat';
 
 interface LayoutContextType {
-  isHistoryOpen: boolean;
-  setIsHistoryOpen: (isOpen: boolean) => void;
+  // Drawer states
   isEditorOpen: boolean;
-  setIsEditorOpen: (isOpen: boolean) => void;
+  setIsEditorOpen: (open: boolean) => void;
   currentEditorTab: number;
-  setCurrentEditorTab: (tabIndex: number) => void;
+  setCurrentEditorTab: (tab: number) => void;
+
+  // Chat configuration
+  chatConfig: ChatConfig;
+  updateChatConfig: (partialConfig: Partial<ChatConfig>) => void;
+
+  // Manual context state
+  manualContext: ManualContextState;
+  setManualContext: (state: ManualContextState) => void;
+  toggleMessageSelection: (messageId: string) => void;
+
+  // Chat history snapshot (readonly mirror)
+  chatHistorySnapshot: Message[];
+  syncChatHistory: (messages: Message[]) => void;
 }
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
-export const LayoutProvider = ({ children }: { children: ReactNode }) => {
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+interface LayoutProviderProps {
+  children: ReactNode;
+}
+
+export function LayoutProvider({ children }: LayoutProviderProps) {
+  // Drawer states
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [currentEditorTab, setCurrentEditorTab] = useState(0);
 
+  // Chat configuration with safe defaults
+  const [chatConfig, setChatConfig] = useState<ChatConfig>({
+    provider: 'groq',
+    model: 'llama-3.1-8b-instant',
+    strategy: 'efficient',
+    temperature: 0.7,
+    topK: 5,
+    memoryWindow: 10,
+  });
+
+  // Manual context state
+  const [manualContext, setManualContext] = useState<ManualContextState>({
+    isActive: false,
+    selectedMessageIds: [],
+    additionalText: '',
+  });
+
+  // Chat history snapshot
+  const [chatHistorySnapshot, setChatHistorySnapshot] = useState<Message[]>([]);
+
+  // Update chat config (partial update)
+  const updateChatConfig = useCallback((partialConfig: Partial<ChatConfig>) => {
+    setChatConfig(prev => ({ ...prev, ...partialConfig }));
+  }, []);
+
+  // Sync chat history - CRITICAL: Prevent infinite re-render loops
+  const syncChatHistory = useCallback((messages: Message[]) => {
+    // Only update if actually changed (size or content check)
+    setChatHistorySnapshot(prev => {
+      // Quick size check first
+      if (prev.length !== messages.length) {
+        return messages;
+      }
+      
+      // Deep comparison using JSON.stringify for simplicity
+      // In production, consider a more efficient comparison
+      const prevJson = JSON.stringify(prev.map(m => ({ id: m.id, content: m.content })));
+      const newJson = JSON.stringify(messages.map(m => ({ id: m.id, content: m.content })));
+      
+      if (prevJson !== newJson) {
+        return messages;
+      }
+      
+      return prev; // No change, return previous reference
+    });
+  }, []);
+
+  // Toggle message selection for manual context
+  const toggleMessageSelection = useCallback((messageId: string) => {
+    setManualContext(prev => {
+      const isSelected = prev.selectedMessageIds.includes(messageId);
+      const newSelectedIds = isSelected
+        ? prev.selectedMessageIds.filter(id => id !== messageId)
+        : [...prev.selectedMessageIds, messageId];
+      
+      return {
+        ...prev,
+        selectedMessageIds: newSelectedIds,
+      };
+    });
+  }, []);
+
+  const value: LayoutContextType = {
+    isEditorOpen,
+    setIsEditorOpen,
+    currentEditorTab,
+    setCurrentEditorTab,
+    chatConfig,
+    updateChatConfig,
+    manualContext,
+    setManualContext,
+    toggleMessageSelection,
+    chatHistorySnapshot,
+    syncChatHistory,
+  };
+
   return (
-    <LayoutContext.Provider value={{ 
-      isHistoryOpen, setIsHistoryOpen, 
-      isEditorOpen, setIsEditorOpen,
-      currentEditorTab, setCurrentEditorTab
-    }}>
+    <LayoutContext.Provider value={value}>
       {children}
     </LayoutContext.Provider>
   );
-};
+}
 
-export const useLayout = () => {
+// Custom hook for consuming the context
+export function useLayout() {
   const context = useContext(LayoutContext);
   if (context === undefined) {
     throw new Error('useLayout must be used within a LayoutProvider');
   }
   return context;
-};
+}

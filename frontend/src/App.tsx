@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, BrowserRouter } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { CustomThemeProvider, useTheme } from './contexts/ThemeContext';
 import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
@@ -53,20 +53,23 @@ function ThemedRoutes() {
 
 /**
  * Componente Nº 2: O "Provedor-Mor"
- * O App.tsx agora só se preocupa em configurar todos os contextos
- * (Roteador, Auth, e o nosso Tema).
+ * ORDEM CORRETA V47:
+ * 1. LayoutProvider (precisa estar disponível para todos os componentes)
+ * 2. AuthProvider (usa LayoutProvider internamente se necessário)
+ * 3. CustomThemeProvider (usa estado mas não depende de rotas)
+ * 4. ThemedRoutes (contém Routes - deve estar por último)
+ * 
+ * NOTA: O BrowserRouter deve estar em main.tsx envolvendo o <App />
  */
 function App() {
   return (
-    <BrowserRouter>
+    <LayoutProvider>
       <AuthProvider>
         <CustomThemeProvider>
-          <LayoutProvider>
-            <ThemedRoutes />
-          </LayoutProvider>
+          <ThemedRoutes />
         </CustomThemeProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </LayoutProvider>
   );
 }
 

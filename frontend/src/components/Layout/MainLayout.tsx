@@ -1,23 +1,19 @@
 import { 
   AppBar, Toolbar, IconButton, Typography, Box, Drawer, 
-  Tabs, Tab, CssBaseline, useTheme, useMediaQuery 
+  CssBaseline, useTheme 
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
 import TuneIcon from '@mui/icons-material/Tune';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { Outlet } from 'react-router-dom'; 
 import { useLayout } from '../../contexts/LayoutContext';
-import ChatSidebar from '../Chat/ChatSidebar'; 
+import ControlPanel from '../drawer/ControlPanel';
 
 export default function MainLayout() {
   const { 
-    isHistoryOpen, setIsHistoryOpen, 
-    isEditorOpen, setIsEditorOpen,
-    currentEditorTab, setCurrentEditorTab
+    isEditorOpen, setIsEditorOpen
   } = useLayout();
 
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', flexDirection: 'column' }}>
@@ -26,9 +22,6 @@ export default function MainLayout() {
       {/* APPBAR */}
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
-          <IconButton color="inherit" onClick={() => setIsHistoryOpen(!isHistoryOpen)} edge="start">
-            <MenuIcon />
-          </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, ml: 2 }}>
             MyIA
           </Typography>
@@ -41,46 +34,31 @@ export default function MainLayout() {
         </Toolbar>
       </AppBar>
 
-      {/* GAVETA ESQUERDA (HISTÓRICO) */}
-      <Drawer
-        anchor="left"
-        open={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        variant={isMobile ? "temporary" : "persistent"}
-        sx={{
-          width: 280, flexShrink: 0,
-          '& .MuiDrawer-paper': { width: 280, boxSizing: 'border-box', mt: '64px' },
-        }}
-      >
-        <ChatSidebar onClose={() => isMobile && setIsHistoryOpen(false)} />
-      </Drawer>
-
       {/* GAVETA DIREITA (EDITOR) */}
       <Drawer
         anchor="right"
         open={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}
         variant="persistent"
-        sx={{
-          width: 400, flexShrink: 0,
-          '& .MuiDrawer-paper': { width: 400, boxSizing: 'border-box', mt: '64px' },
+        sx={{ 
+          width: 400,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: 400,
+            boxSizing: 'border-box',
+          },
         }}
       >
-        <Tabs 
-          value={currentEditorTab} 
-          onChange={(_, newTab) => setCurrentEditorTab(newTab)}
-          variant="fullWidth"
-        >
-          <Tab label="Ajustes Padrão" />
-          <Tab label="Editor Manual" />
-        </Tabs>
+        {/* Espaçamento para não sobrepor a AppBar */}
+        <Toolbar />
         
-        <Box sx={{ p: 2 }}>
-          {currentEditorTab === 0 ? (
-            <Typography>Controles de IA virão aqui (Fase 3)</Typography>
-          ) : (
-            <Typography>Editor Manual virá aqui (Fase 3)</Typography>
-          )}
+        {/* Painel de Controle V47 */}
+        <Box sx={{ 
+          width: 400, 
+          height: '100%',
+          overflow: 'auto'
+        }}>
+          <ControlPanel />
         </Box>
       </Drawer>
 
@@ -97,7 +75,6 @@ export default function MainLayout() {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),
-          marginLeft: isHistoryOpen && !isMobile ? '280px' : 0,
           marginRight: isEditorOpen ? '400px' : 0,
         }}
       >

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Select, MenuItem, FormControl, InputLabel, Chip, Switch, FormControlLabel, Modal } from '@mui/material';
+import { Box, TextField, IconButton, Paper, Typography, CircularProgress, Chip, Switch, FormControlLabel, Modal } from '@mui/material';
 import { Send as SendIcon, Code as CodeIcon, DataObject as DataObjectIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -16,12 +16,9 @@ export default function Chat() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState<string>('groq');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentChatProvider, setCurrentChatProvider] = useState<string | null>(null);
   const [isDevMode, setIsDevMode] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [contextStrategy, setContextStrategy] = useState('fast');
 
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
@@ -30,6 +27,14 @@ export default function Chat() {
 
   // ✨ NOVO: Armazenar o chatId criado para navegar depois
   const newChatIdRef = useRef<string | null>(null);
+
+  // Use o contexto global
+  const {
+    chatConfig,
+    currentEditorTab,
+    syncChatHistory,
+    manualContext,
+  } = useLayout();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -42,13 +47,17 @@ export default function Chat() {
       loadChatMessages(chatId);
     } else {
       setMessages([]);
-      setCurrentChatProvider(null);
     }
   }, [chatId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Sincronize mensagens com o contexto global
+  useEffect(() => {
+    syncChatHistory(messages);
+  }, [messages, syncChatHistory]);
 
   const loadChatMessages = async (id: string) => {
     try {
@@ -59,7 +68,7 @@ export default function Chat() {
       const chats = await chatHistoryService.getAllChats();
       const selectedChat = chats.find(c => c.id === id);
       if (selectedChat) {
-        setCurrentChatProvider(selectedChat.provider);
+        // setCurrentChatProvider(selectedChat.provider);
       }
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
@@ -75,6 +84,17 @@ export default function Chat() {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading || isEditorOpen || isSendingRef.current) {
       return;
+    }
+
+    // [V47] VALIDAÇÃO: Modo Manual sem contexto (APENAS SE ATIVO)
+    if (manualContext.isActive) {
+      const hasSelectedMessages = manualContext.selectedMessageIds.length > 0;
+      const hasAdditionalText = manualContext.additionalText.trim().length > 0;
+      
+      if (!hasSelectedMessages && !hasAdditionalText) {
+        alert('⚠️ Modo Manual Ativo: Selecione pelo menos uma mensagem ou adicione contexto adicional antes de enviar.');
+        return;
+      }
     }
 
     isSendingRef.current = true;
@@ -115,13 +135,33 @@ export default function Chat() {
     };
 
     try {
-      const providerToUse = currentChatProvider || selectedProvider;
+      // [V47] Montar payload baseado no modo
+      let payload: any = {
+        prompt: userMsgText,
+        provider: chatConfig.provider,
+        model: chatConfig.model,
+        chatId: chatId || null,
+      };
+
+      if (manualContext.isActive) {
+        // [V47] MODO MANUAL: Enviar contexto customizado (APENAS SE ATIVO)
+        if (manualContext.additionalText.trim()) {
+          payload.context = manualContext.additionalText.trim();
+        }
+        if (manualContext.selectedMessageIds.length > 0) {
+          payload.selectedMessageIds = manualContext.selectedMessageIds;
+        }
+        // Não enviar strategy em modo manual
+      } else {
+        // [V47] MODO AUTOMÁTICO: Enviar configurações do chatConfig
+        payload.strategy = chatConfig.strategy;
+        payload.temperature = chatConfig.temperature;
+        payload.topK = chatConfig.topK;
+        payload.memoryWindow = chatConfig.memoryWindow;
+      }
 
       await chatService.streamChat(
-        userMsgText,
-        providerToUse,
-        chatId || null,
-        contextStrategy,
+        payload,
         (chunk: StreamChunk) => {
           try {
             if (chunk.type === 'chunk') {
@@ -137,7 +177,6 @@ export default function Chat() {
               
             } else if (chunk.type === 'debug') {
               setDebugLogs(prevLogs => [...prevLogs, chunk.log]);
-              
             } else if (chunk.type === 'telemetry') {
               flushChunkBuffer();
               
@@ -146,9 +185,9 @@ export default function Chat() {
                 console.log(`[V46] Chat criado: ${chunk.metrics.chatId} - Navegação será feita após stream`);
                 newChatIdRef.current = chunk.metrics.chatId;
                 
-                if (chunk.metrics.provider) {
-                  setCurrentChatProvider(chunk.metrics.provider);
-                }
+                // if (chunk.metrics.provider) {
+                //   setCurrentChatProvider(chunk.metrics.provider);
+                // }
               }
               
               setMessages(prev => prev.map(msg => {
@@ -181,7 +220,7 @@ export default function Chat() {
             newChatIdRef.current = null;
           }
         },
-        (err) => { 
+        (err: any) => { 
           console.error('streamChat.onError', err);
           flushChunkBuffer();
           setMessages(prev => prev.map(msg => msg.id === tempAiMsgId ? { ...msg, content: msg.content + "\n[Erro]" } : msg));
@@ -189,7 +228,6 @@ export default function Chat() {
           setIsLoading(false);
         }
       );
-      
     } catch (error) {
       console.error("Erro Fatal:", error);
     } finally {
@@ -376,28 +414,6 @@ export default function Chat() {
       </Paper>
     </Modal>
   );
-
-  const providerContextLimits: Record<string, number> = {
-    'groq': 4000,
-    'openai': 126000,
-    'claude': 198000,
-    'together': 129072,
-    'perplexity': 125000,
-    'mistral': 30000,
-  };
-
-  const formatTokens = (tokens: number): string => {
-    if (tokens >= 1000000) {
-      return `${(tokens / 1000000).toFixed(1)}M`;
-    } else if (tokens >= 1000) {
-      return `${Math.round(tokens / 1000)}k`;
-    }
-    return tokens.toString();
-  };
-
-  const activeProvider = currentChatProvider || selectedProvider;
-  const contextLimit = providerContextLimits[activeProvider] || 4000;
-  const formattedLimit = formatTokens(contextLimit);
 
   if (!isAuthenticated) {
     return null;
@@ -606,6 +622,7 @@ export default function Chat() {
 
       <Paper sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+          {/*
           <FormControl sx={{ minWidth: 200 }}>
             <InputLabel>Provider de IA</InputLabel>
             <Select
@@ -644,15 +661,7 @@ export default function Chat() {
               </MenuItem>
             </Select>
           </FormControl>
-
-          {currentChatProvider && (
-            <Chip 
-              label={`Provider: ${currentChatProvider.toUpperCase()}`}
-              color="primary"
-              variant="outlined"
-              size="small"
-            />
-          )}
+          */}
 
           <Box sx={{ marginLeft: 'auto' }}>
             <FormControlLabel
@@ -671,7 +680,11 @@ export default function Chat() {
         <Box sx={{ display: 'flex', gap: 1 }}>
           <TextField
             fullWidth
-            placeholder="Digite sua mensagem..."
+            placeholder={
+              currentEditorTab === 1 || manualContext.isActive
+                ? 'Digite sua mensagem (Modo Manual)...'
+                : 'Digite sua mensagem...'
+            }
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => {
