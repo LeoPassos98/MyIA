@@ -7,7 +7,12 @@ import MainContentWrapper from './MainContentWrapper';
 
 export default function MainLayout({ children }: { children?: React.ReactNode }) {
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: '#fafafa' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      height: '100vh', 
+      overflow: 'hidden', 
+      bgcolor: 'background.default' // <--- Usa o token do tema!
+    }}>
       
       {/* 1. Barra Superior */}
       <MainHeader />

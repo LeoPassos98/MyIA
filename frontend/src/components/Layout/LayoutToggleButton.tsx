@@ -1,5 +1,5 @@
 import React from 'react';
-import { IconButton, Tooltip } from '@mui/material';
+import { IconButton, Tooltip, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 
 interface LayoutToggleButtonProps {
@@ -8,7 +8,6 @@ interface LayoutToggleButtonProps {
   icon: React.ReactNode;
   activeIcon: React.ReactNode;
   title: string;
-  color: string;
   gradient: string;
   placement?: 'bottom' | 'left' | 'right';
 }
@@ -19,27 +18,28 @@ export default function LayoutToggleButton({
   icon,
   activeIcon,
   title,
-  color,
   gradient,
   placement = 'bottom',
 }: LayoutToggleButtonProps) {
+  const theme = useTheme();
+
   return (
     <Tooltip title={title} arrow placement={placement}>
       <IconButton
         onClick={onClick}
         sx={{
-          background: isActive ? gradient : alpha(color, 0.08),
-          color: isActive ? 'white' : color,
+          background: isActive ? gradient : alpha(theme.palette.primary.main, 0.08),
+          color: isActive ? 'white' : theme.palette.primary.main,
           borderRadius: 2,
           transition: 'all 0.3s ease',
           border: '1px solid',
-          borderColor: isActive ? 'transparent' : alpha(color, 0.2),
+          borderColor: isActive ? 'transparent' : alpha(theme.palette.primary.main, 0.2),
           '&:hover': {
-            background: isActive ? gradient : alpha(color, 0.15),
+            background: isActive ? gradient : alpha(theme.palette.primary.main, 0.15),
             transform: 'scale(1.05)',
             boxShadow: isActive
-              ? `0 4px 15px ${alpha(color, 0.4)}`
-              : `0 2px 8px ${alpha(color, 0.2)}`,
+              ? `0 4px 15px ${alpha(theme.palette.primary.main, 0.4)}`
+              : `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`,
           },
           '&:active': {
             transform: 'scale(0.95)',

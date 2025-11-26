@@ -8,8 +8,8 @@ import { LayoutProvider } from './contexts/LayoutContext';
 import MainLayout from './components/Layout/MainLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Chat from './pages/Chat';
-import Settings from './pages/Settings';
+import Chat from './features/chat';
+import Settings from './features/settings';
 
 /**
  * Componente Nº 1: O Aplicador de Tema

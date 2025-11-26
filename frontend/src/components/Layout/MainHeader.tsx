@@ -1,11 +1,23 @@
-import { AppBar, Toolbar, Box } from '@mui/material';
+import { AppBar, Toolbar, Box, Fade } from '@mui/material';
 import { Menu as MenuIcon, Tune as TuneIcon, History as HistoryIcon, Dashboard as DashboardIcon } from '@mui/icons-material';
 import { useLayout } from '../../contexts/LayoutContext';
+import { useTheme } from '@mui/material/styles';
+import { useLocation } from 'react-router-dom';
 import Logo from '../Logo';
 import LayoutToggleButton from './LayoutToggleButton';
 
 export default function MainHeader() {
-  const { isHistoryOpen, setIsHistoryOpen, isEditorOpen, setIsEditorOpen } = useLayout();
+  const theme = useTheme();
+  const location = useLocation();
+  
+  const { 
+    isHistoryOpen, 
+    setIsHistoryOpen, 
+    isEditorOpen, 
+    setIsEditorOpen 
+  } = useLayout();
+
+  const isChatPage = location.pathname === '/' || location.pathname.startsWith('/chat');
 
   return (
     <AppBar
@@ -13,41 +25,69 @@ export default function MainHeader() {
       elevation={0}
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 100%)',
-        backdropFilter: 'blur(20px)',
+        
+        // --- VISUAL SÓLIDO (PERFORMANCE MÁXIMA) ---
+        bgcolor: 'background.paper', // Usa a cor sólida do tema (Branco ou Cinza Escuro)
+        backdropFilter: 'none',      // Desativa explicitamente o blur
+        
+        // Borda sutil para separar do conteúdo
         borderBottom: '1px solid',
-        borderColor: 'rgba(0,0,0,0.08)',
+        borderColor: 'divider',
+        
+        // Sombra suave apenas no modo claro para dar profundidade
+        boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 1px 3px rgba(0,0,0,0.05)'
       }}
     >
-      <Toolbar variant="dense" sx={{ py: 1, minHeight: 56 }}>
-        {/* Botão Esquerdo - Histórico */}
-        <LayoutToggleButton
-          isActive={isHistoryOpen}
-          onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-          icon={<MenuIcon />}
-          activeIcon={<HistoryIcon />}
-          title="Histórico de Conversas"
-          color="#667eea"
-          gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-        />
+      <Toolbar 
+        variant="dense" 
+        sx={{ 
+          py: 1, 
+          minHeight: 56,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        
+        {/* LADO ESQUERDO */}
+        <Box sx={{ width: 40, display: 'flex', justifyContent: 'flex-start' }}>
+          {isChatPage && (
+            <Fade in={isChatPage}>
+              <Box> 
+                <LayoutToggleButton
+                  isActive={isHistoryOpen}
+                  onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                  icon={<MenuIcon />}
+                  activeIcon={<HistoryIcon />}
+                  title="Histórico"
+                  gradient={theme.gradients.primary}
+                />
+              </Box>
+            </Fade>
+          )}
+        </Box>
 
-        <Box sx={{ width: 1, height: 24, mx: 1 }} />
-
-        {/* Logo Central */}
+        {/* CENTRO */}
         <Logo />
 
-        <Box sx={{ width: 1, height: 24, mx: 1 }} />
+        {/* LADO DIREITO */}
+        <Box sx={{ width: 40, display: 'flex', justifyContent: 'flex-end' }}>
+          {isChatPage && (
+            <Fade in={isChatPage}>
+              <Box>
+                <LayoutToggleButton
+                  isActive={isEditorOpen}
+                  onClick={() => setIsEditorOpen(!isEditorOpen)}
+                  icon={<TuneIcon />}
+                  activeIcon={<DashboardIcon />}
+                  title="Painel"
+                  gradient={theme.gradients.secondary}
+                />
+              </Box>
+            </Fade>
+          )}
+        </Box>
 
-        {/* Botão Direito - Painel */}
-        <LayoutToggleButton
-          isActive={isEditorOpen}
-          onClick={() => setIsEditorOpen(!isEditorOpen)}
-          icon={<TuneIcon />}
-          activeIcon={<DashboardIcon />}
-          title="Painel de Controle"
-          color="#764ba2"
-          gradient="linear-gradient(135deg, #764ba2 0%, #667eea 100%)"
-        />
       </Toolbar>
     </AppBar>
   );

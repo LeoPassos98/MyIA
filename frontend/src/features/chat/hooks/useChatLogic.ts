@@ -100,7 +100,7 @@ export function useChatLogic(chatId?: string) {
     };
 
     try {
-      let payload: any = {
+      const payload: any = {
         prompt: userMsgText,
         provider: chatConfig.provider,
         model: chatConfig.model,

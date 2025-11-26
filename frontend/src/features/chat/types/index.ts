@@ -1,29 +1,65 @@
-// Reexportar ou copiar a interface Message de chatHistoryService
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: string;
-  costInUSD?: number;
+  
+  // Metadados opcionais para debug e custos
   model?: string;
   provider?: string;
+  costInUSD?: number;
   tokensIn?: number;
   tokensOut?: number;
   sentContext?: any;
 }
 
-// Definir e exportar a interface ChatConfig
 export interface ChatConfig {
   provider: string;
-  strategy: string;
+  model: string; // <--- ADICIONADO (Resolve o erro)
   temperature: number;
   topK: number;
   memoryWindow: number;
+  maxTokens?: number;
+  // Tipagem estrita para evitar erros de digitação
+  strategy: 'fast' | 'efficient' | 'thorough' | 'creative';
 }
 
-// Definir e exportar a interface ManualContextState
 export interface ManualContextState {
-  isActive: boolean;
+  isActive: boolean; // Mantido para compatibilidade
   selectedMessageIds: string[];
   additionalText: string;
+  hasAdditionalContext: boolean;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: Message[];
+}
+
+// Payloads de API (Útil para os serviços)
+export interface SendMessagePayload {
+  message: string;
+  chatId?: string;
+  config?: ChatConfig;
+  manualContext?: {
+    messageIds: string[];
+    systemPrompt: string;
+  };
+}
+
+export interface ChatResponse {
+  message: Message;
+  chatId: string;
+  usage?: {
+    totalTokens: number;
+    cost: number;
+  };
+}
+
+export interface Provider {
+  value: string;
+  label: string;
 }

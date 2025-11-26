@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { ChatConfig, ManualContextState, Message } from '../types/chat';
+// CORREÇÃO AQUI: Apontando para a feature correta em vez de ../types/chat
+import { ChatConfig, ManualContextState, Message } from '../features/chat/types';
 
 interface LayoutContextType {
   // Drawer states
@@ -50,9 +51,10 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
 
   // Manual context state
   const [manualContext, setManualContext] = useState<ManualContextState>({
-    isActive: false,
+    isActive: false, // Mantido para compatibilidade
     selectedMessageIds: [],
     additionalText: '',
+    hasAdditionalContext: false,
   });
 
   // Chat history snapshot
@@ -60,20 +62,19 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
 
   // Update chat config (partial update)
   const updateChatConfig = useCallback((partialConfig: Partial<ChatConfig>) => {
-    setChatConfig(prev => ({ ...prev, ...partialConfig }));
+    setChatConfig((prev) => ({ ...prev, ...partialConfig }));
   }, []);
 
   // Sync chat history - CRITICAL: Prevent infinite re-render loops
   const syncChatHistory = useCallback((messages: Message[]) => {
-    // Only update if actually changed (size or content check)
-    setChatHistorySnapshot(prev => {
+    setChatHistorySnapshot((prev) => {
       // Quick size check first
       if (prev.length !== messages.length) {
         return messages;
       }
       
       // Deep comparison using JSON.stringify for simplicity
-      // In production, consider a more efficient comparison
+      // In production, consider a more efficient comparison like lodash.isEqual
       const prevJson = JSON.stringify(prev.map(m => ({ id: m.id, content: m.content })));
       const newJson = JSON.stringify(messages.map(m => ({ id: m.id, content: m.content })));
       
@@ -87,10 +88,10 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
 
   // Toggle message selection for manual context
   const toggleMessageSelection = useCallback((messageId: string) => {
-    setManualContext(prev => {
+    setManualContext((prev) => {
       const isSelected = prev.selectedMessageIds.includes(messageId);
       const newSelectedIds = isSelected
-        ? prev.selectedMessageIds.filter(id => id !== messageId)
+        ? prev.selectedMessageIds.filter((id) => id !== messageId)
         : [...prev.selectedMessageIds, messageId];
       
       return {
