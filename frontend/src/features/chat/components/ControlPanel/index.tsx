@@ -1,8 +1,14 @@
 import { Box, Typography, Tabs, Tab, alpha, useTheme } from '@mui/material';
-import { Tune as TuneIcon, Settings as SettingsIcon, Message as MessageIcon } from '@mui/icons-material';
+import { 
+  Tune as TuneIcon, 
+  Settings as SettingsIcon, 
+  Message as MessageIcon,
+  SmartToy as BotIcon 
+} from '@mui/icons-material';
 import { useControlPanelLogic } from './useControlPanelLogic';
 import { ParametersTab } from './ParametersTab';
 import { ManualContextTab } from './ManualContextTab';
+import { ModelSelectionTab } from './ModelSelectionTab';
 
 export default function ControlPanel() {
   const theme = useTheme();
@@ -26,18 +32,20 @@ export default function ControlPanel() {
         sx={{
           borderBottom: 1,
           borderColor: 'divider',
-          '& .MuiTab-root': { fontWeight: 600 },
+          '& .MuiTab-root': { fontWeight: 600, minWidth: 0, px: 1 },
           '& .Mui-selected': { color: 'primary.main' }
         }}
       >
+        <Tab icon={<BotIcon fontSize="small" />} label="IA" />
         <Tab icon={<SettingsIcon fontSize="small" />} label="Ajustes" />
         <Tab icon={<MessageIcon fontSize="small" />} label="Contexto" />
       </Tabs>
 
       {/* Conteúdo com Scroll */}
       <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
-        {currentEditorTab === 0 && <ParametersTab />}
-        {currentEditorTab === 1 && <ManualContextTab />}
+        {currentEditorTab === 0 && <ModelSelectionTab />}
+        {currentEditorTab === 1 && <ParametersTab />}
+        {currentEditorTab === 2 && <ManualContextTab />}
       </Box>
 
     </Box>

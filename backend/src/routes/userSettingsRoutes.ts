@@ -10,5 +10,7 @@ console.log('getSettings:', userSettingsController?.getSettings);
 
 router.get('/', authMiddleware, userSettingsController.getSettings);
 router.put('/', authMiddleware, userSettingsController.updateSettings);
+router.get('/credentials', userSettingsController.getCredentials);
+router.post('/credentials', userSettingsController.updateCredentials);
 
 export default router;

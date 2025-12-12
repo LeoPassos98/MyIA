@@ -1,46 +1,48 @@
-import { useState, useEffect } from 'react';
-import { Box, TextField, Button, Grid, Alert, useTheme } from '@mui/material';
-import { userSettingsService, UserSettings } from '../../../services/userSettingsService';
+import React, { useState, useEffect } from 'react';
+import { Box, TextField, Button, Grid, Alert, CircularProgress } from '@mui/material';
 import { SettingsSection } from './SettingsSection';
 
-interface ApiKeysTabProps {
-  userSettings: UserSettings | null;
-  onUpdate: (settings: UserSettings) => void;
-}
+import { aiProvidersService } from '../../../services/aiProvidersService';
+import { api } from '../../../services/api';
+import { AIProvider } from '../../../types/ai';
 
-export default function ApiKeysTab({ userSettings, onUpdate }: ApiKeysTabProps) {
-  const theme = useTheme();
-  const [formData, setFormData] = useState<any>({});
+export default function ApiKeysTab() {
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
+  
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
-    if (userSettings) {
-      setFormData({
-        openaiApiKey: (userSettings as any).openaiApiKey || '',
-        groqApiKey: (userSettings as any).groqApiKey || '',
-        claudeApiKey: (userSettings as any).claudeApiKey || '',
-        togetherApiKey: (userSettings as any).togetherApiKey || '',
-        perplexityApiKey: (userSettings as any).perplexityApiKey || '',
-        mistralApiKey: (userSettings as any).mistralApiKey || '',
-      });
-    }
-  }, [userSettings]);
+    async function loadData() {
+      try {
+        setLoading(true);
+        const providersList = await aiProvidersService.getAll();
+        setProviders(providersList);
 
-  const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [field]: e.target.value });
+        const { data: savedKeys } = await api.get('/settings/credentials');
+        setApiKeys(savedKeys || {});
+
+      } catch (error) {
+        console.error(error);
+        setMsg({ type: 'error', text: 'Erro ao carregar configurações.' });
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const handleChange = (slug: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setApiKeys(prev => ({ ...prev, [slug]: e.target.value }));
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const dataToUpdate: any = {};
-      Object.entries(formData).forEach(([key, value]) => {
-        if (typeof value === 'string' && value.trim() !== '') dataToUpdate[key] = value;
-      });
-      const updated = await userSettingsService.updateSettings(dataToUpdate);
-      onUpdate(updated);
-      setMsg({ type: 'success', text: 'Chaves salvas com sucesso!' });
+      await api.post('/settings/credentials', apiKeys);
+      setMsg({ type: 'success', text: 'Chaves atualizadas com sucesso!' });
     } catch (error) {
       setMsg({ type: 'error', text: 'Erro ao salvar chaves.' });
     } finally {
@@ -49,41 +51,55 @@ export default function ApiKeysTab({ userSettings, onUpdate }: ApiKeysTabProps) 
     }
   };
 
+  if (loading) return <Box sx={{ p: 3 }}><CircularProgress /></Box>;
+
   return (
-    <SettingsSection title="Chaves de API" description="Gerencie suas conexões com provedores de IA.">
+    <SettingsSection 
+      title="Chaves de API (Provedores)" 
+      description="Gerencie suas conexões. Se deixar em branco, o sistema tentará usar chaves globais se disponíveis."
+    >
       {msg && <Alert severity={msg.type} sx={{ mb: 3 }}>{msg.text}</Alert>}
       
       <Grid container spacing={3}>
-        {[
-          { id: 'openaiApiKey', label: 'OpenAI API Key', hint: 'GPT-3.5, GPT-4' },
-          { id: 'groqApiKey', label: 'Groq API Key', hint: 'Llama 3 (Rápido)' },
-          { id: 'claudeApiKey', label: 'Claude API Key', hint: 'Claude 3 Sonnet/Opus' },
-          { id: 'togetherApiKey', label: 'Together.ai', hint: 'Mixtral, Llama' },
-          { id: 'perplexityApiKey', label: 'Perplexity', hint: 'Sonar Online' },
-          { id: 'mistralApiKey', label: 'Mistral AI', hint: 'Mistral Large' },
-        ].map((field) => (
-          <Grid item xs={12} md={6} key={field.id}>
+        {providers.map((provider) => (
+          <Grid item xs={12} md={6} key={provider.id}>
             <TextField
               fullWidth
               type="password"
-              label={field.label}
-              value={formData[field.id] || ''}
-              onChange={handleChange(field.id)}
-              helperText={field.hint}
+              label={`Chave da ${provider.name}`}
+              placeholder={`Cole sua API Key da ${provider.name} aqui`}
+              value={apiKeys[provider.slug] || ''}
+              onChange={handleChange(provider.slug)}
+              helperText={
+                provider.slug === 'openai' ? 'Geralmente começa com sk-...' : 
+                provider.slug === 'groq' ? 'Geralmente começa com gsk_...' : 
+                `Chave para usar modelos como: ${provider.models.map(m => m.name).slice(0, 2).join(', ')}...`
+              }
+              InputProps={{
+                startAdornment: provider.logoUrl ? (
+                  <Box component="img" src={provider.logoUrl} sx={{ width: 24, height: 24, mr: 1, borderRadius: '50%' }} />
+                ) : null
+              }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
           </Grid>
         ))}
         
+        {providers.length === 0 && (
+          <Grid item xs={12}>
+            <Alert severity="info">Nenhum provedor de IA configurado no sistema.</Alert>
+          </Grid>
+        )}
+
         <Grid item xs={12}>
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
             <Button 
               variant="contained" 
               onClick={handleSave} 
               disabled={isSaving}
-              sx={{ background: theme.gradients.primary, fontWeight: 'bold' }}
+              sx={{ fontWeight: 'bold', px: 4 }}
             >
-              {isSaving ? 'Salvando...' : 'Salvar Chaves'}
+              {isSaving ? 'Salvando...' : 'Salvar Todas as Chaves'}
             </Button>
           </Box>
         </Grid>

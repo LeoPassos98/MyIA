@@ -30,6 +30,8 @@ model User {
 
   chats        Chat[]
 
+  providerCredentials UserProviderCredential[]
+
   @@map("users")
 }
 
@@ -116,4 +118,65 @@ model Message {
   vector Unsupported("vector(1536)")?
 
   @@map("messages")
+}
+
+// --- SISTEMA MODULAR DE IA ---
+
+// 1. O Provedor (ex: OpenAI, Groq, Anthropic)
+model AIProvider {
+  id          String   @id @default(uuid())
+  name        String   // Ex: "OpenAI", "Groq"
+  slug        String   @unique // Ex: "openai", "groq" (usado no código para carregar o driver)
+  isActive    Boolean  @default(true) // O "Disjuntor" Geral
+  websiteUrl  String?
+  logoUrl     String?
+  
+  // Configurações técnicas
+  baseUrl     String?  // Caso precise sobrescrever (ex: proxies locais)
+  
+  models      AIModel[]
+  credentials UserProviderCredential[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("ai_providers")
+}
+
+// 2. Os Modelos (ex: gpt-4, llama-3-70b)
+model AIModel {
+  id            String   @id @default(uuid())
+  name          String   // Nome visível: "GPT-4 Turbo"
+  apiModelId    String   // ID técnico: "gpt-4-0125-preview"
+  contextWindow Int      @default(4096)
+  
+  // Custos (para cálculo de telemetria)
+  costPer1kInput  Float  @default(0)
+  costPer1kOutput Float  @default(0)
+
+  isActive      Boolean  @default(true) // Pode desativar só um modelo específico
+
+  providerId    String
+  provider      AIProvider @relation(fields: [providerId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("ai_models")
+}
+
+// 3. Credenciais do Usuário (Para o sistema BYOK - Bring Your Own Key)
+// Isso substitui as colunas soltas no UserSettings a longo prazo
+model UserProviderCredential {
+  id          String   @id @default(uuid())
+  apiKey      String   // Criptografar antes de salvar!
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  providerId  String
+  provider    AIProvider @relation(fields: [providerId], references: [id])
+
+  @@unique([userId, providerId]) // Um usuário só tem uma chave por provider
+  @@map("user_provider_credentials")
 }

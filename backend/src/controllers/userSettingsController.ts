@@ -1,5 +1,7 @@
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+
 import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { AuthRequest } from '../middleware/authMiddleware'; // <--- IMPORTANTE: AuthRequest
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { encryptionService } from '../services/encryptionService';
@@ -68,10 +70,10 @@ export const userSettingsController = {
       }
       // --- FIM DA LÓGICA ---
 
-      res.json(safeSettings);
+      return res.json(safeSettings);
 
     } catch (error) {
-      next(error);
+      return next(error);
     }
   },
 
@@ -111,10 +113,71 @@ export const userSettingsController = {
         }
       }
 
-      res.json(safeSettings);
+      return res.json(safeSettings);
 
     } catch (error) {
-      next(error);
+      return next(error);
     }
   },
+
+  // GET /api/settings/credentials
+  async getCredentials(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const credentials = await prisma.userProviderCredential.findMany({
+        where: { userId: req.userId },
+        include: { provider: true }
+      });
+
+      const keyMap: Record<string, string> = {};
+      credentials.forEach(cred => {
+        keyMap[cred.provider.slug] = cred.apiKey;
+      });
+
+      return res.json(keyMap);
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  // POST /api/settings/credentials
+  async updateCredentials(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      // TypeScript estava reclamando que req.body podia ser null stream. 
+      // Forçamos a tipagem aqui:
+      const keys = req.body as Record<string, string>; 
+      const userId = req.userId!;
+
+      if (!keys || typeof keys !== 'object') {
+        return res.status(400).json({ error: 'Body inválido' });
+      }
+
+      const updatePromises = Object.entries(keys).map(async ([providerSlug, apiKey]) => {
+        // Retornamos null explicitamente se falhar, para o TypeScript entender o tipo
+        if (!apiKey || typeof apiKey !== 'string') return null;
+
+        const provider = await prisma.aIProvider.findUnique({ where: { slug: providerSlug } });
+        if (!provider) return null;
+
+        return prisma.userProviderCredential.upsert({
+          where: {
+            userId_providerId: {
+              userId,
+              providerId: provider.id
+            }
+          },
+          update: { apiKey },
+          create: {
+            userId,
+            providerId: provider.id,
+            apiKey
+          }
+        });
+      });
+
+      await Promise.all(updatePromises);
+      return res.json({ success: true });
+    } catch (error) {
+      return next(error);
+    }
+  }
 };
