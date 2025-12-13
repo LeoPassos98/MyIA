@@ -1,6 +1,6 @@
 /// <reference types="node" />
 // backend/prisma/seed.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { PrismaClient } from '@prisma/client';
 
@@ -40,7 +40,7 @@ async function main() {
   });
   console.log(`✅ OpenAI configurado (ID: ${openai.id})`);
 
-  // --- 2. Groq ---
+  // --- 2. Groq (Super Rápido) ---
   const groq = await prisma.aIProvider.upsert({
     where: { slug: 'groq' },
     update: {},
@@ -52,8 +52,9 @@ async function main() {
       websiteUrl: 'https://groq.com',
       models: {
         create: [
-          { name: 'Llama 3 70B', apiModelId: 'llama3-70b-8192', contextWindow: 8192 },
-          { name: 'Mixtral 8x7B', apiModelId: 'mixtral-8x7b-32768', contextWindow: 32768 },
+          // IDs atualizados em 13/12/2025
+          { name: 'Llama 3.3 70B', apiModelId: 'llama-3.3-70b-versatile', contextWindow: 128000 },
+          { name: 'Llama 3.1 8B', apiModelId: 'llama-3.1-8b-instant', contextWindow: 128000 },
         ],
       },
     },

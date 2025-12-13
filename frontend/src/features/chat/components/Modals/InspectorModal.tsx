@@ -1,20 +1,15 @@
+// frontend/src/features/chat/components/Modals/InspectorModal.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { useState } from 'react';
 import { 
-  Modal, 
-  Paper, 
-  Typography, 
-  Box, 
-  IconButton, 
-  useTheme, 
-  alpha, 
-  Tooltip,
-  Fade
+  Modal, Paper, Typography, Box, IconButton, useTheme, alpha, Tooltip, Fade
 } from '@mui/material';
 import { 
   DataObject as DataObjectIcon, 
   Close as CloseIcon, 
-  ContentCopy as CopyIcon,
-  Check as CheckIcon
+  ContentCopy as CopyIcon, 
+  Check as CheckIcon 
 } from '@mui/icons-material';
 
 interface InspectorModalProps {
@@ -35,10 +30,13 @@ export default function InspectorModal({ open, onClose, data }: InspectorModalPr
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const jsonString = JSON.stringify(data, null, 2);
+
   return (
     <Modal
       open={open}
       onClose={onClose}
+      closeAfterTransition
       sx={{ 
         display: 'flex', 
         alignItems: 'center', 
@@ -51,7 +49,7 @@ export default function InspectorModal({ open, onClose, data }: InspectorModalPr
         <Paper
           elevation={24}
           sx={{
-            width: '80vw',
+            width: '100%',
             maxWidth: 900,
             maxHeight: '85vh',
             display: 'flex',
@@ -60,7 +58,8 @@ export default function InspectorModal({ open, onClose, data }: InspectorModalPr
             borderRadius: 3,
             border: '1px solid',
             borderColor: 'divider',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            outline: 'none'
           }}
         >
           {/* HEADER */}
@@ -69,37 +68,46 @@ export default function InspectorModal({ open, onClose, data }: InspectorModalPr
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'space-between',
+            bgcolor: alpha(theme.palette.primary.main, 0.05),
             borderBottom: '1px solid',
-            borderColor: 'divider',
-            // Cor de fundo sutil baseada no tema
-            bgcolor: alpha(theme.palette.secondary.main, 0.05)
+            borderColor: 'divider'
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <DataObjectIcon color="secondary" />
-              <Typography variant="h6" fontWeight="bold">
-                Inspetor de Objeto (JSON)
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ 
+                p: 0.5, 
+                borderRadius: 1, 
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: 'primary.main',
+                display: 'flex'
+              }}>
+                <DataObjectIcon fontSize="small" />
+              </Box>
+              <Typography variant="subtitle1" fontWeight="bold">
+                Inspetor de Objeto
               </Typography>
             </Box>
             
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Tooltip title={copied ? "Copiado!" : "Copiar JSON"}>
                 <IconButton onClick={handleCopy} size="small" color={copied ? "success" : "default"}>
-                  {copied ? <CheckIcon /> : <CopyIcon />}
+                  {copied ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
                 </IconButton>
               </Tooltip>
               <IconButton onClick={onClose} size="small">
-                <CloseIcon />
+                <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
           </Box>
 
-          {/* BODY */}
+          {/* BODY (Code View) */}
           <Box
             sx={{
-              p: 0,
               flex: 1,
               overflow: 'auto',
-              bgcolor: theme.palette.mode === 'dark' ? '#0d1117' : '#f6f8fa', // Cores estilo GitHub
+              p: 0,
+              // CORREÇÃO: Uso de cor do tema em vez de hardcoded #000
+              bgcolor: 'action.hover', 
+              position: 'relative'
             }}
           >
             <Box
@@ -107,36 +115,40 @@ export default function InspectorModal({ open, onClose, data }: InspectorModalPr
               sx={{
                 m: 0,
                 p: 3,
-                fontFamily: '"Fira Code", "Consolas", monospace',
+                // CORREÇÃO: Uso da tipografia do tema
+                fontFamily: theme.typography.monospace, 
                 fontSize: '0.85rem',
                 lineHeight: 1.6,
-                // Lógica de cores para o código
-                color: theme.palette.mode === 'dark' 
-                  ? '#e6edf3' // Texto claro no escuro
-                  : '#1f2328', // Texto escuro no claro
+                color: 'text.primary',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
                 
-                // Seleção de texto bonita
                 '&::selection': {
-                  bgcolor: alpha(theme.palette.secondary.main, 0.3)
+                  bgcolor: alpha(theme.palette.primary.main, 0.2)
                 }
               }}
             >
-              {JSON.stringify(data, null, 2)}
+              {jsonString}
             </Box>
           </Box>
           
-          {/* FOOTER (Opcional - Info rápida) */}
+          {/* FOOTER */}
           <Box sx={{ 
-            p: 1, 
+            py: 1, 
             px: 2, 
             borderTop: '1px solid', 
             borderColor: 'divider', 
             bgcolor: 'background.paper',
             display: 'flex', 
-            justifyContent: 'flex-end'
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: theme.typography.monospace }}>
+              Tamanho: {jsonString.length} chars
+            </Typography>
+            
             <Typography variant="caption" color="text.secondary">
-              Tamanho do Payload: {JSON.stringify(data).length} caracteres
+              JSON Preview
             </Typography>
           </Box>
         </Paper>

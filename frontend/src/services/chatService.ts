@@ -38,14 +38,15 @@ export interface ChatPayload {
 
 export const chatService = {
   /**
-   * NOVA função de stream com SSE.
-   * Usa callbacks para gotejar dados para a UI em tempo real.
+   * Função de stream com SSE.
+   * Agora aceita 'signal' para cancelamento.
    */
   async streamChat(
     payload: ChatPayload,
     onChunk: (chunk: StreamChunk) => void,
     onComplete: () => void,
-    onError: (error: any) => void
+    onError: (error: any) => void,
+    signal?: AbortSignal // <--- 1. NOVO PARÂMETRO
   ) {
     try {
       const token = localStorage.getItem('token');
@@ -59,6 +60,7 @@ export const chatService = {
           'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify(payload),
+        signal: signal, // <--- 2. CONECTADO AO FETCH
       });
 
       if (!response.ok) {
@@ -66,7 +68,7 @@ export const chatService = {
       }
 
       if (!response.body) {
-        throw new Error('Stream não disponível (response body vazio).');
+        throw new Error('Stream não disponível.');
       }
 
       const reader = response.body.getReader();
@@ -78,34 +80,18 @@ export const chatService = {
         
         if (value) {
           buffer += decoder.decode(value, { stream: true });
-          
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
           
           for (const line of lines) {
             if (!line.trim() || !line.startsWith('data: ')) continue;
-            
             const dataPayload = line.slice(6).trim();
             if (dataPayload === '[DONE]') continue;
             
             try {
               const parsed = JSON.parse(dataPayload);
-              
-              if (parsed && typeof parsed === 'object' && parsed.type) {
+              if (parsed && parsed.type) {
                 onChunk(parsed as StreamChunk);
-                
-                if (parsed.type === 'debug' && typeof parsed.log === 'string') {
-                  const chatIdMatch = parsed.log.match(/Chat (?:criado|ID):\s*([0-9a-fA-F-]{36})/i);
-                  if (chatIdMatch) {
-                    onChunk({
-                      type: 'telemetry',
-                      metrics: {
-                        tokensIn: 0, tokensOut: 0, costInUSD: 0,
-                        model: '', provider: payload.provider, chatId: chatIdMatch[1], sentContext: undefined
-                      }
-                    });
-                  }
-                }
               }
             } catch (e) {
               console.error('Parse error:', e);
@@ -114,32 +100,17 @@ export const chatService = {
         }
         
         if (done) {
-          if (buffer.trim()) {
-            const finalLine = buffer.trim();
-            if (finalLine.startsWith('data: ')) {
-              try {
-                const parsed = JSON.parse(finalLine.slice(6));
-                if (parsed?.type) onChunk(parsed as StreamChunk);
-              } catch (e) {
-                console.error('Final buffer parse error:', e);
-              }
-            }
-          }
-          
           onComplete();
           break;
         }
       }
-      
-      return;
-      
     } catch (err: any) {
+      if (err.name === 'AbortError') return; // Ignora cancelamento intencional
       console.error('ERRO no streamChat:', err);
-      onError(err.message || 'Erro desconhecido no stream');
-      return;
+      onError(err.message || 'Erro desconhecido');
     }
   },
-
+  
   // Função legacy (não-streaming) - manter para compatibilidade se necessário
   async sendMessage(message: string, provider?: string, chatId?: string | null): Promise<SendMessageResponse> {
     const response = await api.post('/chat/message', {

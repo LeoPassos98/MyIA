@@ -44,7 +44,7 @@ export default function MessageList({
             width: 80,
             height: 80,
             borderRadius: '50%',
-            background: theme.gradients.shimmer, // Gradiente do Design System
+            background: theme.palette.gradients.shimmer, // Gradiente do Design System
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

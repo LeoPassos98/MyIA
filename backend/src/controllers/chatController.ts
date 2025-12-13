@@ -4,268 +4,122 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { aiService } from '../services/ai';
-import { ragService } from '../services/ragService';
-import { TelemetryMetrics, StreamChunk, AiServiceResponse } from '../services/ai/types';
-import { logger } from '../utils/logger';
+import { TelemetryMetrics, StreamChunk } from '../services/ai/types';
 import { prisma } from '../lib/prisma';
-import { get_encoding } from 'tiktoken';
-// import { getProviderInfo } from '../config/providerMap'; // LEGACY: Removido
-// import { getProviderConfig } from '../services/ai/utils/providerUtils'; // LEGACY: Removido
+import { contextService } from '../services/chat/contextService';
+import { costService } from '../services/chat/costService';
 
-// Instanciar encoding tiktoken (escopo global)
-const encoding = get_encoding('cl100k_base');
-
-// [V22] Interface do relatório estruturado
-interface HybridHistoryReport {
-  finalContext: Message[];
-  relevantMessages: Message[];
-  recentMessages: Message[];
-}
-
-// Tipo auxiliar para Message
-interface Message {
-  id: string;
-  role: string;
-  content: string;
-  createdAt: Date;
-  sentContext?: any;
-}
-
-// Helper: conta palavras
-function countWords(str: string): number {
-  if (!str) return 0;
-  return str.split(/\s+/).filter(Boolean).length;
-}
-
-// Helper: cria timeout reutilizável
-function createTimeout(ms: number, message: string): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => {
-      reject(new Error(message));
-    }, ms);
-  });
-}
-
-// --- MOTOR 1 (V7 - Rápido/Burro) ---
-async function getFastHistory(chatId: string) {
-  const messages = await prisma.message.findMany({
-    where: { chatId },
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-  });
-  return messages.reverse();
-}
-
-// --- O "MOTOR" V9.4 (Híbrido RAG) ---
-async function getHybridRagHistory(
-  chatId: string, 
-  userMessage: string, 
-  providerModel: string, // Agora é apenas string informativa
-  writeSSE: (data: StreamChunk) => void
-): Promise<HybridHistoryReport> {
-
-  writeSSE({ type: 'debug', log: `🧠 V9.4: Buscando memória RAG (relevância semântica)...` });
-  const relevantMessages = await ragService.findSimilarMessages(userMessage, chatId, 5);
-
-  writeSSE({ type: 'debug', log: `🧠 V7: Buscando memória recente (últimas 10 msgs)...` });
-  const recentMessages = await getFastHistory(chatId);
-
-  const combinedMap = new Map<string, any>();
-  recentMessages.forEach(msg => combinedMap.set(msg.id, msg));
-  relevantMessages.forEach(msg => combinedMap.set(msg.id, msg));
-
-  const combinedHistory = Array.from(combinedMap.values())
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-  // FIXME: Pegar limite real do banco de dados no futuro. 
-  // Por enquanto, hardcoded seguro para não quebrar a migração.
-  const MAX_CONTEXT_TOKENS = 6000; 
-  const ANSWER_BUFFER = 2000;
-  
-  const messageTokens = encoding.encode(userMessage).length;
-  let budget = (MAX_CONTEXT_TOKENS - ANSWER_BUFFER) - messageTokens;
-
-  const finalContextHistory = [];
-  
-  for (const msg of [...combinedHistory].reverse()) { 
-    const tokens = encoding.encode(msg.content).length;
-    if (budget - tokens >= 0) {
-      budget -= tokens;
-      finalContextHistory.push(msg);
-    } else {
-      break;
-    }
-  }
-
-  const cleanMessages = (msgs: Message[]): Message[] => {
-    return msgs.map(msg => {
-      const { sentContext, ...cleanedMsg } = msg;
-      return cleanedMsg as Message;
-    });
-  };
-
-  return {
-    finalContext: cleanMessages(finalContextHistory.reverse()),
-    relevantMessages: cleanMessages(relevantMessages),
-    recentMessages: cleanMessages(recentMessages)
-  };
-}
-
-// [V33] PROTEÇÃO ANTI-DISPARO MÚLTIPLO
+// Controle de Concorrência
 const processingRequests = new Set<string>();
 
 export const chatController = {
   async sendMessage(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       if (!req.userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
       }
 
       const { 
-        message: legacyMessage, 
-        prompt, 
-        provider: requestProvider, 
-        chatId, 
-        contextStrategy,
-        model,
-        context,
-        selectedMessageIds,
-        strategy,
-        temperature,
-        topK,
-        memoryWindow
+        prompt, message: legacyMsg, provider, chatId, 
+        model, context, selectedMessageIds, strategy, temperature, memoryWindow, topK
       } = req.body;
 
-      const message = prompt || legacyMessage;
+      const messageContent = prompt || legacyMsg;
 
-      if (!message || typeof message !== 'string' || !message.trim()) {
-        return res.status(400).json({ 
-          error: 'Message/prompt is required and must be a non-empty string' 
-        });
+      if (!messageContent || typeof messageContent !== 'string' || !messageContent.trim()) {
+        res.status(400).json({ error: 'Message required' });
+        return;
       }
 
-      // [V33] ID ÚNICO DETERMINÍSTICO
+      // 1. Prevenção de Duplicidade
       const crypto = require('crypto');
-      const messageHash = crypto.createHash('sha256').update(message).digest('hex').substring(0, 16);
-      const requestId = `${req.userId}-${chatId || 'novo'}-${messageHash}`;
+      const requestId = `${req.userId}-${chatId || 'new'}-${crypto.createHash('sha256').update(messageContent).digest('hex').substring(0,8)}`;
 
       if (processingRequests.has(requestId)) {
-        logger.warn(`[V33] ⛔ Requisição duplicada bloqueada: ${requestId}`);
-        return res.status(429).json({ error: 'Requisição duplicada.' });
+        res.status(429).json({ error: 'Duplicate request blocked' });
+        return;
       }
-
+      
       processingRequests.add(requestId);
+      const cleanup = () => processingRequests.delete(requestId);
+      setTimeout(cleanup, 60000); 
 
-      const cleanup = () => { processingRequests.delete(requestId); };
-      const timeoutCleanup = setTimeout(() => {
-        if (processingRequests.has(requestId)) cleanup();
-      }, 60000);
-
-      // --- Configurar Headers SSE ---
+      // 2. Setup SSE
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders();
 
-      const writeSSE = (data: StreamChunk) => {
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
-      };
+      const writeSSE = (data: StreamChunk) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-      writeSSE({ type: 'debug', log: '🔍 Iniciando processamento modular...' });
-
-      // --- 1. Encontrar ou Criar a Conversa ---
+      // 3. Gestão do Chat
       let currentChat;
-      let lockedProvider: string;
+      let lockedProvider = provider || 'groq'; 
       let isNewChat = false;
 
-      // Definir slug do provider (usando 'groq' como fallback seguro)
-      const providerSlug = requestProvider || 'groq';
-
       if (chatId) {
-        currentChat = await prisma.chat.findUnique({ 
-          where: { id: chatId, userId: req.userId }
-        });
-        
+        currentChat = await prisma.chat.findUnique({ where: { id: chatId, userId: req.userId } });
         if (!currentChat) {
-          writeSSE({ type: 'error', error: 'Conversa não encontrada' });
+          writeSSE({ type: 'error', error: 'Chat not found' });
           res.end();
+          cleanup();
           return;
         }
-        
         lockedProvider = currentChat.provider;
       } else {
         currentChat = await prisma.chat.create({
-          data: {
-            userId: req.userId,
-            provider: providerSlug
-          }
+          data: { userId: req.userId, provider: lockedProvider }
         });
-        lockedProvider = providerSlug;
         isNewChat = true;
       }
 
-      // --- 2. Histórico e Contexto ---
+      // 4. Construção do Histórico
+      const targetModel = model || 'default-model';
       const isManualMode = context !== undefined || (selectedMessageIds && selectedMessageIds.length > 0);
-      
-      // Busca modelo padrão do banco (simulado aqui, idealmente viria do providerConfig)
-      // O Factory lidará com defaults se o model for nulo
-      const targetModelId = model || (lockedProvider === 'openai' ? 'gpt-4-turbo' : 'llama3-70b-8192');
-      
-      let historyReport: HybridHistoryReport | null = null;
-      let historyMessages: Message[] = [];
+      let historyMessages: any[] = [];
 
       if (isManualMode) {
-        if (selectedMessageIds && selectedMessageIds.length > 0) {
+        if (selectedMessageIds?.length > 0) {
           historyMessages = await prisma.message.findMany({
             where: { id: { in: selectedMessageIds }, chatId: currentChat.id },
             orderBy: { createdAt: 'asc' }
           });
         }
-      } else if ((strategy || contextStrategy) === 'efficient') {
-        historyReport = await getHybridRagHistory(currentChat.id, message, targetModelId, writeSSE);
-        historyMessages = historyReport.finalContext;
       } else {
-        historyMessages = await getFastHistory(currentChat.id);
+        const report = await contextService.getHybridRagHistory(currentChat.id, messageContent, writeSSE);
+        historyMessages = report.finalContext;
       }
 
-      // --- 3. Salvar User Message ---
-      const userMessageRecord = await prisma.message.create({
-        data: {
-          role: 'user',
-          content: message,
-          chatId: currentChat.id,
-        }
+      // 5. Salvar Mensagem do Usuário
+      const userMsgRecord = await prisma.message.create({
+        data: { role: 'user', content: messageContent, chatId: currentChat.id }
       });
 
-      // --- 4. Indexação Fire-and-Forget ---
-      (async () => {
-        try {
-          const embedding = await aiService.embed(message);
-          if (embedding) {
-            await prisma.$executeRaw`UPDATE messages SET vector = ${embedding.vector}::vector WHERE id = ${userMessageRecord.id}`;
-          }
-        } catch (e) { console.error("Falha embed user:", e); }
-      })();
-
-      // --- 5. Montar Payload ---
+      // 6. Montar Payload FINAL
       const payloadForIA = [];
+      
       if (isManualMode && context) {
         payloadForIA.push({ role: 'system', content: context });
+      } else {
+        payloadForIA.push({ role: 'system', content: "Você é uma IA útil e direta." });
       }
       
-      payloadForIA.push(
-        ...historyMessages.map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content })),
-        { role: 'user', content: message }
-      );
+      payloadForIA.push(...historyMessages.map(msg => ({ 
+        role: msg.role as 'user' | 'assistant', 
+        content: msg.content 
+      })));
+      
+      payloadForIA.push({ role: 'user', content: messageContent });
 
-      // --- 6. Chamada AI Service (MODULAR) ---
-      // AQUI ESTÁ A GRANDE MUDANÇA PARA A NOVA ARQUITETURA
+      // 7. Streaming
       const stream = aiService.stream(payloadForIA, {
         providerSlug: lockedProvider,
-        modelId: targetModelId,
+        modelId: targetModel,
         userId: req.userId
       });
 
+      // Watchdog
       let watchdogTimer: NodeJS.Timeout | undefined;
       const resetWatchdog = () => {
         if (watchdogTimer) clearTimeout(watchdogTimer);
@@ -279,12 +133,10 @@ export const chatController = {
         resetWatchdog();
         let fullAssistantResponse = "";
         let finalMetrics: TelemetryMetrics | null = null;
-        let chunkCount = 0;
 
         for await (const chunk of stream) {
           resetWatchdog();
           if (chunk.type === 'chunk') {
-            chunkCount++;
             fullAssistantResponse += chunk.content;
           } else if (chunk.type === 'telemetry') {
             finalMetrics = chunk.metrics;
@@ -294,63 +146,121 @@ export const chatController = {
         
         if (watchdogTimer) clearTimeout(watchdogTimer);
 
-        // --- 7. Pós-Processamento (Salvar Resposta) ---
+        // 8. SALVAMENTO E PÓS-PROCESSAMENTO
         if (fullAssistantResponse) {
-           // Fallback de métricas se o provider não mandou
-           const safeMetrics = finalMetrics || {
-             provider: lockedProvider,
-             model: targetModelId,
-             tokensIn: 0, tokensOut: 0, costInUSD: 0
-           };
+          
+          // Fallback de Métricas
+          if (!finalMetrics || finalMetrics.tokensIn === 0) {
+            const tokensIn = contextService.countTokens(payloadForIA as any);
+            const tokensOut = contextService.encode(fullAssistantResponse);
+            const cost = costService.estimate(targetModel, tokensIn, tokensOut);
+            
+            finalMetrics = {
+              provider: lockedProvider,
+              model: targetModel,
+              tokensIn,
+              tokensOut,
+              costInUSD: cost,
+              chatId: currentChat.id
+            };
+            writeSSE({ type: 'telemetry', metrics: finalMetrics });
+          }
 
-           const assistantMessage = await prisma.message.create({
-             data: {
-               role: 'assistant',
-               content: fullAssistantResponse,
-               chatId: currentChat.id,
-               provider: safeMetrics.provider,
-               model: safeMetrics.model,
-               tokensIn: safeMetrics.tokensIn,
-               tokensOut: safeMetrics.tokensOut,
-               costInUSD: safeMetrics.costInUSD,
-               sentContext: isManualMode ? 'manual' : 'auto'
-             }
-           });
+          // Auditoria
+          const auditObject = {
+            config_V47: {
+              mode: isManualMode ? 'manual' : 'auto',
+              model: targetModel,
+              provider: lockedProvider,
+              timestamp: new Date().toISOString(),
+              strategy: strategy || 'efficient',
+              params: { temperature, topK, memoryWindow }
+            },
+            payloadSent_V23: payloadForIA 
+          };
 
-           // Embed da resposta (Async)
-           (async () => {
-             try {
-                const embed = await aiService.embed(fullAssistantResponse);
-                if (embed) {
-                  await prisma.$executeRaw`UPDATE messages SET vector = ${embed.vector}::vector WHERE id = ${assistantMessage.id}`;
-                }
-             } catch (e) { console.error(e); }
-           })();
+          const sentContextString = JSON.stringify(auditObject);
+
+          // Salvar
+          const savedAssistantMsg = await prisma.message.create({
+            data: {
+              role: 'assistant',
+              content: fullAssistantResponse,
+              chatId: currentChat.id,
+              provider: finalMetrics.provider,
+              model: finalMetrics.model,
+              tokensIn: finalMetrics.tokensIn,
+              tokensOut: finalMetrics.tokensOut,
+              costInUSD: finalMetrics.costInUSD,
+              sentContext: sentContextString 
+            }
+          });
+
+          // Embeds
+          aiService.embed(fullAssistantResponse).then(emb => {
+            if (emb) prisma.$executeRaw`UPDATE messages SET vector = ${emb.vector}::vector WHERE id = ${savedAssistantMsg.id}`;
+          }).catch(e => console.error("Embed error:", e));
+          
+          aiService.embed(messageContent).then(emb => {
+            if (emb) prisma.$executeRaw`UPDATE messages SET vector = ${emb.vector}::vector WHERE id = ${userMsgRecord.id}`;
+          }).catch(e => console.error("Embed user error:", e));
         }
 
         res.end();
 
-        // Geração de Título (Simplificado para o exemplo)
-        if (isNewChat) {
-           // Lógica de título fire-and-forget aqui...
+        // [NOVO] Geração de Título Automática (Fire-and-forget)
+        // Só gera se for um chat novo e tivermos resposta
+        if (isNewChat && fullAssistantResponse.length > 0) {
+           (async () => {
+             try {
+               // 1. Prompt focado em resumir
+               const titlePrompt = [
+                 { role: 'system', content: 'Você é uma IA especializada em resumir tópicos. Gere um título curto (máximo 5 palavras) e direto para esta conversa. Responda APENAS o título, sem aspas.' },
+                 { role: 'user', content: `User: ${messageContent}\nAI: ${fullAssistantResponse}` }
+               ];
+
+               // 2. Chama o modelo rápido (Groq/Llama3-8b é ótimo pra isso)
+               // Usamos o 'generate' (não-stream) se seu service tiver, ou stream e pegamos tudo.
+               // Aqui assumo que você pode usar o mesmo stream de antes ou uma função helper.
+               // Para simplificar, vou usar o stream que já temos importado:
+               
+               const titleStream = aiService.stream(titlePrompt, {
+                 providerSlug: 'groq', 
+                 modelId: 'llama-3.1-8b-instant', // Modelo super rápido e barato
+                 userId: req.userId
+               });
+
+               let generatedTitle = '';
+               for await (const chunk of titleStream) {
+                 if (chunk.type === 'chunk') generatedTitle += chunk.content;
+               }
+
+               generatedTitle = generatedTitle.trim().replace(/^["']|["']$/g, ''); // Remove aspas extras
+
+               // 3. Atualiza o banco
+               if (generatedTitle) {
+                 await prisma.chat.update({
+                   where: { id: currentChat.id },
+                   data: { title: generatedTitle }
+                 });
+                 // Opcional: Enviar evento SSE de "title_updated" se quiser tempo real
+               }
+             } catch (err) {
+               console.error("Erro ao gerar título automático:", err);
+             }
+           })();
         }
 
-      } catch (error: any) {
-        writeSSE({ type: 'error', error: translateProviderError(error) });
+      } catch (streamError: any) {
+        console.error("Stream Error:", streamError);
+        writeSSE({ type: 'error', error: streamError.message || "Erro na geração" });
+        res.end();
       } finally {
-        clearTimeout(timeoutCleanup);
         cleanup();
       }
 
     } catch (error) {
-      if (!res.headersSent) return next(error);
-      res.end();
+      if (!res.headersSent) next(error);
     }
-  },
+  }
 };
-
-function translateProviderError(error: any): string {
-  const msg = error.message || String(error);
-  if (msg.includes("413") || msg.includes("too large")) return "Erro: Mensagem muito longa para o modelo.";
-  return msg;
-}

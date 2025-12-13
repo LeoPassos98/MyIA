@@ -60,7 +60,7 @@ export default function MainHeader() {
                   icon={<MenuIcon />}
                   activeIcon={<HistoryIcon />}
                   title="Histórico"
-                  gradient={theme.gradients.primary}
+                  gradient={theme.palette.gradients.primary}
                 />
               </Box>
             </Fade>
@@ -81,7 +81,7 @@ export default function MainHeader() {
                   icon={<TuneIcon />}
                   activeIcon={<DashboardIcon />}
                   title="Painel"
-                  gradient={theme.gradients.secondary}
+                  gradient={theme.palette.gradients.secondary}
                 />
               </Box>
             </Fade>

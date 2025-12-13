@@ -1,13 +1,17 @@
+// frontend/src/features/chat/components/ChatMessage.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Box, Paper, Typography, IconButton, Chip, Fade, alpha, useTheme } from '@mui/material';
 import { 
   Code as CodeIcon, 
+  CopyAll as CopyIcon, 
   DataObject as DataObjectIcon,
   Person as PersonIcon,
   SmartToy as BotIcon,
-  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { Message } from '../types';
 import MarkdownRenderer from './MarkdownRenderer'; // Novo import
+// import MarkdownRenderer from '../../../components/MarkdownRenderer'; // Caminho corrigido para components globais
 
 interface ChatMessageProps {
   message: Message;
@@ -17,11 +21,10 @@ interface ChatMessageProps {
 }
 
 export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewInspector }: ChatMessageProps) {
-  const theme = useTheme(); // Hook para acessar o Design System
+  const theme = useTheme();
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
 
-  // Se for mensagem de sistema e não estiver em modo dev, não mostra (opcional)
   if (isSystem && !isDevMode) return null;
 
   return (
@@ -63,7 +66,7 @@ export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewIn
             {isUser ? <PersonIcon fontSize="small" /> : <BotIcon fontSize="small" />}
           </Box>
 
-          {/* Balão da Mensagem */}
+          {/* Balão */}
           <Paper
             elevation={0}
             sx={{
@@ -78,7 +81,8 @@ export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewIn
               borderColor: isUser 
                 ? alpha(theme.palette.primary.main, 0.2) 
                 : 'divider',
-              '& p': { m: 0 },
+              // Removemos margens padrão para deixar o Markdown controlar
+              '& p': { m: 0 }, 
               '& pre': { m: 0 }
             }}
           >
@@ -95,34 +99,23 @@ export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewIn
               </Box>
             )}
 
-            {/* Rodapé da Mensagem (Timestamp e Ícones) */}
+            {/* Rodapé (Timestamp e Ações) */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1, gap: 2 }}>
               <Typography variant="caption" color="text.secondary">
                 {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Typography>
 
-              {/* Botões de Ação */}
               <Box sx={{ display: 'flex', gap: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}>
-                {/* Botão Copiar (Sempre visível) */}
                 <IconButton size="small" onClick={() => navigator.clipboard.writeText(message.content)} title="Copiar">
                   <CopyIcon fontSize="inherit" />
                 </IconButton>
                 
-                {/* CORREÇÃO AQUI: Botões de Debug só aparecem se isDevMode for true */}
                 {isDevMode && message.role === 'assistant' && (
                   <>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => onViewPrompt && onViewPrompt(message)} 
-                      title="Ver Prompt Enviado"
-                    >
+                    <IconButton size="small" onClick={() => onViewPrompt && onViewPrompt(message)} title="Ver Prompt">
                       <CodeIcon fontSize="inherit" />
                     </IconButton>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => onViewInspector && onViewInspector(message)} 
-                      title="Inspecionar JSON"
-                    >
+                    <IconButton size="small" onClick={() => onViewInspector && onViewInspector(message)} title="Inspecionar JSON">
                       <DataObjectIcon fontSize="inherit" />
                     </IconButton>
                   </>
@@ -130,7 +123,7 @@ export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewIn
               </Box>
             </Box>
 
-            {/* Dados de Debug (Visível apenas se isDevMode e se houver dados) */}
+            {/* Debug Info */}
             {isDevMode && message.model && (
                <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed', borderColor: 'divider' }}>
                  <Chip label={message.model} size="small" variant="outlined" sx={{ mr: 1, fontSize: '0.65rem' }} />

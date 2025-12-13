@@ -78,7 +78,7 @@ export default function ProfileTab() {
               variant="contained" 
               onClick={handleSaveName}
               disabled={isSavingName}
-              sx={{ background: theme.gradients.primary, fontWeight: 'bold' }}
+              sx={{ background: theme.palette.gradients.primary, fontWeight: 'bold' }}
             >
               {isSavingName ? 'Salvando...' : 'Salvar Nome'}
             </Button>

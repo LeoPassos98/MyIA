@@ -1,10 +1,15 @@
+// frontend/src/App.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { CssBaseline } from '@mui/material';
+
+// Contexts
 import { AuthProvider } from './contexts/AuthContext';
-import { CustomThemeProvider, useTheme } from './contexts/ThemeContext';
-import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { useMemo } from 'react';
+import { CustomThemeProvider } from './contexts/ThemeContext';
 import { LayoutProvider } from './contexts/LayoutContext'; 
+
+// Components & Pages
 import MainLayout from './components/Layout/MainLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -12,27 +17,13 @@ import Chat from './features/chat';
 import Settings from './features/settings';
 
 /**
- * Componente Nº 1: O Aplicador de Tema
- * Este componente SÓ existe porque ele precisa estar "dentro" do CustomThemeProvider
- * para poder chamar o hook useTheme().
+ * Componente de Rotas
+ * Agora ele é "burro" em relação ao tema. Ele apenas consome o ambiente já configurado.
  */
-function ThemedRoutes() {
-  const { mode } = useTheme(); // <-- Agora isso funciona!
-
-  // 1. Crie o tema do MUI baseado no 'mode' do nosso contexto
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: mode,
-        },
-      }),
-    [mode],
-  );
-
-  // 2. Aplique o tema e o CSS Baseline, e então renderize as rotas
+function AppRoutes() {
   return (
-    <MuiThemeProvider theme={theme}>
+    <>
+      {/* CssBaseline reseta o CSS do navegador (padding, margin, fontes) */}
       <CssBaseline />
       
       <Routes>
@@ -47,26 +38,21 @@ function ThemedRoutes() {
 
         <Route path="/" element={<Navigate to="/chat" replace />} />
       </Routes>
-    </MuiThemeProvider>
+    </>
   );
 }
 
 /**
- * Componente Nº 2: O "Provedor-Mor"
- * ORDEM CORRETA V47:
- * 1. LayoutProvider (precisa estar disponível para todos os componentes)
- * 2. AuthProvider (usa LayoutProvider internamente se necessário)
- * 3. CustomThemeProvider (usa estado mas não depende de rotas)
- * 4. ThemedRoutes (contém Routes - deve estar por último)
- * 
- * NOTA: O BrowserRouter deve estar em main.tsx envolvendo o <App />
+ * Componente Raiz
+ * Apenas organiza a pirâmide de Provedores.
  */
 function App() {
   return (
     <LayoutProvider>
       <AuthProvider>
+        {/* O CustomThemeProvider já injeta o tema do MUI aqui dentro */}
         <CustomThemeProvider>
-          <ThemedRoutes />
+          <AppRoutes />
         </CustomThemeProvider>
       </AuthProvider>
     </LayoutProvider>

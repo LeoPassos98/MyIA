@@ -55,7 +55,7 @@ export default function SettingsPage() {
           }}
         >
           <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ mb: 4, background: theme.gradients.primary, backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ mb: 4, background: theme.palette.gradients.primary, backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               Configurações
             </Typography>
 

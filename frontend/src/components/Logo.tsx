@@ -49,7 +49,7 @@ export default function Logo() {
           width: 32,
           height: 32,
           borderRadius: 1.5,
-          background: theme.gradients.primary,
+          background: theme.palette.gradients.primary,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -65,7 +65,7 @@ export default function Logo() {
         sx={{
           fontWeight: 800,
           fontSize: '1.2rem',
-          background: theme.gradients.primary,
+          background: theme.palette.gradients.primary,
           backgroundClip: 'text',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
