@@ -9,7 +9,7 @@ import { prisma } from '../lib/prisma';
 import { contextService } from '../services/chat/contextService';
 import { costService } from '../services/chat/costService';
 
-// Controle de Concorrência
+// Controle de Concorrência (Evita spam de requisições iguais)
 const processingRequests = new Set<string>();
 
 export const chatController = {
@@ -43,9 +43,10 @@ export const chatController = {
       
       processingRequests.add(requestId);
       const cleanup = () => processingRequests.delete(requestId);
+      // Timeout de segurança para limpar a flag de processamento
       setTimeout(cleanup, 60000); 
 
-      // 2. Setup SSE
+      // 2. Setup SSE (Streaming)
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
@@ -53,7 +54,7 @@ export const chatController = {
 
       const writeSSE = (data: StreamChunk) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-      // 3. Gestão do Chat
+      // 3. Gestão do Chat (Criar ou Recuperar)
       let currentChat;
       let lockedProvider = provider || 'groq'; 
       let isNewChat = false;
@@ -74,7 +75,7 @@ export const chatController = {
         isNewChat = true;
       }
 
-      // 4. Construção do Histórico
+      // 4. Construção do Contexto (Histórico)
       const targetModel = model || 'default-model';
       const isManualMode = context !== undefined || (selectedMessageIds && selectedMessageIds.length > 0);
       let historyMessages: any[] = [];
@@ -87,16 +88,17 @@ export const chatController = {
           });
         }
       } else {
+        // Modo RAG Híbrido Automático
         const report = await contextService.getHybridRagHistory(currentChat.id, messageContent, writeSSE);
         historyMessages = report.finalContext;
       }
 
-      // 5. Salvar Mensagem do Usuário
+      // 5. Salvar Mensagem do Usuário (Antes de gerar resposta)
       const userMsgRecord = await prisma.message.create({
         data: { role: 'user', content: messageContent, chatId: currentChat.id }
       });
 
-      // 6. Montar Payload FINAL
+      // 6. Montar Payload FINAL para a IA
       const payloadForIA = [];
       
       if (isManualMode && context) {
@@ -105,21 +107,23 @@ export const chatController = {
         payloadForIA.push({ role: 'system', content: "Você é uma IA útil e direta." });
       }
       
+      // Adiciona o histórico recuperado
       payloadForIA.push(...historyMessages.map(msg => ({ 
         role: msg.role as 'user' | 'assistant', 
         content: msg.content 
       })));
       
+      // Adiciona a pergunta atual
       payloadForIA.push({ role: 'user', content: messageContent });
 
-      // 7. Streaming
+      // 7. Streaming da Resposta
       const stream = aiService.stream(payloadForIA, {
         providerSlug: lockedProvider,
         modelId: targetModel,
-        userId: req.userId
+        userId: req.userId // O TypeScript já aceita aqui pois não é função async separada
       });
 
-      // Watchdog
+      // Watchdog: Derruba a conexão se a IA travar por 60s
       let watchdogTimer: NodeJS.Timeout | undefined;
       const resetWatchdog = () => {
         if (watchdogTimer) clearTimeout(watchdogTimer);
@@ -149,7 +153,7 @@ export const chatController = {
         // 8. SALVAMENTO E PÓS-PROCESSAMENTO
         if (fullAssistantResponse) {
           
-          // Fallback de Métricas
+          // Fallback de Métricas (Se a API não mandar o preço)
           if (!finalMetrics || finalMetrics.tokensIn === 0) {
             const tokensIn = contextService.countTokens(payloadForIA as any);
             const tokensOut = contextService.encode(fullAssistantResponse);
@@ -166,7 +170,8 @@ export const chatController = {
             writeSSE({ type: 'telemetry', metrics: finalMetrics });
           }
 
-          // Auditoria
+          // === [AQUI ESTAVA O PROBLEMA ANTES] ===
+          // Prepara objeto de auditoria para salvar no banco
           const auditObject = {
             config_V47: {
               mode: isManualMode ? 'manual' : 'auto',
@@ -180,8 +185,9 @@ export const chatController = {
           };
 
           const sentContextString = JSON.stringify(auditObject);
+          // =======================================
 
-          // Salvar
+          // Salva no Banco
           const savedAssistantMsg = await prisma.message.create({
             data: {
               role: 'assistant',
@@ -192,11 +198,11 @@ export const chatController = {
               tokensIn: finalMetrics.tokensIn,
               tokensOut: finalMetrics.tokensOut,
               costInUSD: finalMetrics.costInUSD,
-              sentContext: sentContextString 
+              sentContext: sentContextString // Campo novo preenchido!
             }
           });
 
-          // Embeds
+          // Embeds (Gera vetores para o futuro)
           aiService.embed(fullAssistantResponse).then(emb => {
             if (emb) prisma.$executeRaw`UPDATE messages SET vector = ${emb.vector}::vector WHERE id = ${savedAssistantMsg.id}`;
           }).catch(e => console.error("Embed error:", e));
@@ -208,26 +214,20 @@ export const chatController = {
 
         res.end();
 
-        // [NOVO] Geração de Título Automática (Fire-and-forget)
-        // Só gera se for um chat novo e tivermos resposta
+        // [NOVO] Geração de Título Automática (Corrigido TypeScript)
         if (isNewChat && fullAssistantResponse.length > 0) {
            (async () => {
              try {
-               // 1. Prompt focado em resumir
                const titlePrompt = [
                  { role: 'system', content: 'Você é uma IA especializada em resumir tópicos. Gere um título curto (máximo 5 palavras) e direto para esta conversa. Responda APENAS o título, sem aspas.' },
                  { role: 'user', content: `User: ${messageContent}\nAI: ${fullAssistantResponse}` }
                ];
-
-               // 2. Chama o modelo rápido (Groq/Llama3-8b é ótimo pra isso)
-               // Usamos o 'generate' (não-stream) se seu service tiver, ou stream e pegamos tudo.
-               // Aqui assumo que você pode usar o mesmo stream de antes ou uma função helper.
-               // Para simplificar, vou usar o stream que já temos importado:
                
+               // Use o ! no final de userId para garantir ao TS que não é nulo
                const titleStream = aiService.stream(titlePrompt, {
                  providerSlug: 'groq', 
-                 modelId: 'llama-3.1-8b-instant', // Modelo super rápido e barato
-                 userId: req.userId
+                 modelId: 'llama-3.1-8b-instant', 
+                 userId: req.userId! 
                });
 
                let generatedTitle = '';
@@ -235,15 +235,13 @@ export const chatController = {
                  if (chunk.type === 'chunk') generatedTitle += chunk.content;
                }
 
-               generatedTitle = generatedTitle.trim().replace(/^["']|["']$/g, ''); // Remove aspas extras
+               generatedTitle = generatedTitle.trim().replace(/^["']|["']$/g, '');
 
-               // 3. Atualiza o banco
                if (generatedTitle) {
                  await prisma.chat.update({
                    where: { id: currentChat.id },
                    data: { title: generatedTitle }
                  });
-                 // Opcional: Enviar evento SSE de "title_updated" se quiser tempo real
                }
              } catch (err) {
                console.error("Erro ao gerar título automático:", err);
