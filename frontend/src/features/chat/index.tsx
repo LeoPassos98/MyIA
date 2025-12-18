@@ -1,5 +1,5 @@
 // frontend/src/features/chat/index.tsx
-// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { useState } from 'react';
 import { Box, alpha, useTheme } from '@mui/material';
@@ -15,8 +15,6 @@ import { useChatLogic } from './hooks/useChatLogic';
 import MessageList from './components/MessageList';
 import ChatInput from './components/ChatInput';
 import { DevConsole } from './components/DevConsole';
-import PromptModal from './components/Modals/PromptModal';
-import InspectorModal from './components/Modals/InspectorModal';
 
 export default function ChatPage() {
   const theme = useTheme();
@@ -35,10 +33,6 @@ export default function ChatPage() {
 
   // UI States (Modais e Paineis)
   const [isDevMode, setIsDevMode] = useState(false);
-  const [promptModalOpen, setPromptModalOpen] = useState(false);
-  const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
-  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
-  const [inspectorData, setInspectorData] = useState<any>(null);
 
   // Placeholders para contextos futuros
   const isDrawerOpen = false; 
@@ -69,14 +63,6 @@ export default function ChatPage() {
             <MessageList
               messages={messages}
               isDevMode={isDevMode}
-              onViewPrompt={(data) => {
-                setSelectedPrompt(data);
-                setPromptModalOpen(true);
-              }}
-              onViewInspector={(data) => {
-                setInspectorData(data);
-                setIsInspectorOpen(true);
-              }}
             />
           )}
 
@@ -111,17 +97,7 @@ export default function ChatPage() {
             />
           </Box>
 
-          {/* Modals Globais */}
-          <PromptModal
-            open={promptModalOpen}
-            onClose={() => setPromptModalOpen(false)}
-            data={selectedPrompt}
-          />
-          <InspectorModal
-            open={isInspectorOpen}
-            onClose={() => setIsInspectorOpen(false)}
-            data={inspectorData}
-          />
+          {/* Removido: Modals Globais de auditoria */}
         </Box>
       </MainContentWrapper>
     </MainLayout>

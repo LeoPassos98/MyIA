@@ -1,40 +1,56 @@
-// frontend/src/features/chat/components/ChatMessage.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { Box, Paper, Typography, IconButton, Chip, Fade, alpha, useTheme } from '@mui/material';
-import { 
-  Code as CodeIcon, 
-  CopyAll as CopyIcon, 
-  DataObject as DataObjectIcon,
+import {
   Person as PersonIcon,
   SmartToy as BotIcon,
+  CopyAll as CopyIcon,
+  Code as CodeIcon,
+  DataObject as DataObjectIcon,
 } from '@mui/icons-material';
 import { Message } from '../types';
-import MarkdownRenderer from './MarkdownRenderer'; // Novo import
-// import MarkdownRenderer from '../../../components/MarkdownRenderer'; // Caminho corrigido para components globais
+import MarkdownRenderer from './MarkdownRenderer';
+import { useAudit } from '../../audit/context/AuditContext';
 
 interface ChatMessageProps {
   message: Message;
-  isDevMode: boolean;
-  onViewPrompt?: (data: any) => void;
-  onViewInspector?: (data: any) => void;
+  isDevMode?: boolean;
+  showDebugInfo?: boolean;
 }
 
-export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewInspector }: ChatMessageProps) {
+export default function ChatMessage({
+  message,
+  isDevMode = false,
+  showDebugInfo = false,
+}: ChatMessageProps) {
   const theme = useTheme();
   const isUser = message.role === 'user';
-  const isSystem = message.role === 'system';
+  const { openAudit } = useAudit(); // ✅ CORRIGIDO: requestAudit → openAudit
 
-  if (isSystem && !isDevMode) return null;
+  const handleViewPayload = () => {
+    openAudit({
+      messageId: message.id,
+      mode: 'payload', // ✅ CORRIGIDO: 'prompt' → 'payload'
+      source: 'chat',
+    });
+  };
+
+  const handleViewResponse = () => {
+    openAudit({
+      messageId: message.id,
+      mode: 'response', // ✅ CORRIGIDO: 'inspector' → 'response'
+      source: 'chat',
+    });
+  };
 
   return (
     <Fade in timeout={400}>
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           mb: 2,
           display: 'flex',
           justifyContent: isUser ? 'flex-end' : 'flex-start',
-          px: { xs: 1, sm: 2 }
+          px: { xs: 1, sm: 2 },
         }}
       >
         <Box
@@ -42,8 +58,9 @@ export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewIn
             display: 'flex',
             flexDirection: isUser ? 'row-reverse' : 'row',
             gap: 1.5,
-            maxWidth: { xs: '90%', sm: '75%', md: '70%' },
-            alignItems: 'flex-start'
+            width: isUser ? { xs: '90%', sm: '70%', md: '65%' } : '100%',
+            maxWidth: isUser ? 600 : '100%',
+            alignItems: 'flex-start',
           }}
         >
           {/* Avatar */}
@@ -56,66 +73,86 @@ export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewIn
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              bgcolor: isUser 
-                ? alpha(theme.palette.primary.main, 0.1) 
+              bgcolor: isUser
+                ? alpha(theme.palette.primary.main, 0.1)
                 : alpha(theme.palette.secondary.main, 0.1),
               color: isUser ? 'primary.main' : 'secondary.main',
-              flexShrink: 0
+              flexShrink: 0,
             }}
           >
             {isUser ? <PersonIcon fontSize="small" /> : <BotIcon fontSize="small" />}
           </Box>
 
-          {/* Balão */}
+          {/* Balão/Painel */}
           <Paper
             elevation={0}
             sx={{
-              p: 2,
-              borderRadius: 2,
-              borderTopRightRadius: isUser ? 0 : 2,
+              p: isUser ? 2 : { xs: 2, sm: 3 },
+              borderRadius: isUser ? 2 : 3,
+              borderTopRightRadius: isUser ? 0 : 3,
               borderTopLeftRadius: isUser ? 2 : 0,
-              bgcolor: isUser 
-                ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.08) 
-                : 'background.paper',
-              border: '1px solid',
-              borderColor: isUser 
-                ? alpha(theme.palette.primary.main, 0.2) 
-                : 'divider',
-              // Removemos margens padrão para deixar o Markdown controlar
-              '& p': { m: 0 }, 
-              '& pre': { m: 0 }
+              bgcolor: isUser
+                ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.08)
+                : alpha(theme.palette.background.paper, 0.95),
+              border: isUser
+                ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+                : 'none',
+              boxShadow: isUser ? undefined : `0 2px 16px ${alpha(theme.palette.grey[900], 0.04)}`,
+              width: isUser ? '100%' : '100%',
+              maxWidth: isUser ? 600 : '100%',
+              minWidth: 0,
+              overflowX: 'auto',
+              '& p': { m: 0 },
+              '& pre': { m: 0 },
+              transition: 'background 0.2s',
             }}
           >
-            {message.role === 'user' ? (
-              <Typography 
-                variant="body1" 
+            {/* Conteúdo */}
+            {isUser ? (
+              <Typography
+                variant="body1"
                 sx={{ whiteSpace: 'pre-wrap', color: 'text.primary', lineHeight: 1.6 }}
               >
                 {message.content}
               </Typography>
             ) : (
-              <Box sx={{ color: 'text.primary' }}>
+              <Box sx={{ color: 'text.primary', fontSize: { xs: 16, sm: 17 }, lineHeight: 1.7 }}>
                 <MarkdownRenderer content={message.content} />
               </Box>
             )}
 
-            {/* Rodapé (Timestamp e Ações) */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1, gap: 2 }}>
+            {/* Rodapé */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mt: 1,
+                gap: 2,
+              }}
+            >
               <Typography variant="caption" color="text.secondary">
-                {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(message.createdAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
               </Typography>
 
-              <Box sx={{ display: 'flex', gap: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}>
-                <IconButton size="small" onClick={() => navigator.clipboard.writeText(message.content)} title="Copiar">
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <IconButton
+                  size="small"
+                  title="Copiar"
+                  onClick={() => navigator.clipboard.writeText(message.content)}
+                >
                   <CopyIcon fontSize="inherit" />
                 </IconButton>
-                
+
                 {isDevMode && message.role === 'assistant' && (
                   <>
-                    <IconButton size="small" onClick={() => onViewPrompt && onViewPrompt(message)} title="Ver Prompt">
+                    <IconButton size="small" title="Ver Payload" onClick={handleViewPayload}>
                       <CodeIcon fontSize="inherit" />
                     </IconButton>
-                    <IconButton size="small" onClick={() => onViewInspector && onViewInspector(message)} title="Inspecionar JSON">
+                    <IconButton size="small" title="Ver Resposta JSON" onClick={handleViewResponse}>
                       <DataObjectIcon fontSize="inherit" />
                     </IconButton>
                   </>
@@ -123,14 +160,22 @@ export default function ChatMessage({ message, isDevMode, onViewPrompt, onViewIn
               </Box>
             </Box>
 
-            {/* Debug Info */}
-            {isDevMode && message.model && (
-               <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed', borderColor: 'divider' }}>
-                 <Chip label={message.model} size="small" variant="outlined" sx={{ mr: 1, fontSize: '0.65rem' }} />
-                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                    {(message.costInUSD || 0).toFixed(6)} USD
-                 </Typography>
-               </Box>
+            {showDebugInfo && message.model && (
+              <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed', borderColor: 'divider' }}>
+                <Chip
+                  label={message.model}
+                  size="small"
+                  variant="outlined"
+                  sx={{ mr: 1, fontSize: '0.65rem' }}
+                />
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: '0.65rem' }}
+                >
+                  {(message.costInUSD || 0).toFixed(6)} USD
+                </Typography>
+              </Box>
             )}
           </Paper>
         </Box>
