@@ -14,6 +14,7 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
 
 - **Caminho Relativo:** Todo arquivo de código **DEVE** iniciar, obrigatoriamente na **primeira linha**, com um comentário indicando seu caminho relativo.
   - *Exemplo:* `// backend/src/services/ai/index.ts`
+  - Caso não encontre ou saiba o caminho, deixe apenas // NULL
 
 - **Referência aos Padrões:** Logo abaixo, deve haver a referência a este documento.
   - *Exemplo:* `// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)`
