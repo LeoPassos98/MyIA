@@ -41,9 +41,50 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
   - **PROIBIDO Cores Hardcoded:** Nunca use hexadecimais (ex: `#00FF41`) diretamente nos componentes.
   - **Uso do Tema:** Use `theme.palette.primary.main`, `theme.palette.custom.matrix`, etc.
   - **Cores Novas:** Se precisar de uma cor nova, adicione-a em `src/theme.ts` primeiro.
+  
+## 3.1 Arquitetura de Layout (Scroll & Viewport)
+
+- **Scroll vertical da aplicação é responsabilidade EXCLUSIVA do `MainContentWrapper`.**
+- O layout raiz (`MainLayout`) **DEVE** usar `overflow: hidden`.
+- Páginas (ex: Chat, AuditPage, Settings) **NUNCA** devem controlar scroll global.
+- ❌ É proibido usar `overflow`, `height: 100vh` ou controle de scroll em páginas.
+- ✅ Qualquer página deve assumir que o scroll já está resolvido pelo layout.
+- **Scroll vertical e offset de header são responsabilidade exclusiva do MainContentWrapper, usando constantes globais de layout.**
 
 ## 4. Arquitetura Backend
 
 - **Modularidade (Factory Pattern):** Lógica de IA deve usar `ProviderFactory`.
 - **Database-Driven:** Configurações residem no banco, nunca hardcoded.
 - **Banco de Dados:** Models em `PascalCase`, tabelas em `snake_case`.
+
+## 5. Fonte Única de Verdade (Regra Arquitetural Imutável)
+
+- **Qualquer entidade auditável, persistida ou governável DEVE ter sua identidade criada exclusivamente no backend.**
+- O frontend **NUNCA** é fonte de verdade para:
+  - IDs de mensagens
+  - IDs de inferências
+  - IDs de auditoria
+  - Decisões, custos ou status de execução
+
+### Definições
+
+- **Frontend:** camada de visualização e interação.
+- **Backend:** fonte única de verdade (persistência, auditoria, governança).
+
+### Regras Práticas
+
+- ❌ Proibido gerar IDs auditáveis no frontend (`Date.now()`, `uuid()`, etc).
+- ✅ O frontend deve sempre consumir IDs retornados pelo backend.
+- ✅ Se um dado pode ser auditado, ele **não pode** nascer no frontend.
+
+### Justificativa
+
+Auditoria, governança e compliance exigem:
+- Persistência
+- Rastreabilidade
+- Consistência histórica
+
+Esses requisitos **só podem ser garantidos pelo backend**.
+
+> 📌 **Regra de ouro:**  
+> *Se pode ser auditado, não pode ter identidade criada no frontend.*

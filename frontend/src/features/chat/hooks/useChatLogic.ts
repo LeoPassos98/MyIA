@@ -166,8 +166,13 @@ export function useChatLogic(chatId?: string) {
                 newChatIdRef.current = chunk.metrics.chatId;
               }
 
+              // 🔥 SWAP CRÍTICO: Trocar ID temporário pelo ID real persistido
               setMessages(prev => prev.map(msg => 
-                msg.id === tempAiMsgId ? { ...msg, ...chunk.metrics } : msg
+                msg.id === tempAiMsgId ? { 
+                  ...msg,
+                  id: chunk.metrics.messageId ?? msg.id, // Fonte Única de Verdade
+                  ...chunk.metrics 
+                } : msg
               ));
             }
             else if (chunk.type === 'debug') {

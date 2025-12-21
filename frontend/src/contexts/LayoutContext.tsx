@@ -1,3 +1,6 @@
+// frontend/src/contexts/LayoutContext.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 // CORREÇÃO AQUI: Apontando para a feature correta em vez de ../types/chat
 import { ChatConfig, ManualContextState, Message } from '../features/chat/types';

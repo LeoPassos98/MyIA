@@ -1,6 +1,7 @@
 // frontend/src/features/audit/components/AuditModal.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -12,8 +13,11 @@ import {
   Chip,
   Divider,
   IconButton,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { auditService, type AuditRecord } from '../../../services/auditService';
 import type { AuditIntent, AuditMode } from '../types';
 
 interface AuditModalProps {
@@ -29,6 +33,39 @@ const MODE_LABEL: Record<AuditMode, string> = {
 
 export function AuditModal({ audit, onClose }: AuditModalProps) {
   const { messageId, mode, source } = audit;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [auditData, setAuditData] = useState<AuditRecord | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchAudit() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await auditService.getAuditByMessageId(messageId);
+        
+        if (isMounted) {
+          setAuditData(data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erro ao carregar auditoria');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchAudit();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [messageId]);
 
   return (
     <Dialog
@@ -63,47 +100,78 @@ export function AuditModal({ audit, onClose }: AuditModalProps) {
 
       {/* Conteúdo */}
       <DialogContent sx={{ pt: 3 }}>
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Identidade
-          </Typography>
-
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: 'auto 1fr',
-              gap: 1.5,
-              p: 2,
-              bgcolor: 'background.default',
-              borderRadius: 1,
-            }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Message ID
-            </Typography>
-            <Typography variant="body2" fontFamily="monospace">
-              {messageId}
-            </Typography>
-
-            <Typography variant="body2" color="text.secondary">
-              Origem
-            </Typography>
-            <Chip label={source} size="small" variant="outlined" />
-
-            <Typography variant="body2" color="text.secondary">
-              Modo
-            </Typography>
-            <Chip label={mode} size="small" color="primary" variant="outlined" />
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
           </Box>
-        </Box>
+        )}
 
-        <Box sx={{ textAlign: 'center' }}>
-          <Chip
-            label="⚠️ Dados simulados — backend ainda não conectado"
-            color="warning"
-            size="small"
-          />
-        </Box>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {!loading && !error && auditData && (
+          <>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Identidade
+              </Typography>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr',
+                  gap: 1.5,
+                  p: 2,
+                  bgcolor: 'background.default',
+                  borderRadius: 1,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Message ID
+                </Typography>
+                <Typography variant="body2" fontFamily="monospace">
+                  {messageId}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                  Origem
+                </Typography>
+                <Chip label={source} size="small" variant="outlined" />
+
+                <Typography variant="body2" color="text.secondary">
+                  Modo
+                </Typography>
+                <Chip label={mode} size="small" color="primary" variant="outlined" />
+              </Box>
+            </Box>
+
+            {/* JSON Completo (Read-only) */}
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Registro de Auditoria Completo
+              </Typography>
+              <Box
+                component="pre"
+                sx={{
+                  p: 2,
+                  bgcolor: 'background.default',
+                  borderRadius: 1,
+                  overflow: 'auto',
+                  maxHeight: '400px',
+                  fontSize: '0.875rem',
+                  fontFamily: 'monospace',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                {JSON.stringify(auditData, null, 2)}
+              </Box>
+            </Box>
+          </>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>

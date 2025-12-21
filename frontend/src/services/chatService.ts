@@ -13,8 +13,9 @@ export interface TelemetryMetrics {
   costInUSD: number;
   model: string;
   provider: string;
-  chatId?: string; // <-- ID do chat (para atualização após primeira mensagem)
-  sentContext?: string; // <-- Contexto enviado (JSON string)
+  chatId?: string; // ID do chat (para atualização após primeira mensagem)
+  messageId?: string; // ID real da mensagem salva (Fonte Única de Verdade)
+  sentContext?: string; // Contexto enviado (JSON string)
 }
 
 export interface SendMessageResponse {

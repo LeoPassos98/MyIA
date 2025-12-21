@@ -11,6 +11,8 @@ import userSettingsRoutes from './routes/userSettingsRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 import userRoutes from './routes/userRoutes';
 import chatHistoryRoutes from './routes/chatHistoryRoutes';
+import auditRoutes from './routes/auditRoutes';
+
 
 const app = express();
 
@@ -56,6 +58,7 @@ app.use('/api/settings', userSettingsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat-history', chatHistoryRoutes);
+app.use('/api/audit', auditRoutes);
 
 // Rota 404
 app.use((_req, res) => {
@@ -72,12 +75,12 @@ async function startServer() {
   try {
     console.log('🔧 Inicializando servidor...');
     console.log('📦 Carregando dependências...');
-    
+
     // Teste de conexão com banco
     console.log('🗄️  Conectando ao banco de dados...');
     await prisma.$connect();
     console.log('✅ Banco de dados conectado!');
-    
+
     app.listen(PORT, () => {
       console.log('✅ Servidor rodando!');
       console.log(`🚀 Backend disponível em http://localhost:${PORT}`);

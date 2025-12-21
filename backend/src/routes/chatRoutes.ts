@@ -1,3 +1,6 @@
+// backend/src/routes/chatRoutes.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md
+
 import { Router } from 'express';
 import { chatController } from '../controllers/chatController';
 import { authMiddleware } from '../middleware/authMiddleware';

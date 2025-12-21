@@ -13,6 +13,9 @@ import { LayoutProvider } from './contexts/LayoutContext';
 import { AuditProvider } from './features/audit/context/AuditContext';
 import { AuditFeature } from './features/audit';
 
+// Pages & Features
+import AuditPage from './features/auditPage';
+
 // Components & Pages
 import MainLayout from './components/Layout/MainLayout';
 import Login from './pages/Login';
@@ -33,6 +36,7 @@ function AppRoutes() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/chat/:chatId" element={<Chat />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/audit" element={<AuditPage />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/chat" replace />} />

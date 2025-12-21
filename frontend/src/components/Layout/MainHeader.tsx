@@ -1,3 +1,6 @@
+// frontend/src/components/Layout/MainHeader.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { AppBar, Toolbar, Box, Fade } from '@mui/material';
 import { Menu as MenuIcon, Tune as TuneIcon, History as HistoryIcon, Dashboard as DashboardIcon } from '@mui/icons-material';
 import { useLayout } from '../../contexts/LayoutContext';
@@ -5,6 +8,7 @@ import { useTheme } from '@mui/material/styles';
 import { useLocation } from 'react-router-dom';
 import Logo from '../Logo';
 import LayoutToggleButton from './LayoutToggleButton';
+import { HEADER_HEIGHT } from './layoutConstants';
 
 export default function MainHeader() {
   const theme = useTheme();
@@ -42,7 +46,7 @@ export default function MainHeader() {
         variant="dense" 
         sx={{ 
           py: 1, 
-          minHeight: 56,
+          minHeight: HEADER_HEIGHT,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'

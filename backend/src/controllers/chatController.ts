@@ -7,7 +7,7 @@ import { aiService } from '../services/ai';
 import { TelemetryMetrics, StreamChunk } from '../services/ai/types';
 import { prisma } from '../lib/prisma';
 import { contextService } from '../services/chat/contextService';
-import { costService } from '../services/chat/costService';
+import { getProviderInfo } from '../config/providerMap';
 
 // Controle de Concorrência (Evita spam de requisições iguais)
 const processingRequests = new Set<string>();
@@ -20,8 +20,8 @@ export const chatController = {
         return;
       }
 
-      const { 
-        prompt, message: legacyMsg, provider, chatId, 
+      const {
+        prompt, message: legacyMsg, provider, chatId,
         model, context, selectedMessageIds, strategy, temperature, memoryWindow, topK
       } = req.body;
 
@@ -34,17 +34,17 @@ export const chatController = {
 
       // 1. Prevenção de Duplicidade
       const crypto = require('crypto');
-      const requestId = `${req.userId}-${chatId || 'new'}-${crypto.createHash('sha256').update(messageContent).digest('hex').substring(0,8)}`;
+      const requestId = `${req.userId}-${chatId || 'new'}-${crypto.createHash('sha256').update(messageContent).digest('hex').substring(0, 8)}`;
 
       if (processingRequests.has(requestId)) {
         res.status(429).json({ error: 'Duplicate request blocked' });
         return;
       }
-      
+
       processingRequests.add(requestId);
       const cleanup = () => processingRequests.delete(requestId);
       // Timeout de segurança para limpar a flag de processamento
-      setTimeout(cleanup, 60000); 
+      setTimeout(cleanup, 60000);
 
       // 2. Setup SSE (Streaming)
       res.setHeader('Content-Type', 'text/event-stream');
@@ -56,7 +56,7 @@ export const chatController = {
 
       // 3. Gestão do Chat (Criar ou Recuperar)
       let currentChat;
-      let lockedProvider = provider || 'groq'; 
+      let lockedProvider = provider || 'groq';
       let isNewChat = false;
 
       if (chatId) {
@@ -100,19 +100,19 @@ export const chatController = {
 
       // 6. Montar Payload FINAL para a IA
       const payloadForIA = [];
-      
+
       if (isManualMode && context) {
         payloadForIA.push({ role: 'system', content: context });
       } else {
         payloadForIA.push({ role: 'system', content: "Você é uma IA útil e direta." });
       }
-      
+
       // Adiciona o histórico recuperado
-      payloadForIA.push(...historyMessages.map(msg => ({ 
-        role: msg.role as 'user' | 'assistant', 
-        content: msg.content 
+      payloadForIA.push(...historyMessages.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
       })));
-      
+
       // Adiciona a pergunta atual
       payloadForIA.push({ role: 'user', content: messageContent });
 
@@ -123,7 +123,7 @@ export const chatController = {
         userId: req.userId // O TypeScript já aceita aqui pois não é função async separada
       });
 
-      // Watchdog: Derruba a conexão se a IA travar por 60s
+      // Watchdog: Derruba a conexão se a IA travar por 60s [PODE SER MENOR QUE 60s]
       let watchdogTimer: NodeJS.Timeout | undefined;
       const resetWatchdog = () => {
         if (watchdogTimer) clearTimeout(watchdogTimer);
@@ -147,27 +147,38 @@ export const chatController = {
           }
           writeSSE(chunk);
         }
-        
+
         if (watchdogTimer) clearTimeout(watchdogTimer);
 
         // 8. SALVAMENTO E PÓS-PROCESSAMENTO
         if (fullAssistantResponse) {
-          
+
           // Fallback de Métricas (Se a API não mandar o preço)
           if (!finalMetrics || finalMetrics.tokensIn === 0) {
             const tokensIn = contextService.countTokens(payloadForIA as any);
             const tokensOut = contextService.encode(fullAssistantResponse);
-            const cost = costService.estimate(targetModel, tokensIn, tokensOut);
-            
+
+            // ✅ Cálculo de custo REAL usando providerMap (não estimativa)
+            const providerInfo = getProviderInfo(targetModel);
+            const realCostInUSD =
+              (tokensIn / 1_000_000) * providerInfo.costIn +
+              (tokensOut / 1_000_000) * providerInfo.costOut;
+
+            // DADOS CONFIAVEIS 
             finalMetrics = {
               provider: lockedProvider,
               model: targetModel,
               tokensIn,
               tokensOut,
-              costInUSD: cost,
+              costInUSD: realCostInUSD,
               chatId: currentChat.id
             };
-            writeSSE({ type: 'telemetry', metrics: finalMetrics });
+
+            writeSSE({
+              type: 'telemetry',
+              metrics: finalMetrics
+            });
+
           }
 
           // === [AQUI ESTAVA O PROBLEMA ANTES] ===
@@ -181,7 +192,7 @@ export const chatController = {
               strategy: strategy || 'efficient',
               params: { temperature, topK, memoryWindow }
             },
-            payloadSent_V23: payloadForIA 
+            payloadSent_V23: payloadForIA
           };
 
           const sentContextString = JSON.stringify(auditObject);
@@ -202,11 +213,15 @@ export const chatController = {
             }
           });
 
+          // 🔥 Envia ID REAL para o frontend (Fonte Única de Verdade)
+          finalMetrics.messageId = savedAssistantMsg.id;
+          writeSSE({ type: 'telemetry', metrics: finalMetrics });
+
           // Embeds (Gera vetores para o futuro)
           aiService.embed(fullAssistantResponse).then(emb => {
             if (emb) prisma.$executeRaw`UPDATE messages SET vector = ${emb.vector}::vector WHERE id = ${savedAssistantMsg.id}`;
           }).catch(e => console.error("Embed error:", e));
-          
+
           aiService.embed(messageContent).then(emb => {
             if (emb) prisma.$executeRaw`UPDATE messages SET vector = ${emb.vector}::vector WHERE id = ${userMsgRecord.id}`;
           }).catch(e => console.error("Embed user error:", e));
@@ -216,37 +231,37 @@ export const chatController = {
 
         // [NOVO] Geração de Título Automática (Corrigido TypeScript)
         if (isNewChat && fullAssistantResponse.length > 0) {
-           (async () => {
-             try {
-               const titlePrompt = [
-                 { role: 'system', content: 'Você é uma IA especializada em resumir tópicos. Gere um título curto (máximo 5 palavras) e direto para esta conversa. Responda APENAS o título, sem aspas.' },
-                 { role: 'user', content: `User: ${messageContent}\nAI: ${fullAssistantResponse}` }
-               ];
-               
-               // Use o ! no final de userId para garantir ao TS que não é nulo
-               const titleStream = aiService.stream(titlePrompt, {
-                 providerSlug: 'groq', 
-                 modelId: 'llama-3.1-8b-instant', 
-                 userId: req.userId! 
-               });
+          (async () => {
+            try {
+              const titlePrompt = [
+                { role: 'system', content: 'Você é uma IA especializada em resumir tópicos. Gere um título curto (máximo 5 palavras) e direto para esta conversa. Responda APENAS o título, sem aspas.' },
+                { role: 'user', content: `User: ${messageContent}\nAI: ${fullAssistantResponse}` }
+              ];
 
-               let generatedTitle = '';
-               for await (const chunk of titleStream) {
-                 if (chunk.type === 'chunk') generatedTitle += chunk.content;
-               }
+              // Use o ! no final de userId para garantir ao TS que não é nulo
+              const titleStream = aiService.stream(titlePrompt, {
+                providerSlug: 'groq',
+                modelId: 'llama-3.1-8b-instant',
+                userId: req.userId!
+              });
 
-               generatedTitle = generatedTitle.trim().replace(/^["']|["']$/g, '');
+              let generatedTitle = '';
+              for await (const chunk of titleStream) {
+                if (chunk.type === 'chunk') generatedTitle += chunk.content;
+              }
 
-               if (generatedTitle) {
-                 await prisma.chat.update({
-                   where: { id: currentChat.id },
-                   data: { title: generatedTitle }
-                 });
-               }
-             } catch (err) {
-               console.error("Erro ao gerar título automático:", err);
-             }
-           })();
+              generatedTitle = generatedTitle.trim().replace(/^["']|["']$/g, '');
+
+              if (generatedTitle) {
+                await prisma.chat.update({
+                  where: { id: currentChat.id },
+                  data: { title: generatedTitle }
+                });
+              }
+            } catch (err) {
+              console.error("Erro ao gerar título automático:", err);
+            }
+          })();
         }
 
       } catch (streamError: any) {

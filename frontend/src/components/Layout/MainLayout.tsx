@@ -1,3 +1,6 @@
+// frontend/src/components/Layout/MainLayout.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import React from 'react';
 import { Box } from '@mui/material';
 import { Outlet } from 'react-router-dom';

@@ -1,3 +1,6 @@
+// backend/src/config/providerMap.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+
 export interface ProviderInfo {
   costIn: number;       // Custo por 1M tokens de entrada
   costOut: number;      // Custo por 1M tokens de saída
