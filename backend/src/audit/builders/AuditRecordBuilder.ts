@@ -35,36 +35,57 @@ export class AuditRecordBuilder {
       }
     }
 
-    return {
-      auditId: randomUUID(),
+    // Derivar dataOrigin de sentContext.meta.isSynthetic quando existir
+    const isSynthetic = parsedContext?.meta?.isSynthetic === true;
+    const dataOrigin = isSynthetic ? 'synthetic' : 'real';
 
+    // Extrair strategy de config_V47
+    const strategy = parsedContext?.config_V47?.strategy ?? undefined;
+
+    // Extrair parameters de config_V47.params
+    const parameters = parsedContext?.config_V47?.params ?? undefined;
+
+    // Calcular totalTokens sempre (soma ou 0)
+    const tokensIn = message.tokensIn ?? undefined;
+    const tokensOut = message.tokensOut ?? undefined;
+    const totalTokens = (tokensIn ?? 0) + (tokensOut ?? 0);
+
+    // Extrair latencyMs de metrics
+    const latencyMs = parsedContext?.metrics?.latencyMs ?? undefined;
+
+    return {
+      schemaVersion: 'audit.v1.4',
+
+      auditId: randomUUID(),
       messageId: message.id,
       chatId: message.chatId,
       userId,
       timestamp: message.createdAt,
       source: 'chat',
+      dataOrigin,
 
       content: {
         assistantMessage: message.role === 'assistant' ? message.content : undefined,
-        promptFinal: message.sentContext ?? undefined,
       },
 
       inference: {
         provider: message.provider ?? undefined,
         model: message.model ?? undefined,
-        strategy: parsedContext?.strategy,
-        parameters: parsedContext?.parameters,
+        strategy,
+        parameters,
       },
 
       usage: {
-        tokensIn: message.tokensIn ?? undefined,
-        tokensOut: message.tokensOut ?? undefined,
+        tokensIn,
+        tokensOut,
+        totalTokens,
         costInUSD: message.costInUSD ?? undefined,
         // bytesIn / bytesOut virão do ApiCallLog no futuro
       },
 
       execution: {
         status: 'success',
+        latencyMs,
       },
     };
   }

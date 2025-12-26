@@ -1,9 +1,13 @@
 // backend/src/audit/domain/AuditRecord.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md
 
-export type AuditStatus = 'success' | 'error';
+export type AuditStatus = 'success' | 'error' | 'timeout';
+export type DataOrigin = 'real' | 'synthetic';
 
 export interface AuditRecord {
+  // Versão do schema
+  schemaVersion: 'audit.v1.4';
+
   // Identidade
   auditId: string;
   messageId: string;
@@ -11,12 +15,12 @@ export interface AuditRecord {
   userId: string;
   timestamp: Date;
   source: 'chat' | 'system';
+  dataOrigin: DataOrigin;
 
   // Conteúdo auditável
   content: {
     userMessage?: string;
     assistantMessage?: string;
-    promptFinal?: string;
   };
 
   // Decisões de inferência
@@ -35,6 +39,7 @@ export interface AuditRecord {
   usage: {
     tokensIn?: number;
     tokensOut?: number;
+    totalTokens?: number;
     costInUSD?: number;
     bytesIn?: number;   // opcional, mas previsto
     bytesOut?: number;  // opcional, mas previsto
@@ -43,6 +48,7 @@ export interface AuditRecord {
   // Execução
   execution: {
     status: AuditStatus;
+    latencyMs?: number;
     error?: {
       code?: string;
       message?: string;
