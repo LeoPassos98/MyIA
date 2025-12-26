@@ -9,6 +9,7 @@ import { useLocation } from 'react-router-dom';
 import Logo from '../Logo';
 import LayoutToggleButton from './LayoutToggleButton';
 import { HEADER_HEIGHT } from './layoutConstants';
+import { useHeaderSlots } from '../../contexts/HeaderSlotsContext';
 
 export default function MainHeader() {
   const theme = useTheme();
@@ -22,6 +23,7 @@ export default function MainHeader() {
   } = useLayout();
 
   const isChatPage = location.pathname === '/' || location.pathname.startsWith('/chat');
+  const { slots } = useHeaderSlots();
 
   return (
     <AppBar
@@ -55,7 +57,7 @@ export default function MainHeader() {
         
         {/* LADO ESQUERDO */}
         <Box sx={{ width: 40, display: 'flex', justifyContent: 'flex-start' }}>
-          {isChatPage && (
+          {isChatPage ? (
             <Fade in={isChatPage}>
               <Box> 
                 <LayoutToggleButton
@@ -68,15 +70,17 @@ export default function MainHeader() {
                 />
               </Box>
             </Fade>
+          ) : (
+            slots.left ? <Box sx={{ display: 'flex' }}>{slots.left}</Box> : null
           )}
         </Box>
 
         {/* CENTRO */}
-        <Logo />
+        {slots.center ? slots.center : <Logo brandText={slots.brandText} />}
 
         {/* LADO DIREITO */}
         <Box sx={{ width: 40, display: 'flex', justifyContent: 'flex-end' }}>
-          {isChatPage && (
+          {isChatPage ? (
             <Fade in={isChatPage}>
               <Box>
                 <LayoutToggleButton
@@ -89,6 +93,8 @@ export default function MainHeader() {
                 />
               </Box>
             </Fade>
+          ) : (
+            slots.right ? <Box sx={{ display: 'flex' }}>{slots.right}</Box> : null
           )}
         </Box>
 

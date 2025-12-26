@@ -1,8 +1,11 @@
+// frontend/src/components/Logo.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Box, Typography, Badge, useTheme, alpha } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { AutoAwesome as SparkleIcon } from '@mui/icons-material';
 
-export default function Logo() {
+export default function Logo({ brandText = 'MyIA' }: { brandText?: string }) {
   const theme = useTheme();
 
   return (
@@ -72,12 +75,12 @@ export default function Logo() {
           letterSpacing: '-0.5px',
         }}
       >
-        MyIA
+        {brandText}
       </Typography>
 
       {/* Badge "TESTE" (Único elemento animado) */}
       <Badge
-        badgeContent="TESTE"
+        badgeContent="Teste"
         sx={{
           '& .MuiBadge-badge': {
             bgcolor: theme.palette.warning.main,

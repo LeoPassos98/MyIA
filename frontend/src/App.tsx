@@ -8,6 +8,7 @@ import { CssBaseline } from '@mui/material';
 import { AuthProvider } from './contexts/AuthContext';
 import { CustomThemeProvider } from './contexts/ThemeContext';
 import { LayoutProvider } from './contexts/LayoutContext';
+import { HeaderSlotsProvider } from './contexts/HeaderSlotsContext';
 
 // Audit
 import { AuditProvider } from './features/audit/context/AuditContext';
@@ -47,19 +48,21 @@ function AppRoutes() {
 
 function App() {
   return (
-    <LayoutProvider>
-      <AuthProvider>
-        <CustomThemeProvider>
-          <AuditProvider>
-            {/* Auditoria global */}
-            <AuditFeature />
+    <HeaderSlotsProvider>
+      <LayoutProvider>
+        <AuthProvider>
+          <CustomThemeProvider>
+            <AuditProvider>
+              {/* Auditoria global */}
+              <AuditFeature />
 
-            {/* Rotas */}
-            <AppRoutes />
-          </AuditProvider>
-        </CustomThemeProvider>
-      </AuthProvider>
-    </LayoutProvider>
+              {/* Rotas */}
+              <AppRoutes />
+            </AuditProvider>
+          </CustomThemeProvider>
+        </AuthProvider>
+      </LayoutProvider>
+    </HeaderSlotsProvider>
   );
 }
 
