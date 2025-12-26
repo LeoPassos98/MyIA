@@ -5,8 +5,7 @@ import { AuditRecord } from '@/services/auditService';
 import { AuditTableRow } from '../types';
 
 export function mapAuditRecord(api: AuditRecord): AuditTableRow {
-  const tokensIn = api.usage?.tokensIn ?? 0;
-  const tokensOut = api.usage?.tokensOut ?? 0;
+  console.log('AUDIT API RECORD', api); // ✅ AQUI
 
   return {
     messageId: api.messageId,
@@ -15,9 +14,9 @@ export function mapAuditRecord(api: AuditRecord): AuditTableRow {
     provider: api.inference?.provider ?? '—',
     model: api.inference?.model ?? '—',
 
-    promptTokens: tokensIn,
-    completionTokens: tokensOut,
-    totalTokens: tokensIn + tokensOut,
+    promptTokens: api.usage?.tokensIn ?? 0,
+    completionTokens: api.usage?.tokensOut ?? 0,
+    totalTokens: api.usage?.totalTokens ?? 0,
 
     cost: api.usage?.costInUSD ?? 0,
   };

@@ -2,7 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { useState, useEffect } from 'react';
-import { auditService } from '../../../services/auditService';
+import { auditService, AuditRecord } from '../../../services/auditService';
 import { AuditPageFilters, AuditTableRow } from '../types';
 import { mapAuditRecord } from '../mappers/mapAuditRecord';
 
@@ -18,7 +18,8 @@ export function useAuditList() {
     dateTo: '',
   });
 
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [selectedAudit, setSelectedAudit] = useState<AuditRecord | null>(null);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   
 
@@ -65,12 +66,20 @@ export function useAuditList() {
     setFilters(prev => ({ ...prev, ...newFilters }));
   };
 
-  const handleRowClick = (messageId: string) => {
-    setSelectedMessageId(messageId);
+  const handleRowClick = async (messageId: string) => {
+    try {
+      setLoadingAudit(true);
+      const audit = await auditService.getAuditByMessageId(messageId);
+      setSelectedAudit(audit);
+    } catch (err) {
+      console.error('Erro ao buscar auditoria:', err);
+    } finally {
+      setLoadingAudit(false);
+    }
   };
 
   const handleCloseModal = () => {
-    setSelectedMessageId(null);
+    setSelectedAudit(null);
   };
 
   return {
@@ -79,7 +88,8 @@ export function useAuditList() {
     error,
     filters,
     handleFilterChange,
-    selectedMessageId,
+    selectedAudit,
+    loadingAudit,
     handleRowClick,
     handleCloseModal,
   };

@@ -5,6 +5,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { auditGateway } from '../auditGateway';
 import type { AuditIntent, AuditState } from '../types';
 
+/**
+ * Valor do contexto de auditoria.
+ * 
+ * Fornece acesso ao estado atual e ações para abrir/fechar auditorias.
+ * A decisão de visualização (human-first vs technical) é feita internamente
+ * pelo AuditController baseada no modo da intent.
+ */
 interface AuditContextValue {
   readonly auditState: AuditState;
   readonly openAudit: (intent: AuditIntent) => void;

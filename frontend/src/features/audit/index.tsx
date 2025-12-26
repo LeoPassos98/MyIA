@@ -1,17 +1,8 @@
 // frontend/src/features/audit/index.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { AuditModal } from './components/AuditModal';
-import { useAudit } from './context/AuditContext';
+import { AuditController } from './components/AuditController';
 
 export function AuditFeature() {
-  const { auditState, closeAudit } = useAudit();
-
-  if (!auditState) return null;
-
-  return (
-    <AuditModal
-      audit={auditState}
-      onClose={closeAudit}
-    />
-  );
+  return <AuditController />;
 }

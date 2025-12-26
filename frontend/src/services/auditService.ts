@@ -4,16 +4,18 @@
 import { api } from './api';
 
 /**
- * Estrutura do AuditRecord retornado pelo backend
- * (expandir conforme necessário)
+ * Estrutura do AuditRecord retornado pelo backend (V1.4)
  */
 export interface AuditRecord {
+  schemaVersion: 'audit.v1.4';
+  
   auditId: string;
   messageId: string;
   chatId: string;
   userId: string;
   timestamp: string;
   source: string;
+  dataOrigin: 'real' | 'synthetic';
 
   content?: {
     assistantMessage?: string;
@@ -30,6 +32,7 @@ export interface AuditRecord {
   usage?: {
     tokensIn?: number;
     tokensOut?: number;
+    totalTokens?: number;
     costInUSD?: number;
   };
 
