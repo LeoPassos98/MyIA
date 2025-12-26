@@ -27,7 +27,6 @@ import {
 } from '@mui/icons-material';
 
 import { useChatInput } from '../hooks/useChatInput';
-import { useDevMode } from '../../../contexts/DevModeContext';
 
 interface ChatInputProps {
   inputMessage: string;
