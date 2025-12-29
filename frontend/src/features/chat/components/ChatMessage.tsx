@@ -6,8 +6,8 @@ import {
   Person as PersonIcon,
   SmartToy as BotIcon,
   CopyAll as CopyIcon,
-  Code as CodeIcon,
   DataObject as DataObjectIcon,
+  Timeline as TimelineIcon,
 } from '@mui/icons-material';
 import { Message } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -26,7 +26,7 @@ export default function ChatMessage({
 }: ChatMessageProps) {
   const theme = useTheme();
   const isUser = message.role === 'user';
-  const { openAudit } = useAudit(); // ✅ CORRIGIDO: requestAudit → openAudit
+  const { openAudit } = useAudit(); 
 
   const handleViewPayload = () => {
     openAudit({
@@ -36,12 +36,8 @@ export default function ChatMessage({
     });
   };
 
-  const handleViewResponse = () => {
-    openAudit({
-      messageId: message.id,
-      mode: 'response', // ✅ CORRIGIDO: 'inspector' → 'response'
-      source: 'chat',
-    });
+  const handleOpenPromptTrace = () => {
+    window.open(`/prompt-trace/${message.id}`, '_blank');
   };
 
   return (
@@ -150,11 +146,11 @@ export default function ChatMessage({
 
                 {isDevMode && message.role === 'assistant' && (
                   <>
-                    <IconButton size="small" title="Ver Payload" onClick={handleViewPayload}>
-                      <CodeIcon fontSize="inherit" />
-                    </IconButton>
-                    <IconButton size="small" title="Ver Resposta JSON" onClick={handleViewResponse}>
+                    <IconButton size="small" title="Abrir Auditoria" onClick={handleViewPayload}>
                       <DataObjectIcon fontSize="inherit" />
+                    </IconButton>
+                    <IconButton size="small" title="Abrir Prompt Trace" onClick={handleOpenPromptTrace}>
+                      <TimelineIcon fontSize="inherit" />
                     </IconButton>
                   </>
                 )}

@@ -16,6 +16,7 @@ import { AuditFeature } from './features/audit';
 
 // Pages & Features
 import AuditPage from './features/auditPage';
+import { PromptTracePage } from "@/features/promptTrace";
 
 // Components & Pages
 import MainLayout from './components/Layout/MainLayout';
@@ -38,6 +39,9 @@ function AppRoutes() {
           <Route path="/chat/:chatId" element={<Chat />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit" element={<AuditPage />} />
+          <Route path="/prompt-trace" element={<PromptTracePage />} />
+          <Route path="/prompt-trace/:traceId" element={<PromptTracePage />} />
+
         </Route>
 
         <Route path="/" element={<Navigate to="/chat" replace />} />
@@ -67,3 +71,17 @@ function App() {
 }
 
 export default App;
+
+
+
+/*
+TODO: catch-all e página que recebe esses catch-all
+Isso costuma acontecer quando existe um catch-all tipo:
+
+<Route path="*" element={<Navigate to="/" replace />} />
+
+
+ou algum guard que te manda pra home quando a rota não bate.
+
+
+*/

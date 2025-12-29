@@ -1,3 +1,6 @@
+// frontend/vite.config.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'

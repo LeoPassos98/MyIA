@@ -1,3 +1,6 @@
+// backend/src/server.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md
+
 import express from 'express';
 import cors from 'cors';
 import { config } from './config/env';
@@ -12,6 +15,8 @@ import analyticsRoutes from './routes/analyticsRoutes';
 import userRoutes from './routes/userRoutes';
 import chatHistoryRoutes from './routes/chatHistoryRoutes';
 import auditRoutes from './routes/auditRoutes';
+import promptTraceRoutes from './routes/promptTraceRoutes';
+
 
 
 const app = express();
@@ -59,6 +64,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat-history', chatHistoryRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/prompt-trace', promptTraceRoutes);
+
 
 // Rota 404
 app.use((_req, res) => {
