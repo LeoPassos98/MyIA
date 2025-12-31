@@ -34,13 +34,17 @@ import { getViewModeForAuditMode } from '../constants/auditViewMode';
 export function AuditController() {
   const { auditState, closeAudit } = useAudit();
 
-  // Sem intent, sem modal
+  // IMPORTANTE: Todos os hooks DEVEM ser chamados antes de qualquer early return
+  // para respeitar as Rules of Hooks do React (mesma ordem em toda renderização).
+  // O hook useAuditLoader aceita null e retorna estado neutro quando não há messageId.
+  const messageId = auditState?.messageId ?? null;
+  const mode = auditState?.mode;
+  const { audit, loading, error } = useAuditLoader(messageId);
+
+  // Sem intent, sem modal (early return APÓS os hooks)
   if (!auditState) {
     return null;
   }
-
-  const { messageId, mode } = auditState;
-  const { audit, loading, error } = useAuditLoader(messageId);
 
   // Estado: Loading
   if (loading) {

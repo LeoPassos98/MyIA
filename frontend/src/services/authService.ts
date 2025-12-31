@@ -33,15 +33,10 @@ export const authService = {
   },
 
   login: async (data: LoginData) => {
-    console.log('=== LOGIN SERVICE ===');
-    console.log('Data recebida:', data);
-    
     const payload = {
       email: data.email,
       password: data.password
     };
-    
-    console.log('Payload a enviar:', payload);
     
     const response = await api.post('/auth/login', payload);
     const { token, user } = response.data;

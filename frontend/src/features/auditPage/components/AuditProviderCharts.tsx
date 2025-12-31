@@ -5,6 +5,9 @@ import { Box, Paper, Typography, Grid, useTheme, alpha } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ProviderStats } from '../hooks/useAuditProviderStats';
 
+/** Altura fixa dos gráficos em pixels - evita warning width(-1) do ResponsiveContainer */
+const CHART_HEIGHT = 300;
+
 interface AuditProviderChartsProps {
   stats: ProviderStats[];
 }
@@ -58,36 +61,38 @@ export default function AuditProviderCharts({ stats }: AuditProviderChartsProps)
             <Typography variant="subtitle1" gutterBottom>
               Custo Total por Provider
             </Typography>
-            <Box sx={{ width: '100%', height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={200}>
-                <BarChart data={stats}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                  <XAxis 
-                    dataKey="provider" 
-                    tick={{ fill: chartColors.text, fontSize: 12 }}
-                  />
-                  <YAxis 
-                    tick={{ fill: chartColors.text, fontSize: 12 }}
-                    tickFormatter={formatCost}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: chartColors.tooltip.background,
-                      border: `1px solid ${chartColors.tooltip.border}`,
-                      borderRadius: 4,
-                      color: chartColors.tooltip.text,
-                    }}
-                    formatter={(value: number | undefined) => [formatCost(value || 0), 'Custo']}
-                    labelStyle={{ color: chartColors.tooltip.text }}
-                  />
-                  <Bar dataKey="totalCost" radius={[4, 4, 0, 0]}>
-                    {stats.map((_, index) => (
-                      <Cell key={`cell-cost-${index}`} fill={chartColors.bar} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
+            {/* 
+              IMPORTANTE: ResponsiveContainer com height em PIXELS (não percentual)
+              Isso evita o warning "width(-1)" pois não depende do pai ter altura definida.
+            */}
+            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+              <BarChart data={stats}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                <XAxis 
+                  dataKey="provider" 
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                />
+                <YAxis 
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                  tickFormatter={formatCost}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: chartColors.tooltip.background,
+                    border: `1px solid ${chartColors.tooltip.border}`,
+                    borderRadius: 4,
+                    color: chartColors.tooltip.text,
+                  }}
+                  formatter={(value: number | undefined) => [formatCost(value || 0), 'Custo']}
+                  labelStyle={{ color: chartColors.tooltip.text }}
+                />
+                <Bar dataKey="totalCost" radius={[4, 4, 0, 0]}>
+                  {stats.map((_, index) => (
+                    <Cell key={`cell-cost-${index}`} fill={chartColors.bar} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </Paper>
         </Grid>
 
@@ -97,36 +102,34 @@ export default function AuditProviderCharts({ stats }: AuditProviderChartsProps)
             <Typography variant="subtitle1" gutterBottom>
               Tokens Totais por Provider
             </Typography>
-            <Box sx={{ width: '100%', height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={200}>
-                <BarChart data={stats}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                  <XAxis 
-                    dataKey="provider" 
-                    tick={{ fill: chartColors.text, fontSize: 12 }}
-                  />
-                  <YAxis 
-                    tick={{ fill: chartColors.text, fontSize: 12 }}
-                    tickFormatter={formatTokens}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: chartColors.tooltip.background,
-                      border: `1px solid ${chartColors.tooltip.border}`,
-                      borderRadius: 4,
-                      color: chartColors.tooltip.text,
-                    }}
-                    formatter={(value: number | undefined) => [formatTokens(value || 0), 'Tokens']}
-                    labelStyle={{ color: chartColors.tooltip.text }}
-                  />
-                  <Bar dataKey="totalTokens" radius={[4, 4, 0, 0]}>
-                    {stats.map((_, index) => (
-                      <Cell key={`cell-tokens-${index}`} fill={chartColors.bar} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
+            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+              <BarChart data={stats}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                <XAxis 
+                  dataKey="provider" 
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                />
+                <YAxis 
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                  tickFormatter={formatTokens}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: chartColors.tooltip.background,
+                    border: `1px solid ${chartColors.tooltip.border}`,
+                    borderRadius: 4,
+                    color: chartColors.tooltip.text,
+                  }}
+                  formatter={(value: number | undefined) => [formatTokens(value || 0), 'Tokens']}
+                  labelStyle={{ color: chartColors.tooltip.text }}
+                />
+                <Bar dataKey="totalTokens" radius={[4, 4, 0, 0]}>
+                  {stats.map((_, index) => (
+                    <Cell key={`cell-tokens-${index}`} fill={chartColors.bar} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </Paper>
         </Grid>
       </Grid>

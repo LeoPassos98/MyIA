@@ -5,8 +5,6 @@ import { AuditRecord } from '@/services/auditService';
 import { AuditTableRow } from '../types';
 
 export function mapAuditRecord(api: AuditRecord): AuditTableRow {
-  console.log('AUDIT API RECORD', api); // ✅ AQUI
-
   return {
     messageId: api.messageId,
     timestamp: api.timestamp,

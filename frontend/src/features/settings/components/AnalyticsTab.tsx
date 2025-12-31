@@ -1,3 +1,6 @@
+// frontend/src/features/settings/components/AnalyticsTab.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress, Alert, Paper, alpha, useTheme } from '@mui/material';
 import { BarChart, LineChart } from '@mui/x-charts';
@@ -48,6 +51,7 @@ export default function AnalyticsTab() {
       </Typography>
       <Paper elevation={0} sx={chartContainerStyle}>
         <LineChart
+          height={280}
           xAxis={[{ data: data.costOverTime.map(d => new Date(d.date)), scaleType: 'time' }]}
           series={[{ data: data.costOverTime.map(d => d.cost), color: theme.palette.primary.main }]}
           grid={{ vertical: true, horizontal: true }}
@@ -59,6 +63,7 @@ export default function AnalyticsTab() {
       </Typography>
       <Paper elevation={0} sx={chartContainerStyle}>
         <BarChart
+          height={280}
           xAxis={[{ scaleType: 'band', data: data.costEfficiency.map(d => d.provider) }]}
           series={[{ data: data.costEfficiency.map(d => d.costPer1kTokens), color: theme.palette.secondary.main }]}
           grid={{ horizontal: true }}

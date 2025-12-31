@@ -1,3 +1,6 @@
+// frontend/src/features/settings/components/ApiKeysTab.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import React, { useState, useEffect } from 'react';
 import { Box, TextField, Button, Grid, Alert, CircularProgress } from '@mui/material';
 import { SettingsSection } from './SettingsSection';

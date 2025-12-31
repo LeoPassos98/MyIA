@@ -18,17 +18,27 @@ interface AuditLoaderState {
  * Não contém JSX, não acessa contexto, não toma decisões de UI.
  * Apenas carrega o AuditRecord completo via API.
  * 
- * @param messageId - ID da mensagem a ser auditada
+ * IMPORTANTE: Este hook aceita messageId null/undefined para permitir que
+ * componentes chamem hooks incondicionalmente (Rules of Hooks).
+ * Quando messageId é null, retorna estado neutro sem fetch.
+ * 
+ * @param messageId - ID da mensagem a ser auditada (pode ser null)
  * @returns Estado com audit, loading e error
  */
-export function useAuditLoader(messageId: string): AuditLoaderState {
+export function useAuditLoader(messageId: string | null | undefined): AuditLoaderState {
   const [state, setState] = useState<AuditLoaderState>({
     audit: null,
-    loading: true,
+    loading: !!messageId, // só inicia loading se tiver messageId
     error: null,
   });
 
   useEffect(() => {
+    // Se não tem messageId, retorna estado neutro (sem loading, sem erro)
+    if (!messageId) {
+      setState({ audit: null, loading: false, error: null });
+      return;
+    }
+
     let isMounted = true;
 
     async function fetchAudit() {
