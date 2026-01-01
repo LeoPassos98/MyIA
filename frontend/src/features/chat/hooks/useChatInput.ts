@@ -42,15 +42,44 @@ export function useChatInput({
     onSend();
   };
 
+  const isSelectionCollapsed = (el: HTMLTextAreaElement | HTMLInputElement) => {
+    return el.selectionStart === el.selectionEnd;
+  };
+
+  const isAtStart = (el: HTMLTextAreaElement | HTMLInputElement) => {
+    return (
+      typeof el.selectionStart === 'number' &&
+      el.selectionStart === 0 &&
+      isSelectionCollapsed(el)
+    );
+  };
+
+  const isAtEnd = (el: HTMLTextAreaElement | HTMLInputElement, value: string) => {
+    return (
+      typeof el.selectionStart === 'number' &&
+      el.selectionStart === value.length &&
+      isSelectionCollapsed(el)
+    );
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
+    const target = e.target as HTMLTextAreaElement | HTMLInputElement;
+
+    // ✅ NÃO interceptar TAB: deixa o comportamento padrão (navegar foco)
+    if (e.key === 'Tab') return;
+
     // ENTER para enviar (sem Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!isLoading) handleSend();
+      return;
     }
 
     // SETA PRA CIMA (Recuperar anterior)
+    // ✅ Só ativa histórico se o cursor estiver no início do texto (não atrapalha navegação no input)
     if (e.key === 'ArrowUp') {
+      if (!target || !isAtStart(target)) return;
+
       if (history.length > 0 && historyIndex < history.length - 1) {
         e.preventDefault();
         
@@ -61,10 +90,14 @@ export function useChatInput({
         setHistoryIndex(nextIndex);
         setInputMessage(history[nextIndex]);
       }
+      return;
     }
 
     // SETA PRA BAIXO (Voltar para o presente)
+    // ✅ Só ativa histórico se o cursor estiver no final do texto
     if (e.key === 'ArrowDown') {
+      if (!target || !isAtEnd(target, inputMessage)) return;
+
       if (historyIndex > -1) {
         e.preventDefault();
         const prevIndex = historyIndex - 1;
@@ -76,6 +109,7 @@ export function useChatInput({
           setInputMessage(history[prevIndex]);
         }
       }
+      return;
     }
   };
 

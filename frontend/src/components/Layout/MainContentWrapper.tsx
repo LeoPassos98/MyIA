@@ -11,7 +11,7 @@ interface MainContentWrapperProps {
 }
 
 export default function MainContentWrapper({ children }: MainContentWrapperProps) {
-  useLayout(); 
+  useLayout();
 
   return (
     <Box
@@ -24,7 +24,7 @@ export default function MainContentWrapper({ children }: MainContentWrapperProps
         display: 'flex',
         flexDirection: 'column',
         pt: `${HEADER_HEIGHT}px`,
-        
+
         transition: (theme) => theme.transitions.create(['margin', 'width'], {
           easing: theme.transitions.easing.sharp,
           duration: theme.transitions.duration.leavingScreen,

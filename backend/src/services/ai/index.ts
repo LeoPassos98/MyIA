@@ -1,3 +1,4 @@
+// backend/src/services/ai/index.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { StreamChunk } from './types';

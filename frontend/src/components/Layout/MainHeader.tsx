@@ -14,12 +14,12 @@ import { useHeaderSlots } from '../../contexts/HeaderSlotsContext';
 export default function MainHeader() {
   const theme = useTheme();
   const location = useLocation();
-  
-  const { 
-    isHistoryOpen, 
-    setIsHistoryOpen, 
-    isEditorOpen, 
-    setIsEditorOpen 
+
+  const {
+    isHistoryOpen,
+    setIsHistoryOpen,
+    isEditorOpen,
+    setIsEditorOpen
   } = useLayout();
 
   const isChatPage = location.pathname === '/' || location.pathname.startsWith('/chat');
@@ -31,35 +31,35 @@ export default function MainHeader() {
       elevation={0}
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        
+
         // --- VISUAL SÓLIDO (PERFORMANCE MÁXIMA) ---
         bgcolor: 'background.paper', // Usa a cor sólida do tema (Branco ou Cinza Escuro)
         backdropFilter: 'none',      // Desativa explicitamente o blur
-        
+
         // Borda sutil para separar do conteúdo
         borderBottom: '1px solid',
         borderColor: 'divider',
-        
+
         // Sombra suave apenas no modo claro para dar profundidade
         boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 1px 3px rgba(0,0,0,0.05)'
       }}
     >
-      <Toolbar 
-        variant="dense" 
-        sx={{ 
-          py: 1, 
+      <Toolbar
+        variant="dense"
+        sx={{
+          py: 1,
           minHeight: HEADER_HEIGHT,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}
       >
-        
+
         {/* LADO ESQUERDO */}
         <Box sx={{ width: 40, display: 'flex', justifyContent: 'flex-start' }}>
           {isChatPage ? (
             <Fade in={isChatPage}>
-              <Box> 
+              <Box>
                 <LayoutToggleButton
                   isActive={isHistoryOpen}
                   onClick={() => setIsHistoryOpen(!isHistoryOpen)}

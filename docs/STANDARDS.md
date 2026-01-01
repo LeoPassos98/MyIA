@@ -88,3 +88,31 @@ Esses requisitos **só podem ser garantidos pelo backend**.
 
 > 📌 **Regra de ouro:**  
 > *Se pode ser auditado, não pode ter identidade criada no frontend.*
+
+## 6. ObservabilityPageLayout (Padrão Obrigatório para Páginas Complexas)
+
+O `ObservabilityPageLayout` é o layout base ("framework interno") para páginas densas e observáveis
+(ex.: Audit, PromptTrace, futuras páginas com sidebar, seções e navegação interna).
+
+### Regras
+
+- Páginas complexas/observáveis **DEVEM** utilizar `ObservabilityPageLayout`.
+- Features **NÃO DEVEM** recriar estruturas próprias de:
+  - sidebar + drawer
+  - header de seção
+  - navegação interna / scroll spy
+  - wrappers de layout equivalentes ao Observability
+- Controle de scroll/viewport **NÃO** deve ser feito pela feature/página.
+  - O scroll é responsabilidade do `MainContentWrapper`, conforme padrão do projeto.
+
+### Quando usar ObservabilityPageLayout?
+Use quando a página tiver pelo menos um dos seguintes:
+- múltiplas seções com navegação/âncoras
+- sidebar persistente ou drawer contextual
+- visualização de dados (tabelas, gráficos, timelines)
+- necessidade de inspeção de registros (ex.: modais de detalhes/trace)
+
+### Motivação
+- padronização de UX
+- consistência de scroll e performance
+- manutenção mais simples e previsível
