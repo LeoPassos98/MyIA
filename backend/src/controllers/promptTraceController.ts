@@ -48,6 +48,7 @@ class PromptTraceController {
       // payloadSent_V23 deve existir no padrão atual do seu auditObject
       const payload = sentContext.payloadSent_V23 || [];
       const config = sentContext.config_V47 || {};
+      const pinnedStepIndices = sentContext.pinnedStepIndices || [];
 
       const trace = {
         traceId: message.id,
@@ -62,6 +63,9 @@ class PromptTraceController {
 
         // O que foi enviado pra IA
         payloadSent: payload,
+
+        // Índices dos steps que eram pinados
+        pinnedStepIndices,
 
         // A resposta final
         response: {

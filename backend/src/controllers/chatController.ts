@@ -98,8 +98,15 @@ export const chatController = {
         data: { role: 'user', content: messageContent, chatId: currentChat.id }
       });
 
+      // 5.1. Enviar ID real da mensagem do user para o frontend
+      writeSSE({ 
+        type: 'user_message_saved', 
+        userMessageId: userMsgRecord.id 
+      });
+
       // 6. Montar Payload FINAL para a IA
-      const payloadForIA = [];
+      const payloadForIA: Array<{ role: string; content: string }> = [];
+      const pinnedStepIndices: number[] = []; // Índices dos steps que são pinados
 
       if (isManualMode && context) {
         payloadForIA.push({ role: 'system', content: context });
@@ -107,11 +114,17 @@ export const chatController = {
         payloadForIA.push({ role: 'system', content: "Você é uma IA útil e direta." });
       }
 
-      // Adiciona o histórico recuperado
-      payloadForIA.push(...historyMessages.map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content
-      })));
+      // Adiciona o histórico recuperado (coleta índices dos pinados)
+      historyMessages.forEach(msg => {
+        const currentIndex = payloadForIA.length; // Índice ANTES de adicionar
+        payloadForIA.push({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        });
+        if (msg.isPinned) {
+          pinnedStepIndices.push(currentIndex);
+        }
+      });
 
       // Adiciona a pergunta atual
       payloadForIA.push({ role: 'user', content: messageContent });
@@ -181,7 +194,7 @@ export const chatController = {
 
           }
 
-          // === [AQUI ESTAVA O PROBLEMA ANTES] ===
+          // === AUDITORIA CONFIÁVEL ===
           // Prepara objeto de auditoria para salvar no banco
           const auditObject = {
             config_V47: {
@@ -192,7 +205,8 @@ export const chatController = {
               strategy: strategy || 'efficient',
               params: { temperature, topK, memoryWindow }
             },
-            payloadSent_V23: payloadForIA
+            payloadSent_V23: payloadForIA, // EXATAMENTE o que foi enviado para a API
+            pinnedStepIndices // Índices dos steps que eram pinados (ex: [1, 3])
           };
 
           const sentContextString = JSON.stringify(auditObject);

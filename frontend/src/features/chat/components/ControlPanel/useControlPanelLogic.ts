@@ -11,6 +11,7 @@ export const useControlPanelLogic = () => {
     setManualContext,
     toggleMessageSelection,
     chatHistorySnapshot,
+    onUnpinMessage,
   } = useLayout();
 
   // Handlers
@@ -29,6 +30,7 @@ export const useControlPanelLogic = () => {
     handleTabChange,
     updateChatConfig,
     setManualContext,
-    toggleMessageSelection
+    toggleMessageSelection,
+    onUnpinMessage,
   };
 };

@@ -27,6 +27,10 @@ interface LayoutContextType {
   // History drawer state
   isHistoryOpen: boolean;
   setIsHistoryOpen: (open: boolean) => void;
+
+  // Pin callback (set by chat page, used by control panel)
+  onUnpinMessage?: (messageId: string) => void;
+  setOnUnpinMessage: (callback: ((messageId: string) => void) | undefined) => void;
 }
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
@@ -62,6 +66,12 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   // Chat history snapshot
   const [chatHistorySnapshot, setChatHistorySnapshot] = useState<Message[]>([]);
 
+  // Pin callback state (needs to trigger re-render when changed)
+  const [onUnpinMessage, setOnUnpinMessageState] = useState<((messageId: string) => void) | undefined>(undefined);
+  const setOnUnpinMessage = useCallback((callback: ((messageId: string) => void) | undefined) => {
+    setOnUnpinMessageState(() => callback);
+  }, []);
+
   // Update chat config (partial update)
   const updateChatConfig = useCallback((partialConfig: Partial<ChatConfig>) => {
     setChatConfig((prev) => ({ ...prev, ...partialConfig }));
@@ -75,10 +85,9 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         return messages;
       }
       
-      // Deep comparison using JSON.stringify for simplicity
-      // In production, consider a more efficient comparison like lodash.isEqual
-      const prevJson = JSON.stringify(prev.map(m => ({ id: m.id, content: m.content })));
-      const newJson = JSON.stringify(messages.map(m => ({ id: m.id, content: m.content })));
+      // Deep comparison including isPinned status
+      const prevJson = JSON.stringify(prev.map(m => ({ id: m.id, content: m.content, isPinned: m.isPinned })));
+      const newJson = JSON.stringify(messages.map(m => ({ id: m.id, content: m.content, isPinned: m.isPinned })));
       
       if (prevJson !== newJson) {
         return messages;
@@ -117,6 +126,8 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     syncChatHistory,
     isHistoryOpen,
     setIsHistoryOpen,
+    onUnpinMessage,
+    setOnUnpinMessage,
   };
 
   return (

@@ -40,7 +40,8 @@ export type StreamChunk =
   | { type: 'chunk'; content: string } // Pedaço de texto
   | { type: 'telemetry'; metrics: TelemetryMetrics } // O recibo final
   | { type: 'error'; error: string } // Se algo der errado
-  | { type: 'debug'; log: string }; // <-- A "CÂMERA DE SEGURANÇA"
+  | { type: 'debug'; log: string } // <-- A "CÂMERA DE SEGURANÇA"
+  | { type: 'user_message_saved'; userMessageId: string }; // ID real da msg do user
 
 // Manter AiServiceResponse para compatibilidade com código não-streaming
 export interface AiServiceResponse {

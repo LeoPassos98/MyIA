@@ -16,6 +16,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import SettingsIcon from '@mui/icons-material/Settings';
 import BuildIcon from '@mui/icons-material/Build';
+import PushPinIcon from '@mui/icons-material/PushPin';
 import type { PromptTraceStep } from '../types';
 
 interface Props {
@@ -83,6 +84,14 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
                       color={config.color as 'primary'}
                       variant="outlined"
                     />
+                    {step.isPinned && (
+                      <PushPinIcon 
+                        fontSize="small" 
+                        color="primary"
+                        titleAccess="Mensagem fixada"
+                        sx={{ ml: 0.5 }}
+                      />
+                    )}
                   </Box>
                 }
                 secondary={

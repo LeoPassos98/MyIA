@@ -1,7 +1,7 @@
 // frontend/src/features/chat/hooks/useChatLogic.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom'; // Importante: hooks de navegação
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLayout } from '../../../contexts/LayoutContext';
@@ -158,6 +158,12 @@ export function useChatLogic(chatId?: string) {
               chunkBufferRef.current += chunk.content;
               if (!flushTimeoutRef.current) flushTimeoutRef.current = setTimeout(flushChunkBuffer, 50);
             } 
+            else if (chunk.type === 'user_message_saved') {
+              // 🔥 SWAP: Trocar ID temporário do USER pelo ID real persistido
+              setMessages(prev => prev.map(msg => 
+                msg.id === userMsgId ? { ...msg, id: chunk.userMessageId } : msg
+              ));
+            }
             else if (chunk.type === 'telemetry') {
               flushChunkBuffer();
               
@@ -207,12 +213,24 @@ export function useChatLogic(chatId?: string) {
     }
   };
 
+  const handleTogglePin = useCallback(async (messageId: string) => {
+    try {
+      const result = await chatHistoryService.toggleMessagePin(messageId);
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, isPinned: result.isPinned } : msg
+      ));
+    } catch (error) {
+      console.error('Erro ao fixar/desafixar mensagem:', error);
+    }
+  }, []);
+
   return {
     messages,
     inputMessage,
     setInputMessage,
     handleSendMessage,
     handleStop,
+    handleTogglePin,
     isLoading,
     debugLogs,
   };

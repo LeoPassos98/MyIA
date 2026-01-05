@@ -1,8 +1,12 @@
+// frontend/src/features/chat/types/index.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: string;
+  isPinned?: boolean;
   
   // Metadados opcionais para debug e custos
   model?: string;

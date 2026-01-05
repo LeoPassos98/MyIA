@@ -26,6 +26,7 @@ interface BackendPromptTracePayload {
     role: string;
     content: string;
   }>;
+  pinnedStepIndices?: number[]; // Índices dos steps que eram pinados
   response?: {
     content?: string;
   };
@@ -40,12 +41,17 @@ interface BackendPromptTracePayload {
  * Converte payload do backend no formato da UI (PromptTraceRecord)
  */
 export function mapPromptTraceRecord(raw: BackendPromptTracePayload): PromptTraceRecord {
+  // Índices dos steps pinados
+  const pinnedIndices = raw.pinnedStepIndices || [];
+  const pinnedCount = pinnedIndices.length;
+
   const steps: PromptTraceStep[] = raw.payloadSent.map((msg, index) => ({
     stepId: `req-${index + 1}`,
     stepNumber: index + 1,
     role: msg.role as PromptTraceStep['role'],
     content: msg.content,
     timestamp: raw.createdAt,
+    isPinned: pinnedIndices.includes(index), // ✅ Agora funciona com índices!
   }));
 
   // ✅ adiciona resposta como step final (melhor UX pra timeline)
@@ -84,6 +90,7 @@ export function mapPromptTraceRecord(raw: BackendPromptTracePayload): PromptTrac
       strategy: raw.config?.strategy,
       contextWindowSize: raw.config?.params?.memoryWindow,
       ragEnabled: false, // ainda não temos no backend
+      pinnedMessagesCount: pinnedCount,
       rawConfig: raw.config, // útil pra debug
     },
 

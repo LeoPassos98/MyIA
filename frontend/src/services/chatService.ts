@@ -5,7 +5,8 @@ export type StreamChunk =
   | { type: 'chunk'; content: string }
   | { type: 'telemetry'; metrics: TelemetryMetrics }
   | { type: 'error'; error: string }
-  | { type: 'debug'; log: string }; // <-- Tipo de debug adicionado
+  | { type: 'debug'; log: string }
+  | { type: 'user_message_saved'; userMessageId: string }; // ID real da msg do user
 
 export interface TelemetryMetrics {
   tokensIn: number;

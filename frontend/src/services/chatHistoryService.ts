@@ -1,3 +1,6 @@
+// frontend/src/services/chatHistoryService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { api } from './api';
 
 export interface Chat {
@@ -12,6 +15,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
+  isPinned?: boolean;
   provider?: string;
   model?: string;
   tokensIn?: number;
@@ -36,5 +40,15 @@ export const chatHistoryService = {
 
   deleteChat: async (chatId: string): Promise<void> => {
     await api.delete(`/chat-history/${chatId}`);
+  },
+
+  toggleMessagePin: async (messageId: string): Promise<{ messageId: string; isPinned: boolean }> => {
+    const response = await api.patch(`/chat-history/message/${messageId}/pin`);
+    return response.data;
+  },
+
+  getPinnedMessages: async (chatId: string): Promise<Message[]> => {
+    const response = await api.get(`/chat-history/${chatId}/pinned`);
+    return response.data;
   },
 };

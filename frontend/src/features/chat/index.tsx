@@ -1,7 +1,7 @@
 // frontend/src/features/chat/index.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, alpha, useTheme } from '@mui/material';
 import { useParams } from 'react-router-dom';
 
@@ -9,6 +9,7 @@ import { useParams } from 'react-router-dom';
 import MainLayout from '../../components/Layout/MainLayout';
 import MainContentWrapper from '../../components/Layout/MainContentWrapper';
 import { LoadingScreen } from '../../components/Feedback/LoadingScreen';
+import { useLayout } from '../../contexts/LayoutContext';
 
 // Componentes da Feature (Modularizados)
 import { useChatLogic } from './hooks/useChatLogic';
@@ -19,6 +20,7 @@ import { DevConsole } from './components/DevConsole';
 export default function ChatPage() {
   const theme = useTheme();
   const { chatId } = useParams();
+  const { setOnUnpinMessage } = useLayout();
 
   // O Hook agora fornece tudo, inclusive o Stop real
   const {
@@ -27,9 +29,16 @@ export default function ChatPage() {
     setInputMessage,
     handleSendMessage,
     handleStop, // <--- O stop real vem daqui agora!
+    handleTogglePin,
     isLoading,
     debugLogs,
   } = useChatLogic(chatId);
+
+  // Registra o callback de unpin no contexto global para o ControlPanel
+  useEffect(() => {
+    setOnUnpinMessage(handleTogglePin);
+    return () => setOnUnpinMessage(undefined);
+  }, [handleTogglePin, setOnUnpinMessage]);
 
   // UI States (Modais e Paineis)
   const [isDevMode, setIsDevMode] = useState(false);
@@ -63,6 +72,7 @@ export default function ChatPage() {
             <MessageList
               messages={messages}
               isDevMode={isDevMode}
+              onTogglePin={handleTogglePin}
             />
           )}
 

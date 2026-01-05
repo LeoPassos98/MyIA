@@ -45,6 +45,7 @@ export function PromptTraceViewer({ trace }: Props) {
 
   const configEntries = useMemo(() => {
     const rawConfig = trace.metadata?.rawConfig as any | undefined;
+    const pinnedCount = trace.metadata?.pinnedMessagesCount ?? 0;
 
     return [
       { label: 'Provider', value: trace.modelInfo.provider },
@@ -54,6 +55,7 @@ export function PromptTraceViewer({ trace }: Props) {
       { label: 'Temperature', value: trace.modelInfo.temperature ?? '—' },
       { label: 'TopK', value: rawConfig?.params?.topK ?? '—' },
       { label: 'Memory Window', value: trace.metadata?.contextWindowSize ?? '—' },
+      { label: '📌 Pinned', value: pinnedCount > 0 ? `${pinnedCount} msg` : '—' },
     ];
   }, [trace]);
 

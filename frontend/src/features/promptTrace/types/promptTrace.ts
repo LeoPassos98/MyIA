@@ -32,6 +32,7 @@ export interface PromptTraceStep {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   timestamp: string;
+  isPinned?: boolean;
   usage?: PromptTraceUsage;
   modelInfo?: PromptTraceModelInfo;
   metadata?: Record<string, unknown>;
@@ -62,6 +63,7 @@ export interface PromptTraceRecord {
     strategy?: string;
     ragEnabled?: boolean;
     contextWindowSize?: number;
+    pinnedMessagesCount?: number;
     rawConfig?: unknown;
   };
 

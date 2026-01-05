@@ -3,16 +3,21 @@ import {
   Tune as TuneIcon, 
   Settings as SettingsIcon, 
   Message as MessageIcon,
-  SmartToy as BotIcon 
+  SmartToy as BotIcon,
+  PushPin as PushPinIcon
 } from '@mui/icons-material';
 import { useControlPanelLogic } from './useControlPanelLogic';
 import { ParametersTab } from './ParametersTab';
 import { ManualContextTab } from './ManualContextTab';
 import { ModelSelectionTab } from './ModelSelectionTab';
+import { PinnedMessagesTab } from './PinnedMessagesTab';
 
 export default function ControlPanel() {
   const theme = useTheme();
-  const { currentEditorTab, handleTabChange } = useControlPanelLogic();
+  const { currentEditorTab, handleTabChange, chatHistorySnapshot } = useControlPanelLogic();
+
+  // Conta mensagens pinadas para badge
+  const pinnedCount = chatHistorySnapshot.filter(msg => msg.isPinned).length;
 
   return (
     <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', color: 'text.primary' }}>
@@ -39,6 +44,10 @@ export default function ControlPanel() {
         <Tab icon={<BotIcon fontSize="small" />} label="IA" />
         <Tab icon={<SettingsIcon fontSize="small" />} label="Ajustes" />
         <Tab icon={<MessageIcon fontSize="small" />} label="Contexto" />
+        <Tab 
+          icon={<PushPinIcon fontSize="small" />} 
+          label={pinnedCount > 0 ? `📌 ${pinnedCount}` : "Fixadas"} 
+        />
       </Tabs>
 
       {/* Conteúdo com Scroll */}
@@ -46,6 +55,7 @@ export default function ControlPanel() {
         {currentEditorTab === 0 && <ModelSelectionTab />}
         {currentEditorTab === 1 && <ParametersTab />}
         {currentEditorTab === 2 && <ManualContextTab />}
+        {currentEditorTab === 3 && <PinnedMessagesTab />}
       </Box>
 
     </Box>

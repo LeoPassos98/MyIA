@@ -8,6 +8,8 @@ import {
   CopyAll as CopyIcon,
   DataObject as DataObjectIcon,
   Timeline as TimelineIcon,
+  PushPin as PushPinIcon,
+  PushPinOutlined as PushPinOutlinedIcon,
 } from '@mui/icons-material';
 import { Message } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -17,12 +19,14 @@ interface ChatMessageProps {
   message: Message;
   isDevMode?: boolean;
   showDebugInfo?: boolean;
+  onTogglePin?: (messageId: string) => void;
 }
 
 export default function ChatMessage({
   message,
   isDevMode = false,
   showDebugInfo = false,
+  onTogglePin,
 }: ChatMessageProps) {
   const theme = useTheme();
   const isUser = message.role === 'user';
@@ -136,6 +140,25 @@ export default function ChatMessage({
               </Typography>
 
               <Box sx={{ display: 'flex', gap: 0.5 }}>
+                {/* Botão de Pin - disponível para todas as mensagens */}
+                <IconButton
+                  size="small"
+                  title={message.isPinned ? "Desafixar mensagem" : "Fixar mensagem"}
+                  onClick={() => onTogglePin?.(message.id)}
+                  sx={{
+                    color: message.isPinned ? 'primary.main' : 'text.secondary',
+                    '&:hover': {
+                      color: 'primary.main',
+                    }
+                  }}
+                >
+                  {message.isPinned ? (
+                    <PushPinIcon fontSize="inherit" />
+                  ) : (
+                    <PushPinOutlinedIcon fontSize="inherit" />
+                  )}
+                </IconButton>
+
                 <IconButton
                   size="small"
                   title="Copiar"

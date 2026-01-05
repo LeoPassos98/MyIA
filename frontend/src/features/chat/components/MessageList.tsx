@@ -10,11 +10,13 @@ import ChatMessage from './ChatMessage';
 interface MessageListProps {
   messages: Message[];
   isDevMode: boolean;
+  onTogglePin?: (messageId: string) => void;
 }
 
 export default function MessageList({
   messages,
   isDevMode,
+  onTogglePin,
 }: MessageListProps) {
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -87,6 +89,7 @@ export default function MessageList({
             key={msg.id}
             message={msg}
             isDevMode={isDevMode}
+            onTogglePin={onTogglePin}
           />
         ))}
         <div ref={messagesEndRef} />
