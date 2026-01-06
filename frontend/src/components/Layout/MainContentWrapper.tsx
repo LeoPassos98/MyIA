@@ -18,11 +18,11 @@ export default function MainContentWrapper({ children }: MainContentWrapperProps
       component="main"
       sx={{
         flexGrow: 1,
-        height: `calc(100vh - ${HEADER_HEIGHT}px)`,
-        overflow: 'auto',
-        position: 'relative',
+        minHeight: 0, // Importante para flex funcionar corretamente
+        overflow: 'hidden', // O scroll fica no conteúdo interno (ex: MessageList)
         display: 'flex',
         flexDirection: 'column',
+        // Offset para compensar o header fixo (position: fixed)
         pt: `${HEADER_HEIGHT}px`,
 
         transition: (theme) => theme.transitions.create(['margin', 'width'], {

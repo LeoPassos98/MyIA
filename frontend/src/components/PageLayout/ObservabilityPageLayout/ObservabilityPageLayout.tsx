@@ -8,6 +8,7 @@ import type { ObservabilityPageLayoutProps } from './types';
 import { ObservabilitySidebar } from './ObservabilitySidebar';
 import { ObservabilityDrawer } from './ObservabilityDrawer';
 import { useScrollSpy } from './useScrollSpy';
+import { scrollbarStyles } from '@/theme/scrollbarStyles';
 
 /**
  * Layout reutilizável para páginas densas de observabilidade
@@ -43,7 +44,13 @@ export function ObservabilityPageLayout({
   );
 
   return (
-    <Box sx={{ minHeight: '100%' }}>
+    <Box 
+      sx={{ 
+        height: '100%',
+        overflow: 'auto', // Scroll do conteúdo da página
+        ...scrollbarStyles, // Estilos unificados de scrollbar
+      }}
+    >
       {/* Container principal */}
       <Box
         sx={{

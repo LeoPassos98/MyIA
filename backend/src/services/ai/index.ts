@@ -9,6 +9,9 @@ export interface AIStreamOptions {
   providerSlug: string;
   modelId: string;
   userId: string;
+  temperature?: number;
+  topK?: number;
+  maxTokens?: number;
 }
 
 export const aiService = {
@@ -49,8 +52,9 @@ export const aiService = {
       const streamGenerator = provider.streamChat(messages, {
         modelId: options.modelId,
         apiKey: apiKey,
-        maxTokens: 4000, 
-        temperature: 0.7
+        maxTokens: options.maxTokens || 4000,
+        temperature: options.temperature ?? 0.7,
+        topK: options.topK
       });
 
       for await (const chunk of streamGenerator) {

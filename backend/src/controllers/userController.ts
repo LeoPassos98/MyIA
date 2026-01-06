@@ -5,6 +5,27 @@ import { AppError } from '../middleware/errorHandler';
 
 export const userController = {
 
+  async getProfile(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.userId) {
+        throw new AppError('Não autorizado', 401);
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, email: true, name: true, createdAt: true }
+      });
+
+      if (!user) {
+        throw new AppError('Usuário não encontrado', 404);
+      }
+
+      res.json(user);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       if (!req.userId) {

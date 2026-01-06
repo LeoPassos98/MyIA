@@ -1,18 +1,20 @@
+// frontend/src/features/chat/components/ControlPanel/index.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Box, Typography, Tabs, Tab, alpha, useTheme } from '@mui/material';
 import { 
   Tune as TuneIcon, 
-  Settings as SettingsIcon, 
   Message as MessageIcon,
   SmartToy as BotIcon,
   PushPin as PushPinIcon,
   AccountTree as PipelineIcon
 } from '@mui/icons-material';
 import { useControlPanelLogic } from './useControlPanelLogic';
-import { ParametersTab } from './ParametersTab';
+import { ModelTab } from './ModelTab';
 import { ManualContextTab } from './ManualContextTab';
-import { ModelSelectionTab } from './ModelSelectionTab';
 import { PinnedMessagesTab } from './PinnedMessagesTab';
 import { ContextConfigTab } from './ContextConfigTab';
+import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 export default function ControlPanel() {
   const theme = useTheme();
@@ -31,36 +33,33 @@ export default function ControlPanel() {
         </Typography>
       </Box>
 
-      {/* Tabs */}
+      {/* Tabs - 4 abas organizadas */}
       <Tabs
         value={currentEditorTab}
         onChange={handleTabChange}
-        variant="scrollable"
-        scrollButtons="auto"
+        variant="fullWidth"
         sx={{
           borderBottom: 1,
           borderColor: 'divider',
-          '& .MuiTab-root': { fontWeight: 600, minWidth: 0, px: 1.5 },
+          '& .MuiTab-root': { fontWeight: 600, minWidth: 0, py: 1.5 },
           '& .Mui-selected': { color: 'primary.main' }
         }}
       >
-        <Tab icon={<BotIcon fontSize="small" />} label="IA" />
-        <Tab icon={<SettingsIcon fontSize="small" />} label="Ajustes" />
+        <Tab icon={<BotIcon fontSize="small" />} label="Modelo" />
         <Tab icon={<PipelineIcon fontSize="small" />} label="Contexto" />
         <Tab icon={<MessageIcon fontSize="small" />} label="Manual" />
         <Tab 
           icon={<PushPinIcon fontSize="small" />} 
-          label={pinnedCount > 0 ? `📌 ${pinnedCount}` : "Fixadas"} 
+          label={pinnedCount > 0 ? `${pinnedCount}` : "Fixadas"} 
         />
       </Tabs>
 
       {/* Conteúdo com Scroll */}
-      <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
-        {currentEditorTab === 0 && <ModelSelectionTab />}
-        {currentEditorTab === 1 && <ParametersTab />}
-        {currentEditorTab === 2 && <ContextConfigTab />}
-        {currentEditorTab === 3 && <ManualContextTab />}
-        {currentEditorTab === 4 && <PinnedMessagesTab />}
+      <Box sx={{ flex: 1, overflowY: 'auto', p: 2, ...scrollbarStyles }}>
+        {currentEditorTab === 0 && <ModelTab />}
+        {currentEditorTab === 1 && <ContextConfigTab />}
+        {currentEditorTab === 2 && <ManualContextTab />}
+        {currentEditorTab === 3 && <PinnedMessagesTab />}
       </Box>
 
     </Box>

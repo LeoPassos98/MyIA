@@ -115,18 +115,28 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
         h3: ({ children }) => <Typography variant="h5" gutterBottom sx={{ mt: 2, fontSize: '1.25rem', fontWeight: 600 }}>{children}</Typography>,
 
         // 8. CÓDIGO (Syntax Highlighting - Mantido e Melhorado)
-        code({ inline, className, children, ...props }: any) {
+        code({ inline, className, children, node, ...props }: any) {
           const match = /language-(\w+)/.exec(className || '');
-          if (inline || !match) {
+          const language = match ? match[1] : null;
+          
+          // Detecção mais robusta de código inline:
+          // - Usa a prop inline se disponível
+          // - Se não, verifica se não tem className (bloco tem language-xxx)
+          // - E verifica se não tem quebras de linha no conteúdo
+          const codeContent = String(children);
+          const hasNewline = codeContent.includes('\n');
+          const isInline = inline ?? (!className && !hasNewline);
+          
+          // Código inline (sem quebra de linha, marcado com ` )
+          // IMPORTANTE: Retorna apenas elemento <code> nativo para evitar <div> dentro de <p>
+          if (isInline) {
             return (
-              <Box
-                component="code"
-                sx={{
-                  bgcolor: alpha(theme.palette.text.primary, 0.1),
+              <code
+                style={{
+                  backgroundColor: alpha(theme.palette.text.primary, 0.1),
                   color: theme.palette.text.primary,
-                  px: 0.6,
-                  py: 0.2,
-                  borderRadius: 1,
+                  padding: '2px 5px',
+                  borderRadius: '4px',
                   fontFamily: theme.typography.monospace,
                   fontSize: '0.85em',
                   fontWeight: 'bold'
@@ -134,15 +144,17 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 {...props}
               >
                 {children}
-              </Box>
+              </code>
             );
           }
+          
+          // Bloco de código (``` com ou sem linguagem)
           return (
             <Box sx={{ my: 2, borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
               <Box sx={{ 
                 px: 2, 
                 py: 0.5, 
-                bgcolor: isDark ? alpha('#000', 0.2) : '#f5f5f5', // Uso de alpha para dark mode
+                bgcolor: isDark ? alpha('#000', 0.2) : '#f5f5f5',
                 borderBottom: '1px solid', 
                 borderColor: 'divider',
                 display: 'flex',
@@ -150,19 +162,19 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 alignItems: 'center'
               }}>
                 <Typography variant="caption" sx={{ fontFamily: theme.typography.monospace, color: 'text.secondary', fontWeight: 'bold' }}>
-                  {match[1].toUpperCase()}
+                  {language ? language.toUpperCase() : 'CODE'}
                 </Typography>
               </Box>
               <SyntaxHighlighter
                 style={isDark ? vscDarkPlus : vs}
-                language={match[1]}
+                language={language || 'text'}
                 PreTag="div"
                 customStyle={{
                   margin: 0,
                   padding: '16px',
                   fontSize: '0.85rem',
                   lineHeight: '1.5',
-                  backgroundColor: isDark ? '#0d1117' : '#ffffff' // Fundo do editor
+                  backgroundColor: isDark ? '#0d1117' : '#ffffff'
                 }}
                 {...props}
               >

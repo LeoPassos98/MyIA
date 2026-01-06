@@ -3,10 +3,12 @@
 
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { config } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { prisma } from './lib/prisma';
+import { authLimiter, apiLimiter, chatLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/authRoutes';
 import chatRoutes from './routes/chatRoutes';
 import aiRoutes from './routes/aiRoutes';
@@ -20,6 +22,31 @@ import promptTraceRoutes from './routes/promptTraceRoutes';
 
 
 const app = express();
+
+// 🔒 Security Headers (Helmet)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Permite embeddings (caso necessário)
+}));
+
+// 🔒 HTTPS Redirect (Production only)
+if (config.nodeEnv === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      logger.warn(`HTTP request redirected to HTTPS: ${req.url}`);
+      return res.redirect(`https://${req.header('host')}${req.url}`);
+    }
+    next();
+  });
+}
 
 // Middlewares globais
 // Usar lista de origens definida em config (parsing centralizado em config/env.ts)
@@ -56,15 +83,18 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Rotas
-app.use('/api/auth', authRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/settings', userSettingsRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/chat-history', chatHistoryRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api/prompt-trace', promptTraceRoutes);
+// 🔒 Rate Limiting para autenticação (proteção contra brute force)
+app.use('/api/auth', authLimiter, authRoutes);
+// 🔒 Rate Limiting para chat (proteção contra spam)
+app.use('/api/chat', chatLimiter, chatRoutes);
+// 🔒 Rate Limiting geral para APIs
+app.use('/api/ai', apiLimiter, aiRoutes);
+app.use('/api/settings', apiLimiter, userSettingsRoutes);
+app.use('/api/analytics', apiLimiter, analyticsRoutes);
+app.use('/api/user', apiLimiter, userRoutes);
+app.use('/api/chat-history', apiLimiter, chatHistoryRoutes);
+app.use('/api/audit', apiLimiter, auditRoutes);
+app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
 
 
 // Rota 404

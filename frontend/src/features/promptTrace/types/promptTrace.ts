@@ -76,7 +76,5 @@ export interface PromptTraceRecord {
     pinnedMessagesCount?: number;
     rawConfig?: unknown;
   };
-
-  /** Payload original do backend (fonte técnica / fiel) */
-  rawPayload?: unknown;
+  // rawPayload removido (Standards §7 - Anti-Duplicação)
 }

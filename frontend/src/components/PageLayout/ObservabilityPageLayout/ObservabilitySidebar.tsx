@@ -5,6 +5,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import type { ObservabilitySidebarProps } from './types';
+import { scrollbarStyles } from '@/theme/scrollbarStyles';
 
 /**
  * Sidebar fixa para navegação entre seções (desktop)
@@ -27,6 +28,7 @@ export function ObservabilitySidebar({
         height: 'fit-content',
         maxHeight: 'calc(100vh - 120px)',
         overflowY: 'auto',
+        ...scrollbarStyles,
       }}
     >
       <Typography

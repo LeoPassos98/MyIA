@@ -6,7 +6,7 @@ MyIA é um hub de IA multi-provider com chat persistente, auditoria e analytics.
 
 ## Regra #1: STANDARDS.md é a Constituição
 
-**SEMPRE leia [docs/STANDARDS.md](docs/STANDARDS.md) antes de modificar qualquer arquivo.** Este documento define regras imutáveis de arquitetura e codificação que devem ser seguidas estritamente.
+**SEMPRE leia [docs/STANDARDS.md](../docs/STANDARDS.md) antes de modificar qualquer arquivo.** Este documento define regras imutáveis de arquitetura e codificação que devem ser seguidas estritamente.
 
 ## Padrões de Código Obrigatórios
 
@@ -41,7 +41,7 @@ Exemplo: `ChatInput.tsx` usa `useChatInput.ts` para lógica
 <Box sx={{ color: theme.palette.custom.matrix }} />
 ```
 
-Adicionar cores novas em [frontend/src/theme.ts](frontend/src/theme.ts)
+Adicionar cores novas em [frontend/src/theme.ts](../frontend/src/theme.ts)
 
 ### Scroll e Layout
 - **`MainContentWrapper`** é o ÚNICO responsável pelo scroll vertical
@@ -129,7 +129,7 @@ frontend/
 
 ## Sistema RAG Híbrido (Contexto Inteligente)
 
-O `contextService` ([backend/src/services/chat/contextService.ts](backend/src/services/chat/contextService.ts)) combina três estratégias com prioridade:
+O `contextService` ([backend/src/services/chat/contextService.ts](../backend/src/services/chat/contextService.ts)) combina três estratégias com prioridade:
 
 1. **📌 Mensagens Pinadas (Prioridade Máxima):** Sempre incluídas, independente do budget
 2. **Busca Semântica (RAG):** `ragService.findSimilarMessages()` encontra mensagens semanticamente relevantes via embeddings

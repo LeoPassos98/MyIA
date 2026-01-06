@@ -23,7 +23,13 @@ export const config = {
 
 // Validar variáveis críticas
 if (!config.jwtSecret) {
-  logger.warn('JWT_SECRET not set, using default (insecure for production)');
+  logger.error('❌ JWT_SECRET is required. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  process.exit(1);
+}
+
+if (config.jwtSecret.length < 32) {
+  logger.error('❌ JWT_SECRET must be at least 32 characters long for security');
+  process.exit(1);
 }
 
 if (!config.databaseUrl) {

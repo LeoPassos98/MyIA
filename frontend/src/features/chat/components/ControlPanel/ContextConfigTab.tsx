@@ -3,7 +3,7 @@
 
 import {
   Box, Typography, Switch, FormControlLabel, Slider, TextField,
-  Divider, Chip, alpha, useTheme, Tooltip, IconButton
+  Divider, Chip, alpha, useTheme, Tooltip, IconButton, Alert
 } from '@mui/material';
 import {
   Psychology as BrainIcon,
@@ -11,10 +11,11 @@ import {
   History as HistoryIcon,
   Search as SearchIcon,
   Token as TokenIcon,
-  Info as InfoIcon,
-  RestartAlt as ResetIcon
+  RestartAlt as ResetIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material';
 import { PanelSection } from './PanelSection';
+import { HelpTooltip } from './HelpTooltip';
 import { useLayout } from '../../../../contexts/LayoutContext';
 
 const DEFAULT_CONFIG = {
@@ -30,7 +31,10 @@ const DEFAULT_CONFIG = {
 
 export const ContextConfigTab = () => {
   const theme = useTheme();
-  const { contextConfig, updateContextConfig, chatHistorySnapshot } = useLayout();
+  const { contextConfig, updateContextConfig, chatHistorySnapshot, manualContext } = useLayout();
+
+  // Modo manual ativo desabilita as opções de pipeline automático
+  const isManualMode = manualContext.hasAdditionalContext;
 
   // Estatísticas
   const pinnedCount = chatHistorySnapshot.filter(msg => msg.isPinned).length;
@@ -42,15 +46,29 @@ export const ContextConfigTab = () => {
 
   return (
     <Box>
+      {/* Aviso de Modo Manual Ativo */}
+      {isManualMode && (
+        <Alert 
+          severity="warning" 
+          icon={<WarningIcon />}
+          sx={{ mb: 2 }}
+        >
+          <strong>Modo Manual ativo!</strong> As opções abaixo estão desabilitadas. 
+          Desative o modo manual na aba "Manual" para usar o pipeline automático.
+        </Alert>
+      )}
+
       {/* Header com Reset */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <BrainIcon color="primary" /> Pipeline de Contexto
         </Typography>
         <Tooltip title="Restaurar padrões">
-          <IconButton size="small" onClick={handleReset}>
-            <ResetIcon fontSize="small" />
-          </IconButton>
+          <span>
+            <IconButton size="small" onClick={handleReset} disabled={isManualMode}>
+              <ResetIcon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
       </Box>
 
@@ -66,6 +84,11 @@ export const ContextConfigTab = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
           <Typography variant="subtitle2" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <BrainIcon fontSize="small" color="info" /> System Prompt
+            <HelpTooltip 
+              title="System Prompt (Instruções Iniciais)"
+              description="Texto enviado no início de cada conversa que define a personalidade e comportamento da IA. É invisível para o usuário mas guia todas as respostas."
+              examples={['Você é um assistente técnico...', 'Responda sempre em português...', 'Seja direto e conciso...']}
+            />
           </Typography>
           <FormControlLabel
             control={
@@ -101,15 +124,20 @@ export const ContextConfigTab = () => {
       <Divider sx={{ my: 2 }} />
 
       {/* 2. Mensagens Pinadas */}
-      <PanelSection active={contextConfig.pinnedEnabled}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <PanelSection active={contextConfig.pinnedEnabled && !isManualMode} disabled={isManualMode}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: isManualMode ? 0.5 : 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PinIcon fontSize="small" color="warning" />
+            <PinIcon fontSize="small" color={isManualMode ? 'disabled' : 'warning'} />
             <Typography variant="subtitle2" fontWeight="bold">Mensagens Fixadas</Typography>
+            <HelpTooltip 
+              title="Mensagens Fixadas (Pinned)"
+              description="Mensagens que você fixou com o ícone 📌 no chat. São SEMPRE enviadas para a IA com prioridade máxima, independente do limite de tokens."
+              examples={['Fixar instruções importantes', 'Manter contexto de projeto', 'Preservar decisões tomadas']}
+            />
             <Chip 
               label={`${pinnedCount} pinned`} 
               size="small" 
-              color={pinnedCount > 0 ? 'warning' : 'default'}
+              color={pinnedCount > 0 && !isManualMode ? 'warning' : 'default'}
               variant="outlined"
             />
           </Box>
@@ -118,6 +146,7 @@ export const ContextConfigTab = () => {
             onChange={(e) => updateContextConfig({ pinnedEnabled: e.target.checked })}
             size="small"
             color="warning"
+            disabled={isManualMode}
           />
         </Box>
         <Typography variant="caption" color="text.secondary">
@@ -128,15 +157,20 @@ export const ContextConfigTab = () => {
       <Divider sx={{ my: 2 }} />
 
       {/* 3. Mensagens Recentes */}
-      <PanelSection active={contextConfig.recentEnabled}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+      <PanelSection active={contextConfig.recentEnabled && !isManualMode} disabled={isManualMode}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, opacity: isManualMode ? 0.5 : 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <HistoryIcon fontSize="small" color="success" />
+            <HistoryIcon fontSize="small" color={isManualMode ? 'disabled' : 'success'} />
             <Typography variant="subtitle2" fontWeight="bold">Memória Recente</Typography>
+            <HelpTooltip 
+              title="Memória Recente (Fast Memory)"
+              description="As últimas N mensagens da conversa são sempre incluídas. Isso mantém o contexto imediato da conversa para a IA entender o fluxo."
+              examples={['5 msgs: Conversação curta', '10 msgs: Contexto médio', '25 msgs: Conversa longa']}
+            />
             <Chip 
               label={`${Math.min(contextConfig.recentCount, totalMessages)}/${totalMessages}`} 
               size="small" 
-              color="success"
+              color={isManualMode ? 'default' : 'success'}
               variant="outlined"
             />
           </Box>
@@ -145,17 +179,18 @@ export const ContextConfigTab = () => {
             onChange={(e) => updateContextConfig({ recentEnabled: e.target.checked })}
             size="small"
             color="success"
+            disabled={isManualMode}
           />
         </Box>
         
-        <Box sx={{ px: 1 }}>
+        <Box sx={{ px: 1, opacity: isManualMode ? 0.5 : 1 }}>
           <Typography variant="caption" color="text.secondary" gutterBottom>
             Últimas mensagens: {contextConfig.recentCount}
           </Typography>
           <Slider
             value={contextConfig.recentCount}
             onChange={(_, value) => updateContextConfig({ recentCount: value as number })}
-            disabled={!contextConfig.recentEnabled}
+            disabled={!contextConfig.recentEnabled || isManualMode}
             min={1}
             max={50}
             marks={[
@@ -174,31 +209,34 @@ export const ContextConfigTab = () => {
       <Divider sx={{ my: 2 }} />
 
       {/* 4. RAG (Busca Semântica) */}
-      <PanelSection active={contextConfig.ragEnabled}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+      <PanelSection active={contextConfig.ragEnabled && !isManualMode} disabled={isManualMode}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, opacity: isManualMode ? 0.5 : 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SearchIcon fontSize="small" color="secondary" />
+            <SearchIcon fontSize="small" color={isManualMode ? 'disabled' : 'secondary'} />
             <Typography variant="subtitle2" fontWeight="bold">RAG (Busca Semântica)</Typography>
-            <Tooltip title="Busca mensagens similares ao que você está perguntando">
-              <InfoIcon fontSize="small" sx={{ opacity: 0.5, cursor: 'help' }} />
-            </Tooltip>
+            <HelpTooltip 
+              title="RAG - Retrieval Augmented Generation"
+              description="Busca mensagens antigas que são semanticamente similares à sua pergunta atual, mesmo que não usem as mesmas palavras. Usa embeddings vetoriais para encontrar contexto relevante."
+              examples={['Pergunta sobre React → encontra msgs antigas sobre React', 'Top 3: Rápido, menos contexto', 'Top 10: Mais contexto, mais tokens']}
+            />
           </Box>
           <Switch
             checked={contextConfig.ragEnabled}
             onChange={(e) => updateContextConfig({ ragEnabled: e.target.checked })}
             size="small"
             color="secondary"
+            disabled={isManualMode}
           />
         </Box>
         
-        <Box sx={{ px: 1 }}>
+        <Box sx={{ px: 1, opacity: isManualMode ? 0.5 : 1 }}>
           <Typography variant="caption" color="text.secondary" gutterBottom>
             Mensagens similares a buscar: {contextConfig.ragTopK}
           </Typography>
           <Slider
             value={contextConfig.ragTopK}
             onChange={(_, value) => updateContextConfig({ ragTopK: value as number })}
-            disabled={!contextConfig.ragEnabled}
+            disabled={!contextConfig.ragEnabled || isManualMode}
             min={1}
             max={20}
             marks={[
@@ -221,6 +259,11 @@ export const ContextConfigTab = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
           <TokenIcon fontSize="small" color="error" />
           <Typography variant="subtitle2" fontWeight="bold">Budget de Tokens</Typography>
+          <HelpTooltip 
+            title="Limite de Tokens do Contexto"
+            description="Tokens são pedaços de palavras (~4 caracteres). Este limite define quanto do histórico pode ser enviado. Mensagens fixadas TÊM prioridade e podem exceder este limite."
+            examples={['2K: Contexto curto, respostas rápidas', '4K: Equilíbrio (recomendado Groq)', '8K: Contexto extenso, mais lento']}
+          />
           <Chip 
             label={`${contextConfig.maxContextTokens.toLocaleString()} max`} 
             size="small" 
@@ -261,24 +304,44 @@ export const ContextConfigTab = () => {
       <Box sx={{ 
         mt: 3, 
         p: 2, 
-        bgcolor: alpha(theme.palette.primary.main, 0.05), 
+        bgcolor: alpha(isManualMode ? theme.palette.warning.main : theme.palette.primary.main, 0.05), 
         borderRadius: 2,
         border: '1px dashed',
-        borderColor: 'divider'
+        borderColor: isManualMode ? 'warning.main' : 'divider'
       }}>
-        <Typography variant="caption" fontWeight="bold" color="primary.main" gutterBottom>
-          📋 Ordem do Pipeline Ativo:
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+          <Typography variant="caption" fontWeight="bold" color={isManualMode ? 'warning.main' : 'primary.main'}>
+            {isManualMode ? '⚠️ Modo Manual Ativo' : '📋 Ordem do Pipeline Ativo:'}
+          </Typography>
+          {!isManualMode && (
+            <HelpTooltip
+              title="Ordem do Pipeline Ativo"
+              description="Ordem de prioridade e construção do contexto enviado para a IA. Cada etapa é adicionada sequencialmente até atingir o limite de tokens."
+              examples={[
+                "1. System: Prompt inicial (sempre primeiro)",
+                "2. Pinned: Mensagens fixadas (prioridade máxima)",
+                "3. Recentes: Últimas N mensagens (memória recente)",
+                "4. RAG: Mensagens semanticamente relevantes (busca inteligente)"
+              ]}
+            />
+          )}
+        </Box>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-          <Chip label="1. System" size="small" color="info" variant="filled" />
-          {contextConfig.pinnedEnabled && (
-            <Chip label={`2. Pinned (${pinnedCount})`} size="small" color="warning" variant="filled" />
-          )}
-          {contextConfig.recentEnabled && (
-            <Chip label={`3. Recentes (${contextConfig.recentCount})`} size="small" color="success" variant="filled" />
-          )}
-          {contextConfig.ragEnabled && (
-            <Chip label={`4. RAG (top ${contextConfig.ragTopK})`} size="small" color="secondary" variant="filled" />
+          {isManualMode ? (
+            <Chip label="Seleção Manual" size="small" color="warning" variant="filled" />
+          ) : (
+            <>
+              <Chip label="1. System" size="small" color="info" variant="filled" />
+              {contextConfig.pinnedEnabled && (
+                <Chip label={`2. Pinned (${pinnedCount})`} size="small" color="warning" variant="filled" />
+              )}
+              {contextConfig.recentEnabled && (
+                <Chip label={`3. Recentes (${contextConfig.recentCount})`} size="small" color="success" variant="filled" />
+              )}
+              {contextConfig.ragEnabled && (
+                <Chip label={`4. RAG (top ${contextConfig.ragTopK})`} size="small" color="secondary" variant="filled" />
+              )}
+            </>
           )}
         </Box>
       </Box>

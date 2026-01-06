@@ -116,3 +116,106 @@ Use quando a página tiver pelo menos um dos seguintes:
 - padronização de UX
 - consistência de scroll e performance
 - manutenção mais simples e previsível
+
+## 7. Armazenamento Lean (Anti-Duplicação de Dados)
+
+O sistema **NÃO DEVE** duplicar conteúdo que já existe em tabelas normalizadas.
+
+### Regra
+
+- **Salvar apenas metadados e referências (IDs), nunca conteúdo duplicado.**
+- Dados de auditoria/trace devem armazenar **ponteiros** para entidades, não cópias.
+
+### Aplicação: `sentContext` (Prompt Trace)
+
+O campo `sentContext` da tabela `messages` armazena metadados de auditoria da inferência.
+
+✅ **O que DEVE ser salvo:**
+```typescript
+{
+  config_V47: { mode, model, provider, timestamp, strategy, params },
+  systemPrompt: "Você é uma IA útil...",  // ← ÚNICO! Não está no banco
+  messageIds: ["uuid1", "uuid2", ...],  // ← IDs do histórico, não conteúdo!
+  userMessageId: "uuid-da-pergunta",  // ← ID da mensagem atual do usuário
+  pinnedStepIndices: [0, 2, 5],
+  stepOrigins: { "0": "pinned", "1": "rag" },
+  preflightTokenCount: 1500
+}
+```
+
+❌ **O que NÃO DEVE ser salvo:**
+```typescript
+{
+  payloadSent: [{ role: "user", content: "texto enorme..." }]  // ← DUPLICAÇÃO!
+}
+```
+
+> **Nota:** O `systemPrompt` é a única informação "única" que precisa ser salva,
+> pois pode ser customizado pelo usuário e não está persistido em outra tabela.
+
+### Justificativa
+
+| Abordagem | 1.000 chats × 50 msgs | 10.000 chats |
+|-----------|----------------------|--------------|
+| Com duplicação | ~2.5 GB | ~25 GB |
+| Lean (só IDs) | ~50 MB | ~500 MB |
+
+**Economia: ~98% de espaço.**
+
+### Reconstrução sob Demanda
+
+O `promptTraceController` deve **reconstruir** o payload original usando os `messageIds` salvos:
+```typescript
+const messages = await prisma.message.findMany({
+  where: { id: { in: savedMessageIds } },
+  orderBy: { createdAt: 'asc' }
+});
+```
+
+## 8. Versionamento de Mensagens (Arquitetura Preparada)
+
+Quando a edição de mensagens for implementada, o sistema **DEVE** preservar a integridade do histórico de traces.
+
+### Regra Arquitetural
+
+- **Editar uma mensagem NÃO sobrescreve o original.**
+- Edições criam uma **nova versão** (branch), preservando o conteúdo original para traces existentes.
+
+### Estrutura Preparada (Schema Futuro)
+
+```prisma
+model Message {
+  id              String    @id @default(uuid())
+  // ... campos existentes ...
+  
+  // === VERSIONAMENTO (FUTURO) ===
+  version         Int       @default(1)
+  originalId      String?   // Aponta para a mensagem original (se for edição)
+  original        Message?  @relation("MessageVersions", fields: [originalId], references: [id])
+  versions        Message[] @relation("MessageVersions")
+  isLatest        Boolean   @default(true)  // Marca a versão mais recente
+  editedAt        DateTime? // Quando foi editada
+}
+```
+
+### Comportamento Esperado
+
+| Ação | Resultado |
+|------|-----------|
+| Criar mensagem | `version: 1`, `originalId: null`, `isLatest: true` |
+| Editar mensagem | Original: `isLatest: false`. Nova: `version: 2`, `originalId: original.id`, `isLatest: true` |
+| Buscar para chat | Filtrar por `isLatest: true` |
+| Reconstruir trace | Usar `messageIds` salvos (aponta para versão exata no momento do trace) |
+
+### Benefícios
+
+1. **Traces Imutáveis:** O trace sempre mostra exatamente o que foi enviado à IA
+2. **Histórico Completo:** Todas as versões são preservadas
+3. **Plug-and-Play:** Quando edição for implementada, a arquitetura já suporta
+
+### Implementação Atual (Stub)
+
+Até a edição ser implementada:
+- Campo `version` pode não existir ainda no schema
+- O código deve ser escrito de forma **defensiva** (assume `version: 1` se ausente)
+- `messageIds` no `sentContext` já garante rastreabilidade futura

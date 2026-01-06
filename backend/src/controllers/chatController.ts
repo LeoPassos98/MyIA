@@ -9,6 +9,7 @@ import { prisma } from '../lib/prisma';
 import { contextService } from '../services/chat/contextService';
 import { getProviderInfo } from '../config/providerMap';
 import { prepareForEmbedding } from '../services/embeddingUtils';
+import { logger } from '../utils/logger';
 
 // Controle de Concorrência (Evita spam de requisições iguais)
 const processingRequests = new Set<string>();
@@ -168,7 +169,8 @@ export const chatController = {
         });
       }
 
-      // 6.6. Preparar objeto de auditoria ANTES de chamar a IA (para salvar mesmo em erro)
+      // 6.6. Preparar objeto de auditoria LEAN (Standards §7 - Anti-Duplicação)
+      // Salva apenas IDs e metadados, não conteúdo duplicado
       const auditObject = {
         config_V47: {
           mode: isManualMode ? 'manual' : 'auto',
@@ -178,17 +180,22 @@ export const chatController = {
           strategy: strategy || 'efficient',
           params: { temperature, topK, memoryWindow }
         },
-        payloadSent_V23: payloadForIA,
+        // LEAN: Salva systemPrompt (único!) e IDs em vez de conteúdo
+        systemPrompt: systemPrompt,
+        messageIds: historyMessages.map((m: any) => m.id),
+        userMessageId: userMsgRecord.id,
         pinnedStepIndices,
         stepOrigins,
-        preflightTokenCount: totalTokens // Para debug
+        preflightTokenCount: totalTokens
       };
 
       // 7. Streaming da Resposta
       const stream = aiService.stream(payloadForIA, {
         providerSlug: lockedProvider,
         modelId: targetModel,
-        userId: req.userId // O TypeScript já aceita aqui pois não é função async separada
+        userId: req.userId,
+        temperature: temperature ?? 0.7,
+        topK: topK
       });
 
       // Watchdog: Derruba a conexão se a IA travar por 60s [PODE SER MENOR QUE 60s]
@@ -315,6 +322,22 @@ export const chatController = {
               costInUSD: finalMetrics.costInUSD,
               sentContext: sentContextString // Campo novo preenchido!
             }
+          });
+
+          // 📊 LOG ESTRUTURADO: Trace criado (para painel admin futuro)
+          logger.info('TRACE_CREATED', {
+            traceId: savedAssistantMsg.id,
+            chatId: currentChat.id,
+            userId: req.userId,
+            provider: finalMetrics.provider,
+            model: finalMetrics.model,
+            tokensIn: finalMetrics.tokensIn,
+            tokensOut: finalMetrics.tokensOut,
+            totalTokens: (finalMetrics.tokensIn || 0) + (finalMetrics.tokensOut || 0),
+            costInUSD: finalMetrics.costInUSD,
+            contextSize: auditObject.messageIds?.length || 0,
+            strategy: auditObject.config_V47?.strategy || 'unknown',
+            timestamp: new Date().toISOString()
           });
 
           // 🔥 Envia ID REAL para o frontend (Fonte Única de Verdade)

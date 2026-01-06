@@ -4,7 +4,11 @@ import * as CryptoJS from 'crypto-js';
 const SECRET_KEY = process.env.ENCRYPTION_SECRET;
 
 if (!SECRET_KEY) {
-  throw new Error('Chave de criptografia (ENCRYPTION_SECRET) não definida no .env');
+  throw new Error('❌ ENCRYPTION_SECRET is required. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+}
+
+if (SECRET_KEY.length < 32) {
+  throw new Error('❌ ENCRYPTION_SECRET must be at least 32 characters long for security');
 }
 
 export const encryptionService = {

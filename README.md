@@ -7,10 +7,17 @@
 ## ✨ Features
 
 ### 🔐 Autenticação & Segurança
-- **Autenticação JWT** com tokens seguros
-- **Registro e login** de usuários
+- **Autenticação JWT** com tokens seguros (mínimo 32 caracteres)
+- **Registro e login** de usuários com bcrypt hash
 - **Proteção de rotas** no frontend e backend
 - **Middleware de autenticação** para todas as rotas protegidas
+- **Rate Limiting** de 3 níveis (auth, chat, API global)
+- **Helmet.js** - Headers de segurança (CSP, X-Frame-Options, etc)
+- **Validação Zod** - Validação estrita de inputs em todas as rotas
+- **Criptografia AES-256** - API keys armazenadas de forma segura
+- **Proteção SQL Injection** - Prisma ORM com queries parametrizadas
+- **CORS configurável** - Whitelist de origens permitidas
+- **100% Testes de Segurança** - Suite automatizada com 7 categorias
 
 ### 💬 Chat Persistente
 - **Histórico permanente** - Mensagens salvas no banco de dados
@@ -56,6 +63,8 @@
 - **Winston** - Logging estruturado
 - **Axios** - Cliente HTTP para APIs externas
 - **OpenAI SDK** - Integração com múltiplos providers
+- **Helmet** - Security headers (CSP, X-Frame-Options, etc)
+- **express-rate-limit** - Proteção contra DDoS e brute force
 
 ### Frontend
 - **React 18** com TypeScript
@@ -104,11 +113,11 @@ cp .env.example .env
 # Banco de Dados (PostgreSQL)
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/myia"
 
-# Autenticação
-JWT_SECRET="seu-segredo-super-secreto-aqui"
+# Autenticação (OBRIGATÓRIO - Min 32 chars)
+JWT_SECRET="seu-jwt-secret-de-64-caracteres-gerado-com-crypto-randomBytes"
 
-# Criptografia de Chaves de API (32+ caracteres recomendado)
-ENCRYPTION_SECRET="sua-chave-de-32-caracteres-ou-mais-aqui"
+# Criptografia de Chaves de API (OBRIGATÓRIO - Min 32 chars)
+ENCRYPTION_SECRET="seu-encryption-secret-de-64-caracteres-randomBytes"
 
 # CORS (Frontend URL)
 CORS_ORIGIN="http://localhost:3000"
@@ -122,10 +131,16 @@ PERPLEXITY_API_KEY="..."
 MISTRAL_API_KEY="..."
 ```
 
-> 💡 **Dica de Segurança**: Gere uma chave aleatória segura para `ENCRYPTION_SECRET`:
+> 🔒 **SEGURANÇA CRÍTICA**: Gere secrets fortes (≥32 chars) para produção:
 > ```bash
+> # Gerar JWT_SECRET
+> node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+> 
+> # Gerar ENCRYPTION_SECRET
 > node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 > ```
+> 
+> ⚠️ **O servidor NÃO iniciará se JWT_SECRET ou ENCRYPTION_SECRET estiverem ausentes ou <32 chars**
 
 > 💡 **Dica**: Consulte `backend/src/config/costMap.ts` para ver todos os modelos suportados e seus custos. Você não precisa configurar TODAS as chaves - apenas as dos providers que pretende usar. O sistema usa **mock responses** quando uma chave está faltando.
 
@@ -209,6 +224,32 @@ npm run dev
 ---
 
 ## 📝 Documentação
+
+### 🔐 Segurança (LEITURA OBRIGATÓRIA)
+
+- **[SECURITY-STANDARDS.md](docs/SECURITY-STANDARDS.md)** - Padrões de segurança e checklist de produção
+- **[SECURITY-SETUP.md](docs/SECURITY-SETUP.md)** - Guia de configuração inicial de segurança
+- **[security-tests.sh](backend/security-tests.sh)** - Suite automatizada de testes (7 categorias)
+
+**Execute os testes de segurança:**
+```bash
+cd backend
+./security-tests.sh  # Deve passar 100% (7/7 testes)
+```
+
+### 📖 Arquitetura & Padrões
+
+- **[STANDARDS.md](docs/STANDARDS.md)** - **LEITURA OBRIGATÓRIA** - Padrões de código e arquitetura
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Visão geral da arquitetura do sistema
+- **[API Endpoints](docs/api-endpoints.md)** - Documentação completa da API REST
+- **[Audit System](docs/audit/README.md)** - Sistema de auditoria e rastreabilidade
+- **[Testing Guide](docs/testing.md)** - Testes unitários e de integração
+
+### 📊 Relatórios de Implementação
+
+- **[SECURITY-PHASE1-DONE.md](docs/SECURITY-PHASE1-DONE.md)** - ✅ Fase 1: Validação de Secrets
+- **[SECURITY-PHASE2-DONE.md](docs/SECURITY-PHASE2-DONE.md)** - ✅ Fase 2: Rate Limiting + Helmet + Validação
+- **[STANDARDS-CONFORMANCE-REPORT.md](docs/STANDARDS-CONFORMANCE-REPORT.md)** - Relatório de conformidade (100%)
 
 ### Documentação Adicional Recomendada
 

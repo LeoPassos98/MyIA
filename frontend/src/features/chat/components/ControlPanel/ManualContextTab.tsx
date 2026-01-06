@@ -1,57 +1,94 @@
+// frontend/src/features/chat/components/ControlPanel/ManualContextTab.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { 
   Box, Typography, FormControlLabel, Switch, Divider, 
   List, ListItemButton, ListItemIcon, Checkbox, ListItemText, 
-  TextField, alpha, useTheme 
+  alpha, useTheme, Alert, Chip
 } from '@mui/material';
-import { Psychology as BrainIcon } from '@mui/icons-material';
+import { Warning as WarningIcon, CheckCircle as CheckIcon } from '@mui/icons-material';
 import { PanelSection } from './PanelSection';
+import { HelpTooltip } from './HelpTooltip';
 import { useControlPanelLogic } from './useControlPanelLogic';
+import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 export const ManualContextTab = () => {
   const theme = useTheme();
   const { manualContext, setManualContext, chatHistorySnapshot, toggleMessageSelection } = useControlPanelLogic();
 
+  const selectedCount = manualContext.selectedMessageIds.length;
+  const isActive = manualContext.hasAdditionalContext && selectedCount > 0;
+
   return (
     <Box>
+      {/* Aviso do Modo */}
+      <Alert 
+        severity={isActive ? 'warning' : 'info'} 
+        icon={isActive ? <WarningIcon /> : undefined}
+        sx={{ mb: 2 }}
+      >
+        {isActive 
+          ? `Modo Manual ativo! A IA usará APENAS ${selectedCount} mensagem(ns) selecionada(s).`
+          : 'Ative o modo manual para controlar exatamente quais mensagens a IA verá.'}
+      </Alert>
+
       {/* Switch Principal */}
       <PanelSection active={manualContext.hasAdditionalContext}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={manualContext.hasAdditionalContext}
-              onChange={(e) => setManualContext({ ...manualContext, hasAdditionalContext: e.target.checked })}
-              color="warning"
-            />
-          }
-          label={
-            <Typography fontWeight="bold" color={manualContext.hasAdditionalContext ? 'warning.main' : 'text.primary'}>
-              Modo de Injeção Manual
-            </Typography>
-          }
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={manualContext.hasAdditionalContext}
+                onChange={(e) => setManualContext({ ...manualContext, hasAdditionalContext: e.target.checked })}
+                color="warning"
+              />
+            }
+            label={
+              <Typography fontWeight="bold" color={manualContext.hasAdditionalContext ? 'warning.main' : 'text.primary'}>
+                Modo de Injeção Manual
+              </Typography>
+            }
+          />
+          <HelpTooltip 
+            title="Modo de Injeção Manual"
+            description="Desativa o pipeline automático (RAG, Recentes, Pinned) e permite que você escolha EXATAMENTE quais mensagens a IA verá. Útil para debugging ou conversas específicas."
+            examples={['Testar resposta com contexto específico', 'Ignorar mensagens irrelevantes', 'Simular conversação anterior']}
+          />
+        </Box>
         <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
-          {manualContext.hasAdditionalContext 
-            ? 'A IA lerá APENAS o que você selecionar abaixo.'
-            : 'A IA usará o modo automático (RAG).'}
+          Sobrescreve o pipeline automático (RAG + Recentes + Pinned).
         </Typography>
       </PanelSection>
 
-      <Divider sx={{ mb: 2 }} />
+      <Divider sx={{ my: 2 }} />
 
       {/* Lista de Seleção */}
-      <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
-        <span>Histórico Recente</span>
-        <Typography variant="caption" sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: 'warning.main', px: 1, borderRadius: 1 }}>
-          {manualContext.selectedMessageIds.length} selecionadas
-        </Typography>
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Typography variant="subtitle2" fontWeight="bold">
+            Selecione as Mensagens
+          </Typography>
+          <HelpTooltip 
+            title="Seleção de Mensagens"
+            description="Clique nas mensagens que deseja incluir no contexto. Apenas as mensagens marcadas serão enviadas para a IA quando o modo manual estiver ativo."
+            examples={['Selecione perguntas anteriores relevantes', 'Inclua respostas importantes da IA', 'Marque instruções que deu antes']}
+          />
+        </Box>
+        <Chip 
+          icon={selectedCount > 0 ? <CheckIcon /> : undefined}
+          label={`${selectedCount} selecionadas`} 
+          size="small"
+          color={selectedCount > 0 ? 'warning' : 'default'}
+          variant="outlined"
+        />
+      </Box>
       
-      <PanelSection sx={{ maxHeight: 300, overflow: 'auto', p: 0 }}>
+      <PanelSection sx={{ maxHeight: 350, overflow: 'auto', p: 0, ...scrollbarStyles }}>
         <List dense>
           {chatHistorySnapshot.length === 0 ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>
               <Typography variant="caption" color="text.secondary">
-                Nenhuma mensagem carregada no buffer.
+                Nenhuma mensagem no chat atual.
               </Typography>
             </Box>
           ) : (
@@ -83,13 +120,21 @@ export const ManualContextTab = () => {
                   </ListItemIcon>
                   <ListItemText
                     primary={
-                      <Typography variant="body2" noWrap sx={{ fontWeight: isSelected ? 600 : 400 }}>
-                        {msg.role === 'user' ? '👤 Você' : '🤖 IA'}: {msg.content.substring(0, 40)}...
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip 
+                          label={msg.role === 'user' ? '👤' : '🤖'} 
+                          size="small" 
+                          sx={{ height: 20, fontSize: '0.7rem' }}
+                        />
+                        <Typography variant="body2" noWrap sx={{ fontWeight: isSelected ? 600 : 400, flex: 1 }}>
+                          {msg.content.substring(0, 50)}...
+                        </Typography>
+                      </Box>
                     }
                     secondary={
                       <Typography variant="caption" color="text.secondary">
                         {new Date(msg.createdAt).toLocaleTimeString()}
+                        {msg.isPinned && ' 📌'}
                       </Typography>
                     }
                   />
@@ -100,28 +145,10 @@ export const ManualContextTab = () => {
         </List>
       </PanelSection>
 
-      {/* Input de System Prompt */}
-      <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-        <BrainIcon fontSize="small" color="info" /> Instruções Extras (System Prompt)
+      {/* Dica */}
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
+        💡 Use a aba <strong>Contexto</strong> para configurar o System Prompt.
       </Typography>
-      
-      <TextField
-        multiline
-        rows={5}
-        placeholder="Ex: 'Responda sempre em formato de lista' ou cole um texto base aqui..."
-        value={manualContext.additionalText}
-        onChange={(e) => setManualContext({ ...manualContext, additionalText: e.target.value })}
-        variant="outlined"
-        fullWidth
-        sx={{
-          bgcolor: 'background.paper',
-          '& .MuiOutlinedInput-root': {
-            '& fieldset': { borderColor: 'divider' },
-            '&:hover fieldset': { borderColor: 'primary.main' },
-            '&.Mui-focused fieldset': { borderColor: 'primary.main' }
-          }
-        }}
-      />
     </Box>
   );
 };

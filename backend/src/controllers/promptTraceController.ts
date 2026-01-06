@@ -4,6 +4,17 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
+import { get_encoding } from 'tiktoken';
+
+// Encoder para contagem de tokens (mesmo usado no contextService)
+const encoding = get_encoding('cl100k_base');
+
+/**
+ * Conta tokens de uma string usando tiktoken
+ */
+function countTokens(text: string): number {
+  return encoding.encode(text).length;
+}
 
 class PromptTraceController {
   /**
@@ -45,11 +56,54 @@ class PromptTraceController {
         return res.status(500).json({ error: 'sentContext inválido (JSON malformado)' });
       }
 
-      // payloadSent_V23 deve existir no padrão atual do seu auditObject
-      const payload = sentContext.payloadSent_V23 || [];
       const config = sentContext.config_V47 || {};
       const pinnedStepIndices = sentContext.pinnedStepIndices || [];
-      const stepOrigins = sentContext.stepOrigins || {}; // Mapa stepIndex → origin
+      const stepOrigins = sentContext.stepOrigins || {};
+
+      // === RECONSTRUÇÃO SOB DEMANDA (Standards §7) ===
+      // Suporte a formato LEAN (messageIds) e legado (payloadSent_V23)
+      let payload: Array<{ role: string; content: string }> = [];
+
+      if (sentContext.messageIds && sentContext.messageIds.length > 0) {
+        // FORMATO LEAN: Reconstruir payload a partir dos IDs
+        const systemPrompt = sentContext.systemPrompt || 'Você é uma IA útil e direta.';
+        
+        // Busca mensagens do histórico
+        const historyMessages = await prisma.message.findMany({
+          where: { id: { in: sentContext.messageIds } },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, role: true, content: true }
+        });
+
+        // Busca mensagem do usuário (pergunta atual)
+        const userMessage = sentContext.userMessageId 
+          ? await prisma.message.findUnique({
+              where: { id: sentContext.userMessageId },
+              select: { role: true, content: true }
+            })
+          : null;
+
+        // Reconstrói o payload na ordem correta
+        payload.push({ role: 'system', content: systemPrompt });
+        historyMessages.forEach(msg => {
+          payload.push({ role: msg.role, content: msg.content });
+        });
+        if (userMessage) {
+          payload.push({ role: userMessage.role, content: userMessage.content });
+        }
+      } else if (sentContext.payloadSent_V23) {
+        // FORMATO LEGADO: Usa payload salvo diretamente
+        payload = sentContext.payloadSent_V23;
+      }
+
+      // === CÁLCULO DE TOKENS POR STEP (sob demanda) ===
+      const payloadWithTokens = payload.map((msg) => ({
+        ...msg,
+        tokens: countTokens(msg.content)
+      }));
+
+      // Tokens da resposta
+      const responseTokens = message.content ? countTokens(message.content) : 0;
 
       const trace = {
         traceId: message.id,
@@ -62,8 +116,8 @@ class PromptTraceController {
         // config guardada junto
         config,
 
-        // O que foi enviado pra IA
-        payloadSent: payload,
+        // O que foi enviado pra IA (com tokens por step)
+        payloadSent: payloadWithTokens,
 
         // Índices dos steps que eram pinados
         pinnedStepIndices,
@@ -71,9 +125,10 @@ class PromptTraceController {
         // Origens de cada step (pinned, rag, recent, rag+recent, manual)
         stepOrigins,
 
-        // A resposta final
+        // A resposta final (com tokens)
         response: {
           content: message.content,
+          tokens: responseTokens,
         },
 
         // Métricas reais salvas no banco

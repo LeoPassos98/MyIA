@@ -6,6 +6,7 @@ import { Box, Typography, alpha, useTheme } from '@mui/material';
 import { Psychology as BrainIcon } from '@mui/icons-material';
 import { Message } from '../types';
 import ChatMessage from './ChatMessage';
+import { scrollbarStyles } from '../../../theme/scrollbarStyles';
 
 interface MessageListProps {
   messages: Message[];
@@ -86,9 +87,10 @@ export default function MessageList({
         display: 'flex',
         justifyContent: 'center',
         px: 2,
+        ...scrollbarStyles,
       }}
     >
-      <Box sx={{ width: '100%', maxWidth: 900, py: 2 }}>
+      <Box sx={{ width: '100%', maxWidth: 900, pb: 8 }}>
         {messages.map((msg) => (
           <ChatMessage
             key={msg.id}
@@ -97,7 +99,8 @@ export default function MessageList({
             onTogglePin={onTogglePin}
           />
         ))}
-        <div ref={messagesEndRef} />
+        {/* Espaçador final para a última mensagem não ficar grudada no input */}
+        <div ref={messagesEndRef} style={{ height: 24 }} />
       </Box>
     </Box>
   );

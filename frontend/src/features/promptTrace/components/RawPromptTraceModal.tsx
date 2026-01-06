@@ -1,7 +1,7 @@
 // frontend/src/features/promptTrace/components/RawPromptTraceModal.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,8 +10,6 @@ import {
   IconButton,
   Box,
   Button,
-  Tabs,
-  Tab,
   Divider,
   Typography,
 } from '@mui/material';
@@ -25,38 +23,17 @@ interface Props {
   onClose: () => void;
 }
 
-type TabKey = 'provider' | 'ui';
-
-function a11yProps(index: number) {
-  return {
-    id: `raw-json-tab-${index}`,
-    'aria-controls': `raw-json-tabpanel-${index}`,
-  };
-}
-
 /**
- * Modal para exibir JSON bruto do trace
- *
- * ✅ Tab 1: payload original do backend (fiel ao que foi salvo/enviado)
- * ✅ Tab 2: record normalizado usado pela UI
+ * Modal para exibir JSON do trace
+ * 
+ * Standards §7: rawPayload removido (Anti-Duplicação)
+ * O trace formatado contém todos os dados necessários para debug
  */
 export function RawPromptTraceModal({ open, trace, onClose }: Props) {
-  const [tab, setTab] = useState<TabKey>('provider');
-
-  const providerJsonString = useMemo(() => {
-    const payload = trace.rawPayload ?? {
-      warning:
-        'rawPayload ausente. Atualize o mapper para salvar rawPayload: raw.',
-    };
-    return JSON.stringify(payload, null, 2);
-  }, [trace.rawPayload]);
-
-  const uiJsonString = useMemo(() => JSON.stringify(trace, null, 2), [trace]);
-
-  const activeJsonString = tab === 'provider' ? providerJsonString : uiJsonString;
+  const jsonString = useMemo(() => JSON.stringify(trace, null, 2), [trace]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(activeJsonString);
+    navigator.clipboard.writeText(jsonString);
   };
 
   return (
@@ -70,24 +47,9 @@ export function RawPromptTraceModal({ open, trace, onClose }: Props) {
 
       <Divider />
 
-      <Box sx={{ px: 2 }}>
-        <Tabs
-          value={tab}
-          onChange={(_, value) => setTab(value)}
-          aria-label="Raw JSON tabs"
-        >
-          <Tab
-            label="Provider payload"
-            value="provider"
-            {...a11yProps(0)}
-          />
-          <Tab label="UI record" value="ui" {...a11yProps(1)} />
-        </Tabs>
-
+      <Box sx={{ px: 2, py: 1 }}>
         <Typography variant="caption" color="text.secondary">
-          {tab === 'provider'
-            ? 'Payload bruto retornado pelo backend (fonte técnica / fiel).'
-            : 'Estrutura normalizada usada pela UI.'}
+          Dados completos do trace formatados para análise
         </Typography>
       </Box>
 
@@ -106,7 +68,7 @@ export function RawPromptTraceModal({ open, trace, onClose }: Props) {
             borderColor: 'divider',
           }}
         >
-          {activeJsonString}
+          {jsonString}
         </Box>
       </DialogContent>
 

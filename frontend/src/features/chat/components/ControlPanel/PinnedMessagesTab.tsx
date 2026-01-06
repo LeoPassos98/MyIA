@@ -10,7 +10,9 @@ import {
   Delete as DeleteIcon 
 } from '@mui/icons-material';
 import { PanelSection } from './PanelSection';
+import { HelpTooltip } from './HelpTooltip';
 import { useControlPanelLogic } from './useControlPanelLogic';
+import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 export const PinnedMessagesTab = () => {
   const theme = useTheme();
@@ -23,9 +25,16 @@ export const PinnedMessagesTab = () => {
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PushPinIcon color="primary" /> Mensagens Fixadas
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PushPinIcon color="primary" /> Mensagens Fixadas
+          </Typography>
+          <HelpTooltip 
+            title="Mensagens Fixadas (Pinned)"
+            description="Mensagens fixadas são SEMPRE incluídas no contexto enviado à IA, independente do limite de tokens. Têm prioridade máxima sobre RAG e memória recente."
+            examples={['Fixe instruções importantes do projeto', 'Preserve decisões técnicas', 'Mantenha contexto crítico sempre visível']}
+          />
+        </Box>
         <Chip 
           label={`${pinnedMessages.length} pinadas`}
           size="small"
@@ -40,7 +49,7 @@ export const PinnedMessagesTab = () => {
       </Typography>
 
       {/* Lista de Mensagens Pinadas */}
-      <PanelSection sx={{ maxHeight: 400, overflow: 'auto', p: 0 }}>
+      <PanelSection sx={{ maxHeight: 400, overflow: 'auto', p: 0, ...scrollbarStyles }}>
         <List dense>
           {pinnedMessages.length === 0 ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>

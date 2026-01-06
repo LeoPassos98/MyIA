@@ -4,6 +4,7 @@ import MainLayout from '../../components/Layout/MainLayout';
 import MainContentWrapper from '../../components/Layout/MainContentWrapper'; // <--- Importe o Wrapper
 import { useAuth } from '../../contexts/AuthContext';
 import { userSettingsService, UserSettings } from '../../services/userSettingsService';
+import { scrollbarStyles } from '../../theme/scrollbarStyles';
 
 // Componentes Modulares
 import ProfileTab from './components/ProfileTab';
@@ -52,6 +53,7 @@ export default function SettingsPage() {
             height: '100%',    
             pb: 4,
             pt: '80px', // <--- ADICIONADO (64px do Header + respiro extra)
+            ...scrollbarStyles,
           }}
         >
           <Container maxWidth="lg" sx={{ py: 4 }}>

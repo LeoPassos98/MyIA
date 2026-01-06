@@ -28,11 +28,13 @@ interface BackendPromptTracePayload {
   payloadSent: Array<{
     role: string;
     content: string;
+    tokens?: number; // Tokens calculados pelo backend
   }>;
   pinnedStepIndices?: number[]; // Índices dos steps que eram pinados
   stepOrigins?: Record<string, StepOrigin>; // Mapa stepIndex → origin
   response?: {
     content?: string;
+    tokens?: number; // Tokens da resposta calculados pelo backend
   };
   usage?: {
     tokensIn?: number;
@@ -83,6 +85,8 @@ export function mapPromptTraceRecord(raw: BackendPromptTracePayload): PromptTrac
       isPinned: pinnedIndices.includes(index), // ✅ Agora funciona com índices!
       origin, // ✅ Origem da mensagem (pinned, rag, recent, etc)
       wasTruncatedForEmbedding, // ⚠️ Embedding pode ser parcial
+      // ✅ Tokens calculados pelo backend (precisão 100%)
+      usage: msg.tokens ? { tokensIn: msg.tokens, tokensOut: 0, totalTokens: msg.tokens } : undefined,
     };
   });
 
@@ -94,6 +98,8 @@ export function mapPromptTraceRecord(raw: BackendPromptTracePayload): PromptTrac
       role: 'assistant',
       content: raw.response.content,
       timestamp: raw.createdAt,
+      // ✅ Tokens da resposta calculados pelo backend
+      usage: raw.response.tokens ? { tokensIn: 0, tokensOut: raw.response.tokens, totalTokens: raw.response.tokens } : undefined,
     });
   }
 
@@ -134,8 +140,7 @@ export function mapPromptTraceRecord(raw: BackendPromptTracePayload): PromptTrac
       pinnedMessagesCount: pinnedCount,
       rawConfig: raw.config, // útil pra debug
     },
-
-    // ✅ payload original do backend
-    rawPayload: raw,
+    // rawPayload removido (Standards §7 - Anti-Duplicação)
+    // steps já contém toda informação necessária para exibição
   };
 }

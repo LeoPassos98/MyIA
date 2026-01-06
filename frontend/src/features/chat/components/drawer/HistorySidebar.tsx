@@ -10,6 +10,7 @@ import { Add as AddIcon, ChatBubbleOutline, Settings as SettingsIcon, History as
 import { useNavigate, useLocation } from 'react-router-dom';
 import { chatHistoryService, ChatSession } from '../../../../services/chatHistoryService';
 import { useLayout } from '../../../../contexts/LayoutContext';
+import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 export default function HistorySidebar() {
   const [chats, setChats] = useState<ChatSession[]>([]);
@@ -107,7 +108,7 @@ export default function HistorySidebar() {
       <Divider />
 
       {/* Lista com Grupos */}
-      <List sx={{ flex: 1, overflow: 'auto', px: 1, pt: 0 }}>
+      <List sx={{ flex: 1, overflow: 'auto', px: 1, pt: 0, ...scrollbarStyles }}>
         {isLoading ? (
           // Loading Skeletons
           [1, 2, 3].map((i) => (

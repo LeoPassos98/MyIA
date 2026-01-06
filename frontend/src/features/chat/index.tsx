@@ -6,8 +6,6 @@ import { Box, alpha, useTheme } from '@mui/material';
 import { useParams } from 'react-router-dom';
 
 // Layout Global
-import MainLayout from '../../components/Layout/MainLayout';
-import MainContentWrapper from '../../components/Layout/MainContentWrapper';
 import { LoadingScreen } from '../../components/Feedback/LoadingScreen';
 import { useLayout } from '../../contexts/LayoutContext';
 
@@ -48,68 +46,64 @@ export default function ChatPage() {
   const isManualMode = false; 
 
   return (
-    <MainLayout>
-      <MainContentWrapper>
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-            bgcolor: 'background.default',
-            height: '100%',
-            pt: '64px',
-          }}
-        >
-          {/* 1. Tela de Carregamento Inicial */}
-          <LoadingScreen 
-            visible={isLoading && messages.length === 0} 
-            message="Iniciando conexão neural..." 
-          />
+    <Box
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        bgcolor: 'background.default',
+        height: '100%',
+        minHeight: 0, // Importante para flex shrink funcionar
+      }}
+    >
+      {/* 1. Tela de Carregamento Inicial */}
+      <LoadingScreen 
+        visible={isLoading && messages.length === 0} 
+        message="Iniciando conexão neural..." 
+      />
 
-          {/* 2. Área de Mensagens */}
-          {(!isLoading || messages.length > 0) && (
-            <MessageList
-              messages={messages}
-              isDevMode={isDevMode}
-              onTogglePin={handleTogglePin}
-            />
-          )}
+      {/* 2. Área de Mensagens */}
+      {(!isLoading || messages.length > 0) && (
+        <MessageList
+          messages={messages}
+          isDevMode={isDevMode}
+          onTogglePin={handleTogglePin}
+        />
+      )}
 
-          {/* 3. Console Hacker (Modularizado) */}
-          <DevConsole 
-            logs={debugLogs} 
-            visible={isDevMode} 
-          />
+      {/* 3. Console Hacker (Modularizado) */}
+      <DevConsole 
+        logs={debugLogs} 
+        visible={isDevMode} 
+      />
 
-          {/* 4. Input Area (Fixo no rodapé) */}
-          <Box
-            sx={{
-              position: 'sticky',
-              bottom: 0,
-              borderTop: '1px solid',
-              borderColor: 'divider',
-              bgcolor: alpha(theme.palette.background.paper, 0.8),
-              backdropFilter: 'blur(10px)',
-              zIndex: 10,
-            }}
-          >
-            <ChatInput
-              inputMessage={inputMessage}
-              setInputMessage={setInputMessage}
-              onSend={handleSendMessage}
-              onStop={handleStop} // Conectado!
-              isLoading={isLoading}
-              isDevMode={isDevMode}
-              setIsDevMode={setIsDevMode}
-              isManualMode={isManualMode}
-              isDrawerOpen={isDrawerOpen}
-            />
-          </Box>
+      {/* 4. Input Area (Fixo no rodapé) */}
+      <Box
+        sx={{
+          position: 'sticky',
+          bottom: 0,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          bgcolor: alpha(theme.palette.background.paper, 0.8),
+          backdropFilter: 'blur(10px)',
+          zIndex: 10,
+        }}
+      >
+        <ChatInput
+          inputMessage={inputMessage}
+          setInputMessage={setInputMessage}
+          onSend={handleSendMessage}
+          onStop={handleStop} // Conectado!
+          isLoading={isLoading}
+          isDevMode={isDevMode}
+          setIsDevMode={setIsDevMode}
+          isManualMode={isManualMode}
+          isDrawerOpen={isDrawerOpen}
+        />
+      </Box>
 
-          {/* Removido: Modals Globais de auditoria */}
-        </Box>
-      </MainContentWrapper>
-    </MainLayout>
+      {/* Removido: Modals Globais de auditoria */}
+    </Box>
   );
 }

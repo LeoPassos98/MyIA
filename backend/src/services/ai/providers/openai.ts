@@ -26,11 +26,16 @@ export class OpenAIProvider extends BaseAIProvider {
     });
 
     try {
+      // Nota: OpenAI/Groq não tem top_k direto, usamos top_p como aproximação
+      // top_k baixo → top_p baixo (mais focado)
+      const topP = options.topK ? Math.min(1, options.topK / 100) : undefined;
+
       const stream = await client.chat.completions.create({
         model: options.modelId,
         messages: messages,
         temperature: options.temperature || 0.7,
         max_tokens: options.maxTokens,
+        top_p: topP,
         stream: true,
       });
 

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { userSettingsController } from '../controllers/userSettingsController';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { validateRequest } from '../middleware/validateRequest';
+import { updateSettingsSchema, updateCredentialsSchema } from '../middleware/validators/settingsValidator';
 
 const router = Router();
 
@@ -9,8 +11,8 @@ console.log('userSettingsController:', userSettingsController);
 console.log('getSettings:', userSettingsController?.getSettings);
 
 router.get('/', authMiddleware, userSettingsController.getSettings);
-router.put('/', authMiddleware, userSettingsController.updateSettings);
+router.put('/', authMiddleware, validateRequest(updateSettingsSchema), userSettingsController.updateSettings);
 router.get('/credentials', userSettingsController.getCredentials);
-router.post('/credentials', userSettingsController.updateCredentials);
+router.post('/credentials', validateRequest(updateCredentialsSchema), userSettingsController.updateCredentials);
 
 export default router;
