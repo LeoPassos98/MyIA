@@ -6,4 +6,5 @@ export type {
   PromptTraceStep,
   PromptTraceUsage,
   PromptTraceModelInfo,
+  StepOrigin,
 } from './promptTrace';

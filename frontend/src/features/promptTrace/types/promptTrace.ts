@@ -24,6 +24,11 @@ export interface PromptTraceUsage {
 }
 
 /**
+ * Origem de um step no contexto
+ */
+export type StepOrigin = 'pinned' | 'rag' | 'recent' | 'rag+recent' | 'manual' | 'system' | 'user-input';
+
+/**
  * Representa um passo/turno individual no trace
  */
 export interface PromptTraceStep {
@@ -33,6 +38,8 @@ export interface PromptTraceStep {
   content: string;
   timestamp: string;
   isPinned?: boolean;
+  origin?: StepOrigin; // De onde veio essa mensagem no contexto
+  wasTruncatedForEmbedding?: boolean; // Se o embedding foi gerado de versão truncada
   usage?: PromptTraceUsage;
   modelInfo?: PromptTraceModelInfo;
   metadata?: Record<string, unknown>;
@@ -47,7 +54,10 @@ export interface PromptTraceRecord {
   chatId: string;
   userId?: string;
   timestamp: string;
-  status: 'success' | 'error' | 'timeout';
+  status: 'success' | 'error' | 'timeout' | 'pending';
+  
+  /** Mensagem de erro se status === 'error' */
+  errorMessage?: string;
 
   /** Informações do modelo final */
   modelInfo: PromptTraceModelInfo;

@@ -2,7 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { ChatConfig, ManualContextState, Message } from '../features/chat/types';
+import { ChatConfig, ManualContextState, Message, ContextPipelineConfig } from '../features/chat/types';
 
 interface LayoutContextType {
   // Drawer states
@@ -14,6 +14,10 @@ interface LayoutContextType {
   // Chat configuration
   chatConfig: ChatConfig;
   updateChatConfig: (partialConfig: Partial<ChatConfig>) => void;
+
+  // Context Pipeline configuration
+  contextConfig: ContextPipelineConfig;
+  updateContextConfig: (partialConfig: Partial<ContextPipelineConfig>) => void;
 
   // Manual context state
   manualContext: ManualContextState;
@@ -55,6 +59,18 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     memoryWindow: 10,
   });
 
+  // Context Pipeline configuration (valores conservadores para Groq free tier: 12K TPM limit)
+  const [contextConfig, setContextConfig] = useState<ContextPipelineConfig>({
+    systemPrompt: 'Você é uma IA útil e direta.',
+    useCustomSystemPrompt: false,
+    pinnedEnabled: true,
+    recentEnabled: true,
+    recentCount: 5, // Reduzido para evitar contexto muito grande
+    ragEnabled: true,
+    ragTopK: 3, // Reduzido para evitar contexto muito grande
+    maxContextTokens: 4000, // Seguro para Groq (deixa margem para resposta)
+  });
+
   // Manual context state
   const [manualContext, setManualContext] = useState<ManualContextState>({
     isActive: false, // Mantido para compatibilidade
@@ -75,6 +91,11 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   // Update chat config (partial update)
   const updateChatConfig = useCallback((partialConfig: Partial<ChatConfig>) => {
     setChatConfig((prev) => ({ ...prev, ...partialConfig }));
+  }, []);
+
+  // Update context pipeline config (partial update)
+  const updateContextConfig = useCallback((partialConfig: Partial<ContextPipelineConfig>) => {
+    setContextConfig((prev) => ({ ...prev, ...partialConfig }));
   }, []);
 
   // Sync chat history - CRITICAL: Prevent infinite re-render loops
@@ -119,6 +140,8 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     setCurrentEditorTab,
     chatConfig,
     updateChatConfig,
+    contextConfig,
+    updateContextConfig,
     manualContext,
     setManualContext,
     toggleMessageSelection,

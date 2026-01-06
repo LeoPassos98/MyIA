@@ -8,6 +8,7 @@ import { TelemetryMetrics, StreamChunk } from '../services/ai/types';
 import { prisma } from '../lib/prisma';
 import { contextService } from '../services/chat/contextService';
 import { getProviderInfo } from '../config/providerMap';
+import { prepareForEmbedding } from '../services/embeddingUtils';
 
 // Controle de Concorrência (Evita spam de requisições iguais)
 const processingRequests = new Set<string>();
@@ -22,7 +23,8 @@ export const chatController = {
 
       const {
         prompt, message: legacyMsg, provider, chatId,
-        model, context, selectedMessageIds, strategy, temperature, memoryWindow, topK
+        model, context, selectedMessageIds, strategy, temperature, memoryWindow, topK,
+        contextConfig // Nova configuração do pipeline de contexto
       } = req.body;
 
       const messageContent = prompt || legacyMsg;
@@ -80,17 +82,26 @@ export const chatController = {
       const isManualMode = context !== undefined || (selectedMessageIds && selectedMessageIds.length > 0);
       let historyMessages: any[] = [];
 
+      let messageOrigins: Record<string, 'pinned' | 'rag' | 'recent' | 'rag+recent'> = {};
+      
       if (isManualMode) {
         if (selectedMessageIds?.length > 0) {
           historyMessages = await prisma.message.findMany({
             where: { id: { in: selectedMessageIds }, chatId: currentChat.id },
             orderBy: { createdAt: 'asc' }
           });
+          // Modo manual: todas são 'manual' (não rastreamos origem)
         }
       } else {
-        // Modo RAG Híbrido Automático
-        const report = await contextService.getHybridRagHistory(currentChat.id, messageContent, writeSSE);
+        // Modo RAG Híbrido Automático com configuração do usuário
+        const report = await contextService.getHybridRagHistory(
+          currentChat.id, 
+          messageContent, 
+          writeSSE,
+          contextConfig // Passa a configuração para o serviço
+        );
         historyMessages = report.finalContext;
+        messageOrigins = report.messageOrigins; // Captura origens
       }
 
       // 5. Salvar Mensagem do Usuário (Antes de gerar resposta)
@@ -108,13 +119,16 @@ export const chatController = {
       const payloadForIA: Array<{ role: string; content: string }> = [];
       const pinnedStepIndices: number[] = []; // Índices dos steps que são pinados
 
-      if (isManualMode && context) {
-        payloadForIA.push({ role: 'system', content: context });
-      } else {
-        payloadForIA.push({ role: 'system', content: "Você é uma IA útil e direta." });
-      }
+      // System Prompt - usa configuração do usuário se disponível
+      const systemPrompt = isManualMode && context 
+        ? context 
+        : (contextConfig?.systemPrompt || "Você é uma IA útil e direta.");
+      payloadForIA.push({ role: 'system', content: systemPrompt });
 
-      // Adiciona o histórico recuperado (coleta índices dos pinados)
+      // Mapa de stepIndex → origin para auditoria
+      const stepOrigins: Record<number, 'pinned' | 'rag' | 'recent' | 'rag+recent' | 'manual'> = {};
+
+      // Adiciona o histórico recuperado (coleta índices dos pinados e origens)
       historyMessages.forEach(msg => {
         const currentIndex = payloadForIA.length; // Índice ANTES de adicionar
         payloadForIA.push({
@@ -124,10 +138,51 @@ export const chatController = {
         if (msg.isPinned) {
           pinnedStepIndices.push(currentIndex);
         }
+        // Mapeia origem do step
+        if (messageOrigins[msg.id]) {
+          stepOrigins[currentIndex] = messageOrigins[msg.id];
+        } else if (isManualMode) {
+          stepOrigins[currentIndex] = 'manual';
+        }
       });
 
       // Adiciona a pergunta atual
       payloadForIA.push({ role: 'user', content: messageContent });
+
+      // 6.5. VALIDAÇÃO DE TOKENS ANTES DE ENVIAR
+      const totalTokens = contextService.countTokens(payloadForIA as any);
+      
+      // Limites conhecidos por provider/modelo (Groq free tier)
+      const GROQ_FREE_LIMITS: Record<string, number> = {
+        'llama-3.1-8b-instant': 6000,
+        'llama-3.3-70b-versatile': 12000,
+        'default': 6000
+      };
+      
+      const estimatedLimit = GROQ_FREE_LIMITS[targetModel] || GROQ_FREE_LIMITS['default'];
+      
+      if (lockedProvider === 'groq' && totalTokens > estimatedLimit * 0.9) {
+        writeSSE({ 
+          type: 'debug', 
+          log: `⚠️ AVISO: Contexto com ${totalTokens} tokens (limite estimado: ${estimatedLimit}). Pode falhar!` 
+        });
+      }
+
+      // 6.6. Preparar objeto de auditoria ANTES de chamar a IA (para salvar mesmo em erro)
+      const auditObject = {
+        config_V47: {
+          mode: isManualMode ? 'manual' : 'auto',
+          model: targetModel,
+          provider: lockedProvider,
+          timestamp: new Date().toISOString(),
+          strategy: strategy || 'efficient',
+          params: { temperature, topK, memoryWindow }
+        },
+        payloadSent_V23: payloadForIA,
+        pinnedStepIndices,
+        stepOrigins,
+        preflightTokenCount: totalTokens // Para debug
+      };
 
       // 7. Streaming da Resposta
       const stream = aiService.stream(payloadForIA, {
@@ -150,6 +205,7 @@ export const chatController = {
         resetWatchdog();
         let fullAssistantResponse = "";
         let finalMetrics: TelemetryMetrics | null = null;
+        let streamError: string | null = null;
 
         for await (const chunk of stream) {
           resetWatchdog();
@@ -157,11 +213,59 @@ export const chatController = {
             fullAssistantResponse += chunk.content;
           } else if (chunk.type === 'telemetry') {
             finalMetrics = chunk.metrics;
+          } else if (chunk.type === 'error') {
+            // 🔥 Erro vindo do aiService como chunk - captura para tratar depois
+            streamError = chunk.error;
           }
           writeSSE(chunk);
         }
 
         if (watchdogTimer) clearTimeout(watchdogTimer);
+
+        // 🔥 Se houve erro durante o stream, salva audit e encerra
+        if (streamError) {
+          const errorContent = `[ERRO] ${streamError}`;
+          const errorAuditObject = {
+            ...auditObject,
+            error: {
+              message: streamError,
+              type: 'stream_error',
+            }
+          };
+          
+          const savedErrorMsg = await prisma.message.create({
+            data: {
+              role: 'assistant',
+              content: errorContent,
+              chatId: currentChat.id,
+              provider: lockedProvider,
+              model: targetModel,
+              tokensIn: auditObject.preflightTokenCount || 0,
+              tokensOut: 0,
+              costInUSD: 0,
+              sentContext: JSON.stringify(errorAuditObject)
+            }
+          });
+          
+          // Envia ID para frontend poder abrir Prompt Trace
+          writeSSE({ 
+            type: 'telemetry', 
+            metrics: {
+              messageId: savedErrorMsg.id,
+              chatId: currentChat.id,
+              provider: lockedProvider,
+              model: targetModel,
+              tokensIn: auditObject.preflightTokenCount || 0,
+              tokensOut: 0,
+              costInUSD: 0
+            }
+          });
+          
+          writeSSE({ type: 'debug', log: `❌ Erro salvo com ID: ${savedErrorMsg.id}` });
+          res.end();
+          cleanup();
+          return;
+        }
 
         // 8. SALVAMENTO E PÓS-PROCESSAMENTO
         if (fullAssistantResponse) {
@@ -194,21 +298,7 @@ export const chatController = {
 
           }
 
-          // === AUDITORIA CONFIÁVEL ===
-          // Prepara objeto de auditoria para salvar no banco
-          const auditObject = {
-            config_V47: {
-              mode: isManualMode ? 'manual' : 'auto',
-              model: targetModel,
-              provider: lockedProvider,
-              timestamp: new Date().toISOString(),
-              strategy: strategy || 'efficient',
-              params: { temperature, topK, memoryWindow }
-            },
-            payloadSent_V23: payloadForIA, // EXATAMENTE o que foi enviado para a API
-            pinnedStepIndices // Índices dos steps que eram pinados (ex: [1, 3])
-          };
-
+          // === AUDITORIA CONFIÁVEL (auditObject já foi preparado antes do stream) ===
           const sentContextString = JSON.stringify(auditObject);
           // =======================================
 
@@ -231,13 +321,19 @@ export const chatController = {
           finalMetrics.messageId = savedAssistantMsg.id;
           writeSSE({ type: 'telemetry', metrics: finalMetrics });
 
-          // Embeds (Gera vetores para o futuro)
-          aiService.embed(fullAssistantResponse).then(emb => {
-            if (emb) prisma.$executeRaw`UPDATE messages SET vector = ${emb.vector}::vector WHERE id = ${savedAssistantMsg.id}`;
+          // Embeds (Gera vetores para o futuro) - Fire and forget com tratamento correto
+          aiService.embed(prepareForEmbedding(fullAssistantResponse)).then(async (emb) => {
+            if (emb) {
+              const vectorStr = '[' + emb.vector.join(',') + ']';
+              await prisma.$executeRaw`UPDATE messages SET vector = ${vectorStr}::vector WHERE id = ${savedAssistantMsg.id}`;
+            }
           }).catch(e => console.error("Embed error:", e));
 
-          aiService.embed(messageContent).then(emb => {
-            if (emb) prisma.$executeRaw`UPDATE messages SET vector = ${emb.vector}::vector WHERE id = ${userMsgRecord.id}`;
+          aiService.embed(prepareForEmbedding(messageContent)).then(async (emb) => {
+            if (emb) {
+              const vectorStr = '[' + emb.vector.join(',') + ']';
+              await prisma.$executeRaw`UPDATE messages SET vector = ${vectorStr}::vector WHERE id = ${userMsgRecord.id}`;
+            }
           }).catch(e => console.error("Embed user error:", e));
         }
 
@@ -280,6 +376,53 @@ export const chatController = {
 
       } catch (streamError: any) {
         console.error("Stream Error:", streamError);
+        
+        // 🔥 NOVO: Salva mensagem de erro com audit trace para debug
+        const errorContent = `[ERRO] ${streamError.message || "Erro na geração"}`;
+        const errorAuditObject = {
+          ...auditObject,
+          error: {
+            message: streamError.message,
+            code: streamError.code,
+            status: streamError.status,
+          }
+        };
+        
+        try {
+          const savedErrorMsg = await prisma.message.create({
+            data: {
+              role: 'assistant',
+              content: errorContent,
+              chatId: currentChat.id,
+              provider: lockedProvider,
+              model: targetModel,
+              tokensIn: auditObject.preflightTokenCount || 0,
+              tokensOut: 0,
+              costInUSD: 0,
+              sentContext: JSON.stringify(errorAuditObject)
+            }
+          });
+          
+          // Envia ID para frontend poder abrir Prompt Trace
+          writeSSE({ 
+            type: 'telemetry', 
+            metrics: {
+              messageId: savedErrorMsg.id,
+              chatId: currentChat.id,
+              provider: lockedProvider,
+              model: targetModel,
+              tokensIn: auditObject.preflightTokenCount || 0,
+              tokensOut: 0,
+              costInUSD: 0
+            }
+          });
+          
+          // Envia o erro separadamente
+          writeSSE({ type: 'debug', log: `❌ Erro salvo com ID: ${savedErrorMsg.id}` });
+        } catch (saveErr) {
+          console.error("Erro ao salvar audit de erro:", saveErr);
+        }
+        
         writeSSE({ type: 'error', error: streamError.message || "Erro na geração" });
         res.end();
       } finally {

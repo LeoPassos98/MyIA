@@ -60,8 +60,15 @@ export function PromptTraceViewer({ trace }: Props) {
   }, [trace]);
 
   const infoEntries = useMemo(() => {
+    // Status com formatação especial
+    const statusDisplay = trace.status === 'error' 
+      ? '❌ error' 
+      : trace.status === 'timeout' 
+        ? '⏱️ timeout' 
+        : '✅ success';
+    
     return [
-      { label: 'Status', value: trace.status },
+      { label: 'Status', value: statusDisplay, isError: trace.status === 'error' },
       { label: 'Provider / Model', value: `${trace.modelInfo.provider} / ${trace.modelInfo.model}` },
       { label: 'Total Steps', value: trace.steps.length },
 
@@ -124,12 +131,40 @@ export function PromptTraceViewer({ trace }: Props) {
                   </Typography>
                   <Typography
                     variant="caption"
-                    sx={{ fontFamily: 'monospace', display: 'block' }}
+                    sx={{ 
+                      fontFamily: 'monospace', 
+                      display: 'block',
+                      color: (item as any).isError ? 'error.main' : 'text.primary',
+                      fontWeight: (item as any).isError ? 600 : 400,
+                    }}
                   >
                     {String(item.value)}
                   </Typography>
                 </Box>
               ))}
+              
+              {/* Mensagem de erro detalhada */}
+              {trace.errorMessage && (
+                <Box sx={{ 
+                  mt: 1, 
+                  p: 1.5, 
+                  bgcolor: 'error.dark', 
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'error.main',
+                }}>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: 'error.contrastText',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {trace.errorMessage}
+                  </Typography>
+                </Box>
+              )}
             </Stack>
           </Paper>
         </Grid>

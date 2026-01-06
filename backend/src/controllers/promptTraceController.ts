@@ -49,6 +49,7 @@ class PromptTraceController {
       const payload = sentContext.payloadSent_V23 || [];
       const config = sentContext.config_V47 || {};
       const pinnedStepIndices = sentContext.pinnedStepIndices || [];
+      const stepOrigins = sentContext.stepOrigins || {}; // Mapa stepIndex → origin
 
       const trace = {
         traceId: message.id,
@@ -66,6 +67,9 @@ class PromptTraceController {
 
         // Índices dos steps que eram pinados
         pinnedStepIndices,
+
+        // Origens de cada step (pinned, rag, recent, rag+recent, manual)
+        stepOrigins,
 
         // A resposta final
         response: {

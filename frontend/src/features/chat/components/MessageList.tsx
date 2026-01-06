@@ -20,10 +20,15 @@ export default function MessageList({
 }: MessageListProps) {
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastMessageCountRef = useRef(messages.length);
 
+  // Só faz scroll se uma nova mensagem foi adicionada
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (messages.length > lastMessageCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    lastMessageCountRef.current = messages.length;
+  }, [messages.length]);
 
   if (messages.length === 0) {
     return (

@@ -4,13 +4,15 @@ import {
   Settings as SettingsIcon, 
   Message as MessageIcon,
   SmartToy as BotIcon,
-  PushPin as PushPinIcon
+  PushPin as PushPinIcon,
+  AccountTree as PipelineIcon
 } from '@mui/icons-material';
 import { useControlPanelLogic } from './useControlPanelLogic';
 import { ParametersTab } from './ParametersTab';
 import { ManualContextTab } from './ManualContextTab';
 import { ModelSelectionTab } from './ModelSelectionTab';
 import { PinnedMessagesTab } from './PinnedMessagesTab';
+import { ContextConfigTab } from './ContextConfigTab';
 
 export default function ControlPanel() {
   const theme = useTheme();
@@ -33,17 +35,19 @@ export default function ControlPanel() {
       <Tabs
         value={currentEditorTab}
         onChange={handleTabChange}
-        variant="fullWidth"
+        variant="scrollable"
+        scrollButtons="auto"
         sx={{
           borderBottom: 1,
           borderColor: 'divider',
-          '& .MuiTab-root': { fontWeight: 600, minWidth: 0, px: 1 },
+          '& .MuiTab-root': { fontWeight: 600, minWidth: 0, px: 1.5 },
           '& .Mui-selected': { color: 'primary.main' }
         }}
       >
         <Tab icon={<BotIcon fontSize="small" />} label="IA" />
         <Tab icon={<SettingsIcon fontSize="small" />} label="Ajustes" />
-        <Tab icon={<MessageIcon fontSize="small" />} label="Contexto" />
+        <Tab icon={<PipelineIcon fontSize="small" />} label="Contexto" />
+        <Tab icon={<MessageIcon fontSize="small" />} label="Manual" />
         <Tab 
           icon={<PushPinIcon fontSize="small" />} 
           label={pinnedCount > 0 ? `📌 ${pinnedCount}` : "Fixadas"} 
@@ -54,8 +58,9 @@ export default function ControlPanel() {
       <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
         {currentEditorTab === 0 && <ModelSelectionTab />}
         {currentEditorTab === 1 && <ParametersTab />}
-        {currentEditorTab === 2 && <ManualContextTab />}
-        {currentEditorTab === 3 && <PinnedMessagesTab />}
+        {currentEditorTab === 2 && <ContextConfigTab />}
+        {currentEditorTab === 3 && <ManualContextTab />}
+        {currentEditorTab === 4 && <PinnedMessagesTab />}
       </Box>
 
     </Box>

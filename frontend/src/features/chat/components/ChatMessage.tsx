@@ -1,6 +1,7 @@
 // frontend/src/features/chat/components/ChatMessage.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
+import { memo } from 'react';
 import { Box, Paper, Typography, IconButton, Chip, Fade, alpha, useTheme } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -22,7 +23,7 @@ interface ChatMessageProps {
   onTogglePin?: (messageId: string) => void;
 }
 
-export default function ChatMessage({
+function ChatMessage({
   message,
   isDevMode = false,
   showDebugInfo = false,
@@ -203,3 +204,14 @@ export default function ChatMessage({
     </Fade>
   );
 }
+
+// Memoização para evitar re-renders desnecessários
+export default memo(ChatMessage, (prevProps, nextProps) => {
+  // Só re-renderiza se a mensagem ou props relevantes mudarem
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.isPinned === nextProps.message.isPinned &&
+    prevProps.isDevMode === nextProps.isDevMode
+  );
+});

@@ -11,13 +11,17 @@ import {
   Chip,
   alpha,
   useTheme,
+  Tooltip,
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import SettingsIcon from '@mui/icons-material/Settings';
 import BuildIcon from '@mui/icons-material/Build';
 import PushPinIcon from '@mui/icons-material/PushPin';
-import type { PromptTraceStep } from '../types';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import HistoryIcon from '@mui/icons-material/History';
+import EditIcon from '@mui/icons-material/Edit';
+import type { PromptTraceStep, StepOrigin } from '../types';
 
 interface Props {
   steps: PromptTraceStep[];
@@ -33,6 +37,59 @@ const ROLE_CONFIG: Record<
   user: { icon: <PersonIcon />, label: 'User', color: 'primary' },
   assistant: { icon: <SmartToyIcon />, label: 'Assistant', color: 'success' },
   tool: { icon: <BuildIcon />, label: 'Tool', color: 'warning' },
+};
+
+/**
+ * Configuração de exibição para origens de mensagens
+ */
+const ORIGIN_CONFIG: Record<StepOrigin, { 
+  label: string; 
+  tooltip: string; 
+  icon: React.ReactNode;
+  color: 'primary' | 'secondary' | 'success' | 'warning' | 'info' | 'error';
+}> = {
+  pinned: { 
+    label: '📌', 
+    tooltip: 'Mensagem Fixada (sempre incluída)', 
+    icon: <PushPinIcon fontSize="inherit" />,
+    color: 'primary'
+  },
+  rag: { 
+    label: '🧠', 
+    tooltip: 'Recuperada via RAG (busca semântica)', 
+    icon: <PsychologyIcon fontSize="inherit" />,
+    color: 'secondary'
+  },
+  recent: { 
+    label: '🕐', 
+    tooltip: 'Memória Recente', 
+    icon: <HistoryIcon fontSize="inherit" />,
+    color: 'info'
+  },
+  'rag+recent': { 
+    label: '🧠🕐', 
+    tooltip: 'Encontrada via RAG e também é recente', 
+    icon: <PsychologyIcon fontSize="inherit" />,
+    color: 'success'
+  },
+  manual: { 
+    label: '✋', 
+    tooltip: 'Selecionada manualmente', 
+    icon: <EditIcon fontSize="inherit" />,
+    color: 'warning'
+  },
+  system: { 
+    label: '⚙️', 
+    tooltip: 'System Prompt', 
+    icon: <SettingsIcon fontSize="inherit" />,
+    color: 'info'
+  },
+  'user-input': { 
+    label: '✏️', 
+    tooltip: 'Mensagem atual do usuário', 
+    icon: <PersonIcon fontSize="inherit" />,
+    color: 'primary'
+  },
 };
 
 /**
@@ -91,6 +148,36 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
                         titleAccess="Mensagem fixada"
                         sx={{ ml: 0.5 }}
                       />
+                    )}
+                    {step.origin && ORIGIN_CONFIG[step.origin] && (
+                      <Tooltip title={ORIGIN_CONFIG[step.origin].tooltip} arrow>
+                        <Chip
+                          label={ORIGIN_CONFIG[step.origin].label}
+                          size="small"
+                          color={ORIGIN_CONFIG[step.origin].color}
+                          variant="filled"
+                          sx={{ 
+                            fontSize: '0.7rem', 
+                            height: 20,
+                            '& .MuiChip-label': { px: 0.75 }
+                          }}
+                        />
+                      </Tooltip>
+                    )}
+                    {step.wasTruncatedForEmbedding && (
+                      <Tooltip title="Embedding gerado de versão truncada (~8K tokens). A busca semântica pode não considerar todo o conteúdo." arrow>
+                        <Chip
+                          label="⚠️"
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                          sx={{ 
+                            fontSize: '0.7rem', 
+                            height: 20,
+                            '& .MuiChip-label': { px: 0.5 }
+                          }}
+                        />
+                      </Tooltip>
                     )}
                   </Box>
                 }

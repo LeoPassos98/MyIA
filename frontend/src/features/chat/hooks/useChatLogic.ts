@@ -11,7 +11,7 @@ import { chatHistoryService, Message } from '../../../services/chatHistoryServic
 export function useChatLogic(chatId?: string) {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { chatConfig, syncChatHistory, manualContext } = useLayout();
+  const { chatConfig, contextConfig, syncChatHistory, manualContext } = useLayout();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -145,6 +145,17 @@ export function useChatLogic(chatId?: string) {
         payload.temperature = chatConfig.temperature;
         payload.topK = chatConfig.topK;
         payload.memoryWindow = chatConfig.memoryWindow;
+        
+        // Configuração do Pipeline de Contexto
+        payload.contextConfig = {
+          systemPrompt: contextConfig.useCustomSystemPrompt ? contextConfig.systemPrompt : undefined,
+          pinnedEnabled: contextConfig.pinnedEnabled,
+          recentEnabled: contextConfig.recentEnabled,
+          recentCount: contextConfig.recentCount,
+          ragEnabled: contextConfig.ragEnabled,
+          ragTopK: contextConfig.ragTopK,
+          maxContextTokens: contextConfig.maxContextTokens,
+        };
       }
 
       // --- CHAMADA AO SERVIÇO ---
@@ -183,6 +194,17 @@ export function useChatLogic(chatId?: string) {
             }
             else if (chunk.type === 'debug') {
               setDebugLogs(prev => [...prev, chunk.log]);
+            }
+            else if (chunk.type === 'error') {
+              // 🔥 Erro vindo do backend via SSE - atualiza conteúdo da mensagem
+              flushChunkBuffer();
+              setMessages(prev => prev.map(msg => 
+                msg.id === tempAiMsgId ? { 
+                  ...msg, 
+                  content: msg.content ? `${msg.content}\n\n❌ ${chunk.error}` : `❌ ${chunk.error}`
+                } : msg
+              ));
+              setDebugLogs(prev => [...prev, `❌ Erro: ${chunk.error}`]);
             }
           } catch (e) { console.error(e); }
         },

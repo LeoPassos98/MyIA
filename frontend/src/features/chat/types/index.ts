@@ -35,6 +35,30 @@ export interface ManualContextState {
   hasAdditionalContext: boolean;
 }
 
+/**
+ * Configuração do Pipeline de Contexto
+ * Define como o contexto é construído e enviado para a IA
+ */
+export interface ContextPipelineConfig {
+  // System Prompt
+  systemPrompt: string;
+  useCustomSystemPrompt: boolean;
+
+  // Mensagens Pinadas (sempre incluídas se enabled)
+  pinnedEnabled: boolean;
+
+  // Mensagens Recentes
+  recentEnabled: boolean;
+  recentCount: number; // Quantas mensagens recentes incluir (padrão: 10)
+
+  // RAG (Busca Semântica)
+  ragEnabled: boolean;
+  ragTopK: number; // Quantas mensagens similares buscar (padrão: 5)
+
+  // Limite de Tokens
+  maxContextTokens: number; // Budget máximo (padrão: 6000)
+}
+
 export interface ChatSession {
   id: string;
   title: string;

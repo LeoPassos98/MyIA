@@ -7,6 +7,8 @@ export const useControlPanelLogic = () => {
     setCurrentEditorTab,
     chatConfig,
     updateChatConfig,
+    contextConfig,
+    updateContextConfig,
     manualContext,
     setManualContext,
     toggleMessageSelection,
@@ -23,12 +25,14 @@ export const useControlPanelLogic = () => {
     // State
     currentEditorTab,
     chatConfig,
+    contextConfig,
     manualContext,
     chatHistorySnapshot,
     
     // Actions
     handleTabChange,
     updateChatConfig,
+    updateContextConfig,
     setManualContext,
     toggleMessageSelection,
     onUnpinMessage,

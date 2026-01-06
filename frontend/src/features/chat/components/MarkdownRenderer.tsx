@@ -1,6 +1,7 @@
 // frontend/src/features/chat/components/MarkdownRenderer.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -11,7 +12,7 @@ interface MarkdownRendererProps {
   content: string;
 }
 
-export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
+function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
@@ -79,7 +80,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
         // 4. LISTAS
         ul: ({ children }) => <Box component="ul" sx={{ pl: 3, mb: 2 }}>{children}</Box>,
-        ol: ({ children }) => <Box component="ol" sx={{ pl: 3, mb: 2 }}>{children}</Box>,
+        ol: ({ children, start }) => <Box component="ol" start={start} sx={{ pl: 3, mb: 2 }}>{children}</Box>,
         li: ({ children }) => (
           <Typography component="li" variant="body1" sx={{ mb: 0.5 }}>
             {children}
@@ -176,3 +177,6 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     </ReactMarkdown>
   );
 }
+
+// Memoização para evitar re-parsing de Markdown desnecessário
+export default memo(MarkdownRenderer);
