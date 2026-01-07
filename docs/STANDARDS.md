@@ -219,3 +219,104 @@ Até a edição ser implementada:
 - Campo `version` pode não existir ainda no schema
 - O código deve ser escrito de forma **defensiva** (assume `version: 1` se ausente)
 - `messageIds` no `sentContext` já garante rastreabilidade futura
+
+## 9. Identidade Visual e Design System
+
+> **Documento Completo:** [docs/VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md)
+
+### Princípios Fundamentais
+
+1. **Theme-First:** NUNCA usar cores hardcoded (`#HEX`, `rgba()`)
+2. **Consistência de Ícones:** Material Icons (Outlined padrão)
+3. **Acessibilidade:** Todo IconButton DEVE ter Tooltip
+4. **Hierarquia Clara:** Primário → Secundário → Terciário
+5. **Animações Suaves:** Transições de 0.2s-0.3s
+
+### Paleta de Cores (Tokens Obrigatórios)
+
+**❌ PROIBIDO:**
+```typescript
+color: '#00FF41'
+bgcolor: 'rgba(255,255,255,0.1)'
+borderColor: 'rgba(0,0,0,0.2)'
+background: alpha(theme.palette.primary.main, 0.2)
+```
+
+**✅ PERMITIDO:**
+```typescript
+color: 'text.secondary'
+bgcolor: 'grey.100'
+borderColor: 'divider'
+color: 'text.secondary'
+opacity: 0.8
+```
+
+### Ícones Padronizados
+
+| Categoria | Ícones | Uso |
+|-----------|--------|-----|
+| Mensagens | `Send`, `Stop`, `PushPin` | Enviar, parar, fixar |
+| Edição | `CopyAll`, `Edit`, `Delete` | Copiar, editar, deletar |
+| Debug | `DataObject`, `Timeline` | Payload, trace |
+| Estado | `Warning`, `Error`, `CheckCircle` | Avisos, erros, sucesso |
+| IA | `SmartToy`, `AutoAwesome` | Avatar bot, recursos IA |
+
+### Espaçamento (Grid 8px)
+
+```typescript
+gap: 0.5   // 4px
+gap: 1     // 8px  (padrão ícones)
+gap: 1.5   // 12px (confortável)
+gap: 2     // 16px (generoso)
+gap: 3     // 24px (seções)
+```
+
+### Componentes de Ação
+
+**IconButton Template:**
+```typescript
+<Tooltip title="Ação">
+  <IconButton
+    size="small"
+    sx={{
+      color: 'text.secondary',
+      '&:hover': {
+        color: 'primary.main',
+        transform: 'scale(1.1)',
+      },
+      transition: 'all 0.2s',
+    }}
+  >
+    <Icon fontSize="small" />
+  </IconButton>
+</Tooltip>
+```
+
+**Botão Primário (Gradiente):**
+```typescript
+<IconButton
+  sx={{
+    background: theme.palette.gradients.primary,
+    color: 'white',
+    width: 48,
+    height: 48,
+    '&:hover': { transform: 'scale(1.05)' },
+    transition: 'all 0.2s',
+  }}
+>
+  <SendIcon />
+</IconButton>
+```
+
+### Checklist de Conformidade Visual
+
+- [ ] Usa apenas tokens do tema
+- [ ] Todos IconButtons têm Tooltip
+- [ ] Ícones Material Icons (Outlined)
+- [ ] Espaçamento múltiplo de 8px
+- [ ] Transições suaves (0.2s/0.3s)
+- [ ] Responsivo (xs/sm/md)
+- [ ] Hover states definidos
+- [ ] Border radius consistente (1, 2, 3)
+
+> **Para mais detalhes:** Consulte [VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md)

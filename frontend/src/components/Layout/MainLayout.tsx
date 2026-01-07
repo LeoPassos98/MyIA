@@ -14,7 +14,7 @@ export default function MainLayout({ children }: { children?: React.ReactNode })
       display: 'flex', 
       height: '100vh', 
       overflow: 'hidden', 
-      bgcolor: 'background.default' // <--- Usa o token do tema!
+      bgcolor: 'background.default',
     }}>
       
       {/* 1. Barra Superior */}

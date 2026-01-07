@@ -1,23 +1,25 @@
-// frontend/src/features/chat/components/MessageList.tsx
+// frontend/src/features/chat/components/message/MessageList.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { useRef, useEffect } from 'react';
 import { Box, Typography, alpha, useTheme } from '@mui/material';
 import { Psychology as BrainIcon } from '@mui/icons-material';
-import { Message } from '../types';
+import { Message } from '../../types';
 import ChatMessage from './ChatMessage';
-import { scrollbarStyles } from '../../../theme/scrollbarStyles';
+import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 interface MessageListProps {
   messages: Message[];
   isDevMode: boolean;
   onTogglePin?: (messageId: string) => void;
+  inputHeight?: number;
 }
 
 export default function MessageList({
   messages,
   isDevMode,
   onTogglePin,
+  inputHeight = 180,
 }: MessageListProps) {
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,12 +87,16 @@ export default function MessageList({
         flex: 1,
         overflowY: 'auto',
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
         px: 2,
+        pb: `${inputHeight}px`, // Padding dinâmico baseado na altura real do input
         ...scrollbarStyles,
       }}
     >
-      <Box sx={{ width: '100%', maxWidth: 900, pb: 8 }}>
+      {/* Espaçador que empurra mensagens para baixo quando há poucas */}
+      <Box sx={{ flex: 1, minHeight: 0 }} />
+      
+      <Box sx={{ width: '100%', maxWidth: 900, margin: '0 auto', py: 2 }}>
         {messages.map((msg) => (
           <ChatMessage
             key={msg.id}
@@ -99,8 +105,8 @@ export default function MessageList({
             onTogglePin={onTogglePin}
           />
         ))}
-        {/* Espaçador final para a última mensagem não ficar grudada no input */}
-        <div ref={messagesEndRef} style={{ height: 24 }} />
+        {/* Ref para scroll automático */}
+        <div ref={messagesEndRef} style={{ height: 0 }} />
       </Box>
     </Box>
   );

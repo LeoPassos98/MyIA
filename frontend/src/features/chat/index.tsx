@@ -2,7 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { useState, useEffect } from 'react';
-import { Box, alpha, useTheme } from '@mui/material';
+import { Box } from '@mui/material';
 import { useParams } from 'react-router-dom';
 
 // Layout Global
@@ -11,12 +11,11 @@ import { useLayout } from '../../contexts/LayoutContext';
 
 // Componentes da Feature (Modularizados)
 import { useChatLogic } from './hooks/useChatLogic';
-import MessageList from './components/MessageList';
-import ChatInput from './components/ChatInput';
+import { MessageList } from './components/message';
+import { ChatInput } from './components/input';
 import { DevConsole } from './components/DevConsole';
 
 export default function ChatPage() {
-  const theme = useTheme();
   const { chatId } = useParams();
   const { setOnUnpinMessage } = useLayout();
 
@@ -40,6 +39,7 @@ export default function ChatPage() {
 
   // UI States (Modais e Paineis)
   const [isDevMode, setIsDevMode] = useState(false);
+  const [inputHeight, setInputHeight] = useState(180); // Altura padrão do input
 
   // Placeholders para contextos futuros
   const isDrawerOpen = false; 
@@ -69,6 +69,7 @@ export default function ChatPage() {
           messages={messages}
           isDevMode={isDevMode}
           onTogglePin={handleTogglePin}
+          inputHeight={inputHeight}
         />
       )}
 
@@ -78,30 +79,19 @@ export default function ChatPage() {
         visible={isDevMode} 
       />
 
-      {/* 4. Input Area (Fixo no rodapé) */}
-      <Box
-        sx={{
-          position: 'sticky',
-          bottom: 0,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          bgcolor: alpha(theme.palette.background.paper, 0.8),
-          backdropFilter: 'blur(10px)',
-          zIndex: 10,
-        }}
-      >
-        <ChatInput
-          inputMessage={inputMessage}
-          setInputMessage={setInputMessage}
-          onSend={handleSendMessage}
-          onStop={handleStop} // Conectado!
-          isLoading={isLoading}
-          isDevMode={isDevMode}
-          setIsDevMode={setIsDevMode}
-          isManualMode={isManualMode}
-          isDrawerOpen={isDrawerOpen}
-        />
-      </Box>
+      {/* 4. Input Area (Fixed Bottom - Glassmorphism) */}
+      <ChatInput
+        inputMessage={inputMessage}
+        setInputMessage={setInputMessage}
+        onSend={handleSendMessage}
+        onStop={handleStop}
+        isLoading={isLoading}
+        isDevMode={isDevMode}
+        setIsDevMode={setIsDevMode}
+        isManualMode={isManualMode}
+        isDrawerOpen={isDrawerOpen}
+        onHeightChange={setInputHeight}
+      />
 
       {/* Removido: Modals Globais de auditoria */}
     </Box>
