@@ -68,12 +68,12 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
         tbody: ({ children }) => <tbody>{children}</tbody>,
         tr: ({ children }) => <tr style={{ borderBottom: `1px solid ${theme.palette.divider}` }}>{children}</tr>,
         th: ({ children }) => (
-          <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: theme.palette.text.primary }}>
+          <th style={{ padding: theme.spacing(1.5), textAlign: 'left', fontWeight: 600, color: theme.palette.text.primary }}>
             {children}
           </th>
         ),
         td: ({ children }) => (
-          <td style={{ padding: '12px', color: theme.palette.text.secondary }}>
+          <td style={{ padding: theme.spacing(1.5), color: theme.palette.text.secondary }}>
             {children}
           </td>
         ),
@@ -135,8 +135,8 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 style={{
                   backgroundColor: alpha(theme.palette.text.primary, 0.1),
                   color: theme.palette.text.primary,
-                  padding: '2px 5px',
-                  borderRadius: '4px',
+                  padding: `${theme.spacing(0.25)} ${theme.spacing(0.625)}`,
+                  borderRadius: theme.shape.borderRadius,
                   fontFamily: theme.typography.monospace,
                   fontSize: '0.85em',
                   fontWeight: 'bold'
@@ -150,11 +150,11 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
           
           // Bloco de código (``` com ou sem linguagem)
           return (
-            <Box sx={{ my: 2, borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ my: 2, borderRadius: theme.shape.borderRadius, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
               <Box sx={{ 
                 px: 2, 
                 py: 0.5, 
-                bgcolor: isDark ? alpha('#000', 0.2) : '#f5f5f5',
+                bgcolor: isDark ? alpha(theme.palette.background.default, 0.2) : theme.palette.background.paper,
                 borderBottom: '1px solid', 
                 borderColor: 'divider',
                 display: 'flex',
@@ -171,10 +171,10 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 PreTag="div"
                 customStyle={{
                   margin: 0,
-                  padding: '16px',
+                  padding: theme.spacing(2),
                   fontSize: '0.85rem',
                   lineHeight: '1.5',
-                  backgroundColor: isDark ? '#0d1117' : '#ffffff'
+                  backgroundColor: isDark ? theme.palette.custom.hackerBg : theme.palette.background.paper
                 }}
                 {...props}
               >

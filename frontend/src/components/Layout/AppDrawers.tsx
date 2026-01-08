@@ -1,4 +1,5 @@
 import { Drawer, useTheme, alpha } from '@mui/material';
+import { HEADER_HEIGHT } from '../../components/Layout/layoutConstants';
 import { useLayout } from '../../contexts/LayoutContext';
 import ControlPanel from '../../features/chat/components/ControlPanel';
 import HistorySidebar from '../../features/chat/components/drawer/HistorySidebar';
@@ -7,18 +8,16 @@ export default function AppDrawers() {
   const theme = useTheme();
   const { isHistoryOpen, setIsHistoryOpen, isEditorOpen, setIsEditorOpen } = useLayout();
 
-  // Estilo base para os painéis laterais (Glassmorphism adaptativo)
+  // Estilo base para os painéis laterais (Glassmorphism adaptativo, 100% theme)
   const drawerPaperStyle = {
     boxSizing: 'border-box' as const,
-    mt: '56px', // Altura do Header
-    height: 'calc(100% - 56px)',
-    // AQUI ESTÁ A MÁGICA: Usa a cor do papel do tema, não branco fixo
-    background: theme.palette.mode === 'dark' 
-      ? alpha(theme.palette.background.paper, 0.95)
-      : 'rgba(255, 255, 255, 0.95)',
+    mt: `${HEADER_HEIGHT}px`, // Altura do Header
+    height: `calc(100% - ${HEADER_HEIGHT}px)`,
+    background: alpha(theme.palette.background.paper, 0.95),
     backdropFilter: 'blur(10px)',
-    border: '1px solid',
-    borderColor: 'divider',
+    border: `1px solid ${theme.palette.divider}`,
+    borderColor: theme.palette.divider,
+    boxShadow: theme.shadows[4],
   };
 
   return (
@@ -32,8 +31,8 @@ export default function AppDrawers() {
           '& .MuiDrawer-paper': {
             ...drawerPaperStyle,
             width: 300,
-            borderRight: '1px solid',
-            borderColor: 'divider',
+            borderRight: `1px solid ${theme.palette.divider}`,
+            borderColor: theme.palette.divider,
             boxShadow: theme.shadows[4],
           },
         }}
@@ -51,8 +50,8 @@ export default function AppDrawers() {
           '& .MuiDrawer-paper': {
             ...drawerPaperStyle,
             width: 380,
-            borderLeft: '1px solid',
-            borderColor: 'divider',
+            borderLeft: `1px solid ${theme.palette.divider}`,
+            borderColor: theme.palette.divider,
             boxShadow: theme.shadows[4],
           },
         }}

@@ -133,7 +133,7 @@ export const PinnedMessagesTab = () => {
             p: 2, 
             borderRadius: 1,
             bgcolor: alpha(theme.palette.info.main, 0.1),
-            border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`
+              border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
           }}
         >
           <Typography variant="caption" color="info.main" fontWeight="bold">

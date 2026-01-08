@@ -41,7 +41,7 @@ export default function MainHeader() {
         borderColor: 'divider',
 
         // Sombra suave apenas no modo claro para dar profundidade
-        boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 1px 3px rgba(0,0,0,0.05)'
+        boxShadow: theme.palette.mode === 'dark' ? 'none' : 1
       }}
     >
       <Toolbar

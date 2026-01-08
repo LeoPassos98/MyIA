@@ -21,9 +21,7 @@ export const SettingsSection = ({ title, description, children }: SettingsSectio
         // O Segredo do Design System:
         background: alpha(theme.palette.background.paper, 0.6),
         backdropFilter: 'blur(20px)',
-        boxShadow: theme.palette.mode === 'dark' 
-          ? '0 8px 32px rgba(0, 0, 0, 0.2)' 
-          : '0 8px 32px rgba(0, 0, 0, 0.05)',
+        boxShadow: theme.shadows[4],
         transition: 'all 0.3s ease'
       }}
     >

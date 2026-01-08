@@ -115,7 +115,7 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
               selected={isSelected}
               onClick={() => onStepSelect(step.stepId)}
               sx={{
-                borderRadius: 1,
+                borderRadius: theme.shape.borderRadius,
                 mb: 0.5,
                 border: '1px solid',
                 borderColor: isSelected ? 'primary.main' : 'divider',

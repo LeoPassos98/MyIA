@@ -35,18 +35,25 @@ export default function ChatInput({
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
 
+
   // ResizeObserver para detectar mudanças na altura do input
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !onHeightChange) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const height = entry.contentRect.height;
-        onHeightChange(height + 32); // +32px para margem extra
-      }
-    });
+    // Callback para atualizar altura
+    const updateHeight = () => {
+      const height = container.offsetHeight;
+      onHeightChange(height);
+    };
 
+    // Chama ao montar
+    updateHeight();
+
+    // Observa mudanças de tamanho
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
     resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
   }, [onHeightChange]);

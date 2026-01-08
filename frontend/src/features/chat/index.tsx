@@ -64,20 +64,21 @@ export default function ChatPage() {
       />
 
       {/* 2. Área de Mensagens */}
+
       {(!isLoading || messages.length > 0) && (
         <MessageList
           messages={messages}
           isDevMode={isDevMode}
           onTogglePin={handleTogglePin}
           inputHeight={inputHeight}
+          devConsole={
+            <DevConsole
+              logs={debugLogs}
+              visible={isDevMode}
+            />
+          }
         />
       )}
-
-      {/* 3. Console Hacker (Modularizado) */}
-      <DevConsole 
-        logs={debugLogs} 
-        visible={isDevMode} 
-      />
 
       {/* 4. Input Area (Fixed Bottom - Glassmorphism) */}
       <ChatInput

@@ -90,6 +90,23 @@ export function AuditController() {
   }
 
   // Decisão: qual visualização usar
+  if (!mode) {
+    return (
+      <Dialog
+        open
+        onClose={closeAudit}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogContent>
+          <Alert severity="warning" sx={{ my: 2 }}>
+            Modo de auditoria não definido.
+          </Alert>
+        </DialogContent>
+      </Dialog>
+    );
+  }
   const viewMode = getViewModeForAuditMode(mode);
 
   if (viewMode === 'human') {

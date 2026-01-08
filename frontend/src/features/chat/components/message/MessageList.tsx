@@ -1,26 +1,33 @@
 // frontend/src/features/chat/components/message/MessageList.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
+
 import { useRef, useEffect } from 'react';
-import { Box, Typography, alpha, useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
 import { Psychology as BrainIcon } from '@mui/icons-material';
 import { Message } from '../../types';
 import ChatMessage from './ChatMessage';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
+
 interface MessageListProps {
   messages: Message[];
-  isDevMode: boolean;
+  isDevMode?: boolean;
   onTogglePin?: (messageId: string) => void;
-  inputHeight?: number;
+  inputHeight: number;
+  devConsole?: React.ReactNode;
 }
 
-export default function MessageList({
+
+const MessageList: React.FC<MessageListProps> = ({
   messages,
-  isDevMode,
+  isDevMode = false,
   onTogglePin,
-  inputHeight = 180,
-}: MessageListProps) {
+  inputHeight,
+  devConsole,
+}) => {
   const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageCountRef = useRef(messages.length);
@@ -95,7 +102,7 @@ export default function MessageList({
     >
       {/* Espaçador que empurra mensagens para baixo quando há poucas */}
       <Box sx={{ flex: 1, minHeight: 0 }} />
-      
+
       <Box sx={{ width: '100%', maxWidth: 900, margin: '0 auto', py: 2 }}>
         {messages.map((msg) => (
           <ChatMessage
@@ -105,9 +112,13 @@ export default function MessageList({
             onTogglePin={onTogglePin}
           />
         ))}
+        {/* DevConsole aparece logo acima do input, dentro do fluxo do scroll */}
+        {devConsole}
         {/* Ref para scroll automático */}
         <div ref={messagesEndRef} style={{ height: 0 }} />
       </Box>
     </Box>
   );
-}
+};
+
+export default MessageList;

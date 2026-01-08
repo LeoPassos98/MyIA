@@ -1,5 +1,5 @@
 // backend/src/services/ai/providers/openai.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import OpenAI from 'openai';
 import { BaseAIProvider, AIRequestOptions } from './base';

@@ -1,7 +1,7 @@
 // frontend/src/features/chat/components/DevConsole.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
-import { Box, Typography, Paper, Fade, alpha } from '@mui/material';
+import { Box, Typography, Paper, Fade, alpha, useTheme } from '@mui/material';
 import { Terminal as TerminalIcon } from '@mui/icons-material';
 
 interface DevConsoleProps {
@@ -10,6 +10,7 @@ interface DevConsoleProps {
 }
 
 export function DevConsole({ logs, visible }: DevConsoleProps) {
+  const theme = useTheme();
   if (!visible) return null;
 
   return (
@@ -24,23 +25,23 @@ export function DevConsole({ logs, visible }: DevConsoleProps) {
           flexDirection: 'column',
           overflow: 'hidden',
           borderRadius: 2,
-          bgcolor: '#0d1117', // Fundo terminal hacker (Hardcoded propositalmente para estilo)
+          bgcolor: theme.palette.custom.hackerBg, // Fundo terminal hacker (padronizado)
           border: '1px solid',
-          borderColor: alpha('#00FF41', 0.2),
+          borderColor: alpha(theme.palette.custom.matrix, 0.2),
           boxShadow: `0 8px 32px ${alpha('#000', 0.5)}`,
         }}
       >
         {/* Header */}
         <Box sx={{
           display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1,
-          borderBottom: '1px solid', borderColor: alpha('#00FF41', 0.2),
-          bgcolor: alpha('#00FF41', 0.05),
+          borderBottom: '1px solid', borderColor: alpha(theme.palette.custom.matrix, 0.2),
+          bgcolor: alpha(theme.palette.custom.matrix, 0.05),
         }}>
-          <TerminalIcon sx={{ fontSize: 18, color: '#00FF41' }} />
-          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#00FF41', fontWeight: 600 }}>
+          <TerminalIcon sx={{ fontSize: 18, color: theme.palette.custom.matrix }} />
+          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: theme.palette.custom.matrix, fontWeight: 600 }}>
             DEBUG CONSOLE
           </Typography>
-          <Typography variant="caption" sx={{ ml: 'auto', fontFamily: 'monospace', color: alpha('#00FF41', 0.6), fontSize: '0.7rem' }}>
+          <Typography variant="caption" sx={{ ml: 'auto', fontFamily: 'monospace', color: alpha(theme.palette.custom.matrix, 0.6), fontSize: '0.7rem' }}>
             {logs.length} logs
           </Typography>
         </Box>
@@ -48,22 +49,22 @@ export function DevConsole({ logs, visible }: DevConsoleProps) {
         {/* Logs */}
         <Box sx={{
           flex: 1, overflowY: 'auto', p: 1.5, fontFamily: 'monospace', fontSize: '0.75rem',
-          lineHeight: 1.8, color: '#00FF41',
+          lineHeight: 1.8, color: theme.palette.custom.matrix,
           '&::-webkit-scrollbar': { width: '6px' },
-          '&::-webkit-scrollbar-thumb': { background: alpha('#00FF41', 0.3), borderRadius: '3px' }
+          '&::-webkit-scrollbar-thumb': { background: alpha(theme.palette.custom.matrix, 0.3), borderRadius: 1.5 }
         }}>
           {logs.length === 0 ? (
-            <Typography sx={{ color: alpha('#00FF41', 0.4), fontStyle: 'italic', fontSize: 'inherit' }}>
+            <Typography sx={{ color: alpha(theme.palette.custom.matrix, 0.4), fontStyle: 'italic', fontSize: 'inherit' }}>
               [SYSTEM] Aguardando eventos...
             </Typography>
           ) : (
             logs.map((log, index) => (
               <Fade in timeout={200} key={index}>
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Typography component="span" sx={{ color: alpha('#00FF41', 0.5), fontSize: '0.7rem', minWidth: 65 }}>
+                  <Typography component="span" sx={{ color: alpha(theme.palette.custom.matrix, 0.5), fontSize: '0.7rem', minWidth: 65 }}>
                     [{new Date().toLocaleTimeString('pt-BR')}]
                   </Typography>
-                  <Typography component="span" sx={{ color: '#00FF41', wordBreak: 'break-all', fontSize: 'inherit' }}>
+                  <Typography component="span" sx={{ color: theme.palette.custom.matrix, wordBreak: 'break-all', fontSize: 'inherit' }}>
                     {log}
                   </Typography>
                 </Box>
