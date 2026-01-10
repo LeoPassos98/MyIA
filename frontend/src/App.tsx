@@ -17,12 +17,10 @@ import { AuditFeature } from './features/audit';
 // Pages & Features
 import AuditPage from './features/auditPage';
 import { PromptTracePage } from "@/features/promptTrace";
-
-// Components & Pages
-import MainLayout from './components/Layout/MainLayout';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Chat from './features/chat';
+import MainLayout from "./components/Layout/MainLayout";
+import Login from "./features/login/LoginPage";
+import Register from "./pages/Register";
+import Chat from "./features/chat";
 import Settings from './features/settings';
 
 function AppRoutes() {
