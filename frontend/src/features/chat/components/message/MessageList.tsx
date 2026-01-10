@@ -5,8 +5,6 @@
 import { useRef, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
-import { Psychology as BrainIcon } from '@mui/icons-material';
 import { Message } from '../../types';
 import ChatMessage from './ChatMessage';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
@@ -28,7 +26,6 @@ const MessageList: React.FC<MessageListProps> = ({
   inputHeight,
   devConsole,
 }) => {
-  const theme = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageCountRef = useRef(messages.length);
 
@@ -50,39 +47,24 @@ const MessageList: React.FC<MessageListProps> = ({
           justifyContent: 'center',
           flexDirection: 'column',
           p: 2,
-          opacity: 0.8,
+          opacity: 0.85,
         }}
       >
-        <Box
-          sx={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            background: theme.palette.gradients.shimmer,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            mb: 3,
-            boxShadow: `0 8px 32px ${alpha(
-              theme.palette.primary.main,
-              0.1
-            )}`,
-          }}
-        >
-          <BrainIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-        </Box>
-
-        <Typography variant="h5" fontWeight="bold">
-          MyIA V47
-        </Typography>
-
         <Typography
           variant="body1"
           color="text.secondary"
           align="center"
-          sx={{ maxWidth: 400 }}
+          sx={{ maxWidth: 340, fontWeight: 400, fontSize: '1.08rem', mb: 1.5 }}
         >
-          Seu assistente pessoal inteligente.
+          Start a conversation with MyIA
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.disabled"
+          align="center"
+          sx={{ maxWidth: 320, fontWeight: 400, fontSize: '0.98rem' }}
+        >
+          Ex: "Summarize this article for me"<br />or "What can you do?"
         </Typography>
       </Box>
     );

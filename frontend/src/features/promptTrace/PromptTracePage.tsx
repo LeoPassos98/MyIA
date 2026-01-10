@@ -104,9 +104,7 @@ export default function PromptTracePage() {
             {/* Visão Geral */}
             <ObservabilitySection id="overview" title="Visão Geral">
               <PromptTraceViewer trace={trace} />
-            </ObservabilitySection>
-
-            
+            </ObservabilitySection>            
           </>
         )}
 

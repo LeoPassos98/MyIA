@@ -202,7 +202,7 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
               {/* Tokens da resposta (output) */}
               {step.usage?.tokensOut !== undefined && step.usage.tokensOut > 0 && (
                 <Chip
-                  label={`${step.usage.tokensOut} tok`}
+                  label={`${step.usage.tokensOut} tokens`}
                   size="small"
                   variant="outlined"
                   color="success"
@@ -212,7 +212,7 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
               {/* Tokens de entrada (input) - só mostra se não tiver tokensOut */}
               {step.usage?.tokensIn !== undefined && step.usage.tokensIn > 0 && !step.usage?.tokensOut && (
                 <Chip
-                  label={`${step.usage.tokensIn} tok`}
+                  label={`${step.usage.tokensIn} tokens`}
                   size="small"
                   variant="outlined"
                   sx={{ ml: 1 }}

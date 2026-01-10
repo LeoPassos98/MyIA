@@ -12,7 +12,7 @@ import {
   Chip,
 } from '@mui/material';
 import type { PromptTraceRecord } from '../types';
-import { PromptTraceHeader } from './PromptTraceHeader';
+import { scrollbarStyles } from './../../../theme/scrollbarStyles';
 import { PromptTraceTimeline } from './PromptTraceTimeline';
 import { PromptTraceStepDetails } from './PromptTraceStepDetails';
 import { PromptTraceUsageSummary } from './PromptTraceUsageSummary';
@@ -82,7 +82,6 @@ export function PromptTraceViewer({ trace }: Props) {
   return (
     <Box>
       {/* Header */}
-      <PromptTraceHeader trace={trace} />
 
       {/* Overview Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -189,13 +188,14 @@ export function PromptTraceViewer({ trace }: Props) {
             {responseMessage ? (
               <Box
                 sx={{
-                    border: '1px solid',
+                  border: '1px solid',
                   borderColor: 'divider',
                   borderRadius: 1,
                   p: 1.5,
-                  maxHeight: 240,
+                  maxHeight: 365,
                   overflow: 'auto',
                   bgcolor: 'background.default',
+                  ...scrollbarStyles,
                 }}
               >
                 <Typography

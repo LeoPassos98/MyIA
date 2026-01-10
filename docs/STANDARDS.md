@@ -42,7 +42,7 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
   - **Uso do Tema:** Use `theme.palette.primary.main`, `theme.palette.custom.matrix`, etc.
   - **Cores Novas:** Se precisar de uma cor nova, adicione-a em `src/theme.ts` primeiro.
   
-## 3.1 Arquitetura de Layout (Scroll & Viewport)
+### 3.1 Arquitetura de Layout (Scroll & Viewport)
 
 - **Scroll vertical da aplicação é responsabilidade EXCLUSIVA do `MainContentWrapper`.**
 - O layout raiz (`MainLayout`) **DEVE** usar `overflow: hidden`.
@@ -50,6 +50,35 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
 - ❌ É proibido usar `overflow`, `height: 100vh` ou controle de scroll em páginas.
 - ✅ Qualquer página deve assumir que o scroll já está resolvido pelo layout.
 - **Scroll vertical e offset de header são responsabilidade exclusiva do MainContentWrapper, usando constantes globais de layout.**
+
+### 3.2 Centralização Total de Cores no theme.ts
+
+- **Todas as cores da aplicação (incluindo primary, secondary, error, success, info, warning, grey, common, divider, text, action, status, etc) DEVEM ser definidas explicitamente em `frontend/src/theme.ts`.**
+- **É proibido usar valores default do MUI (ex: primary.main, error.main, etc) sem que estejam declarados e customizados no theme.ts.**
+- **Novos tokens de cor (ex: para status, gráficos, bordas, etc) DEVEM ser criados no theme.ts antes de serem usados.**
+- **Não é permitido usar diretamente nomes do MUI (ex: 'primary', 'error', 'grey.800') sem garantir que o valor está no theme.ts.**
+- **A adição de qualquer cor nova deve ser feita exclusivamente em theme.ts, nunca inline ou em outros arquivos.**
+
+#### Exemplo de implementação correta:
+
+```typescript
+// theme.ts
+palette: {
+  primary: { main: '#1976d2' },
+  error: { main: '#e53935' },
+  custom: { matrix: '#00FF41', hackerBg: '#0d1117' },
+  status: { warning: '#ffb300', info: '#0288d1' }
+}
+
+// Uso:
+sx={{ color: theme.palette.status.warning }}
+```
+
+#### Justificativa
+
+- Garante rastreabilidade, branding e fácil manutenção.
+- Permite dark/light mode real e branding dinâmico.
+- Evita inconsistências visuais e dependência de defaults do MUI.
 
 ## 4. Arquitetura Backend
 

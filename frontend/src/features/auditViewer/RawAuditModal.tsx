@@ -2,6 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { Dialog, DialogContent, DialogTitle, IconButton, Box } from '@mui/material';
+import { scrollbarStyles } from '../../theme/scrollbarStyles';
 import CloseIcon from '@mui/icons-material/Close';
 import { AuditRecord } from '@/services/auditService';
 
@@ -34,6 +35,7 @@ export function RawAuditModal({ open, audit, onClose }: Props) {
             backgroundColor: (theme) => theme.palette.background.default,
             p: 2,
             borderRadius: 1,
+            ...scrollbarStyles,
           }}
         >
           {JSON.stringify(audit, null, 2)}

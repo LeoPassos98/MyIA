@@ -2,6 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { Box, Typography, Paper, Chip, Divider, Stack } from '@mui/material';
+import { scrollbarStyles } from './../../../theme/scrollbarStyles';
 import type { PromptTraceStep } from '../types';
 
 interface Props {
@@ -35,6 +36,7 @@ export function PromptTraceStepDetails({ step, showTimestamp = true }: Props) {
           bgcolor: 'background.default',
           maxHeight: 300,
           overflow: 'auto',
+          ...scrollbarStyles,
         }}
       >
         <Typography

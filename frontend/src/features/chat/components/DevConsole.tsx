@@ -28,7 +28,7 @@ export function DevConsole({ logs, visible }: DevConsoleProps) {
           bgcolor: theme.palette.custom.hackerBg, // Fundo terminal hacker (padronizado)
           border: '1px solid',
           borderColor: alpha(theme.palette.custom.matrix, 0.2),
-          boxShadow: `0 8px 32px ${alpha('#000', 0.5)}`,
+          boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.5)}`,
         }}
       >
         {/* Header */}

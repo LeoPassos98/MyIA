@@ -2,6 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { useMemo } from 'react';
+import { scrollbarStyles } from './../../../theme/scrollbarStyles';
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,7 @@ export function RawPromptTraceModal({ open, trace, onClose }: Props) {
             maxHeight: 520,
             border: '1px solid',
             borderColor: 'divider',
+            ...scrollbarStyles,
           }}
         >
           {jsonString}
