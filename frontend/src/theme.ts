@@ -70,9 +70,9 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
         contrastText: '#fff',
       },
       secondary: {
-        main: '#ac2fc2ff',
-        light: '#d05ce3',
-        dark: '#7a1fa2',
+        main: '#ff9800',      // Laranja principal
+        light: '#ffc947',    // Laranja claro
+        dark: '#c66900',     // Laranja escuro
         contrastText: '#fff',
       },
       error: {

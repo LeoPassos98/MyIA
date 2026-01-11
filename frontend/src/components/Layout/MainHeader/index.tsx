@@ -33,7 +33,7 @@ export default function MainHeader() {
       elevation={0}
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        bgcolor: theme.palette.mode === 'dark' ? 'rgba(18,18,18,0.85)' : 'rgba(255,255,255,0.85)',
+        bgcolor: theme.palette.background.default,
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         borderBottom: '1px solid',

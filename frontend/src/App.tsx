@@ -19,7 +19,7 @@ import AuditPage from './features/auditPage';
 import { PromptTracePage } from "@/features/promptTrace";
 import MainLayout from "./components/Layout/MainLayout";
 import Login from "./features/login/LoginPage";
-import Register from "./pages/Register";
+import Register from "./features/register/RegisterPage";
 import Chat from "./features/chat";
 import Settings from './features/settings';
 

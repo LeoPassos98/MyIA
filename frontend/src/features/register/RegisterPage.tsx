@@ -1,3 +1,4 @@
+// frontend/src/features/register/RegisterPage.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { useEffect } from 'react';
@@ -6,9 +7,9 @@ import { Container, Paper, Typography, Link, Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
 import MainHeader from '../../components/Layout/MainHeader';
-import LoginForm from './components/LoginForm';
+import RegisterForm from './components/RegisterForm';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const theme = useTheme();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -41,10 +42,9 @@ export default function LoginPage() {
               p: 4,
               width: '100%',
               borderRadius: 3,
-              background:
-                theme.palette.mode === 'dark'
-                  ? theme.palette.background.paper
-                  : theme.palette.gradients.glass,
+              background: theme.palette.mode === 'dark'
+                ? theme.palette.background.paper
+                : theme.palette.gradients.glass,
               boxShadow: theme.shadows[3],
             }}
           >
@@ -60,22 +60,19 @@ export default function LoginPage() {
                 mb: 2,
               }}
             >
-              MyIA - Login
+              MyIA - Cadastro
             </Typography>
-            <LoginForm onSuccess={handleSuccess} />
+            <RegisterForm onSuccess={handleSuccess} />
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Não tem uma conta?{' '}
+                Já tem uma conta?{' '}
                 <Link
                   component={RouterLink}
-                  to="/register"
+                  to="/login"
                   underline="hover"
-                  sx={{
-                    color: theme.palette.secondary.main,
-                    fontWeight: 500,
-                  }}
+                  sx={{ color: theme.palette.secondary.main, fontWeight: 500 }}
                 >
-                  Cadastre-se
+                  Faça login
                 </Link>
               </Typography>
             </Box>
