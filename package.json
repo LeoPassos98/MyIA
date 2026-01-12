@@ -8,7 +8,15 @@
     "dev:frontend:wait": "echo '⏳ Aguardando Backend iniciar...' && wait-on -l http://localhost:3001/api/health -t 60000 --interval 1000 && npm run dev:frontend"
   },
   "devDependencies": {
+    "@types/passport": "^1.0.17",
+    "@types/passport-github2": "^1.2.9",
+    "@types/passport-google-oauth20": "^2.0.17",
     "concurrently": "^6.0.0",
     "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
+    "passport-google-oauth20": "^2.0.0"
   }
 }

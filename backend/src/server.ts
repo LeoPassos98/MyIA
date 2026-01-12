@@ -18,10 +18,11 @@ import userRoutes from './routes/userRoutes';
 import chatHistoryRoutes from './routes/chatHistoryRoutes';
 import auditRoutes from './routes/auditRoutes';
 import promptTraceRoutes from './routes/promptTraceRoutes';
-
+import passport from './config/passport';
 
 
 const app = express();
+
 
 // 🔒 Security Headers (Helmet)
 app.use(helmet({
@@ -71,6 +72,9 @@ app.use(cors({
 app.options('*', cors());
 app.use(express.json());
 
+// Inicializa Passport para OAuth
+app.use(passport.initialize() as any); 
+
 // Log de requisições
 app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`);
@@ -96,7 +100,6 @@ app.use('/api/chat-history', apiLimiter, chatHistoryRoutes);
 app.use('/api/audit', apiLimiter, auditRoutes);
 app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
 
-
 // Rota 404
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
@@ -112,12 +115,12 @@ async function startServer() {
   try {
     console.log('🔧 Inicializando servidor...');
     console.log('📦 Carregando dependências...');
-
+    
     // Teste de conexão com banco
     console.log('🗄️  Conectando ao banco de dados...');
     await prisma.$connect();
     console.log('✅ Banco de dados conectado!');
-
+    
     app.listen(PORT, () => {
       console.log('✅ Servidor rodando!');
       console.log(`🚀 Backend disponível em http://localhost:${PORT}`);

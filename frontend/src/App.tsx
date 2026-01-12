@@ -15,6 +15,7 @@ import { AuditProvider } from './features/audit/context/AuditContext';
 import { AuditFeature } from './features/audit';
 
 // Pages & Features
+
 import AuditPage from './features/auditPage';
 import { PromptTracePage } from "@/features/promptTrace";
 import MainLayout from "./components/Layout/MainLayout";
@@ -23,6 +24,7 @@ import Register from "./features/register/RegisterPage";
 import Chat from "./features/chat";
 import Settings from './features/settings';
 import LandingPage from './features/landing/components/LandingPage';
+import AuthSuccess from './pages/AuthSuccess';
 
 function AppRoutes() {
   return (
@@ -33,6 +35,9 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        {/* Social Auth Success */}
+        <Route path="/auth-success" element={<AuthSuccess />} />
+import AuthSuccess from './pages/AuthSuccess';
 
         <Route element={<MainLayout />}>
           <Route path="/chat" element={<Chat />} />

@@ -1,0 +1,34 @@
+### Configurações
+@baseUrl = http://localhost:3000/api/auth
+
+### 1. Testar Validação (Nome faltando)
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "email": "teste_falha@email.com",
+  "password": "password123"
+}
+
+###
+
+### 2. Cadastro Sucesso (Use um e-mail novo)
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "name": "Leonardo Teste",
+  "email": "leo_sucesso@email.com",
+  "password": "password123"
+}
+
+###
+
+### 3. Login Sucesso
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "leo_sucesso@email.com",
+  "password": "password123"
+}

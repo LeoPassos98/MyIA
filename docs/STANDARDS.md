@@ -349,3 +349,19 @@ gap: 3     // 24px (seções)
 - [ ] Border radius consistente (1, 2, 3)
 
 > **Para mais detalhes:** Consulte [VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md)
+
+## 🌐 Padronização de API e Respostas (JSend)
+
+Toda comunicação entre Backend e Frontend deve seguir o padrão **JSend** para garantir previsibilidade.
+
+### Formato de Resposta
+- **Sucesso (200, 201):** `{ "status": "success", "data": { ... } }`
+- **Falha de Cliente/Validação (400, 403):** `{ "status": "fail", "data": { "campo": "mensagem" } }`
+- **Erro de Servidor (500):** `{ "status": "error", "message": "Descrição amigável", "code": 500 }`
+
+### Validação e Fluxo
+1. **Zod Middleware:** Nenhuma rota deve processar dados sem antes passar pelo middleware `validate(schema)`.
+2. **Controller:** Deve ser focado apenas na orquestração (chamar services/providers e retornar `ApiResponse`).
+3. **Segurança:** - Senhas nunca devem ser salvas em texto puro (usar `bcrypt` com salt de 10).
+   - O objeto de usuário retornado jamais deve incluir o campo `password`.
+4. **Erros:** Proibido o uso de `try/catch` genérico dentro dos controllers para retornar erro. Os erros devem ser lançados (`throw`) e capturados pelo `errorHandler` global.

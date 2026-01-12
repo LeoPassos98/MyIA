@@ -32,3 +32,6 @@ build/
 # Temporary files
 tmp/
 temp/
+
+# Arquivos removidos temporariamente
+.trash/

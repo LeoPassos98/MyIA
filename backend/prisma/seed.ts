@@ -437,7 +437,30 @@ async function seedChatsAndMessages(userId: string) {
 async function main() {
   console.log('🌱 Iniciando seed completo do MyIA...');
 
-  await seedProvidersAndModels();
+    console.log('🌱 Populando Provedores de IA...');
+
+    const providers = [
+      { name: 'Google', slug: 'google' },
+      { name: 'GitHub', slug: 'github' },
+      { name: 'OpenAI', slug: 'openai' },
+      { name: 'Groq', slug: 'groq' }
+    ];
+
+    for (const p of providers) {
+      await prisma.aIProvider.upsert({
+        where: { slug: p.slug },
+        update: {},
+        create: {
+          name: p.name,
+          slug: p.slug,
+          isActive: true
+        }
+      });
+    }
+
+    console.log('✅ Seed finalizado com sucesso!');
+
+    await seedProvidersAndModels();
   const user = await seedUser();
   await seedChatsAndMessages(user.id);
 

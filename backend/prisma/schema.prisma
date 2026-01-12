@@ -2,7 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
@@ -21,14 +21,14 @@ model User {
   updatedAt DateTime @updatedAt
 
   // --- ARQUITETURA NOVA ---
-  
-  // Link para a tabela de configurações (Relação 1-para-1)
-  settings  UserSettings? 
-  
-  // Link para os logs de chamadas (Relação 1-para-N)
-  apiCalls  ApiCallLog[]
 
-  chats        Chat[]
+  // Link para a tabela de configurações (Relação 1-para-1)
+  settings UserSettings?
+
+  // Link para os logs de chamadas (Relação 1-para-N)
+  apiCalls ApiCallLog[]
+
+  chats Chat[]
 
   providerCredentials UserProviderCredential[]
 
@@ -37,8 +37,8 @@ model User {
 
 // 2. ADICIONE ESTE NOVO MODELO (Configurações)
 model UserSettings {
-  id        String   @id @default(uuid())
-  theme     String   @default("light") // "light" ou "dark"
+  id    String @id @default(uuid())
+  theme String @default("light") // "light" ou "dark"
 
   // --- Aba 3: Chaves de API ---
   // (IMPORTANTE: Você deve criptografar isso no backend antes de salvar!)
@@ -50,46 +50,46 @@ model UserSettings {
   mistralApiKey    String?
 
   // --- O Link de volta ao User ---
-  userId    String   @unique // O '@unique' garante a relação 1-para-1
-  user      User     @relation(fields: [userId], references: [id])
+  userId String @unique // O '@unique' garante a relação 1-para-1
+  user   User   @relation(fields: [userId], references: [id])
 
   @@map("user_settings")
 }
 
 // 3. ADICIONE ESTE NOVO MODELO (Analytics)
 model ApiCallLog {
-  id         String   @id @default(uuid())
-  timestamp  DateTime @default(now())
-  provider   String
-  model      String?  // <-- O "fiscal" não vê este
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
+  provider  String
+  model     String? // <-- O "fiscal" não vê este
 
-  tokensIn   Int      @default(0) // <-- O "fiscal" não vê este
-  tokensOut  Int      @default(0) // <-- O "fiscal" não vê este
-  costInUSD  Float    @default(0.0) // <-- O "fiscal" não vê este
+  tokensIn  Int   @default(0) // <-- O "fiscal" não vê este
+  tokensOut Int   @default(0) // <-- O "fiscal" não vê este
+  costInUSD Float @default(0.0) // <-- O "fiscal" não vê este
 
-  wordsIn    Int      @default(0)
-  wordsOut   Int      @default(0)
-  bytesIn    Int      @default(0)
-  bytesOut   Int      @default(0)
+  wordsIn  Int @default(0)
+  wordsOut Int @default(0)
+  bytesIn  Int @default(0)
+  bytesOut Int @default(0)
 
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   @@map("api_call_logs")
 }
 
 // Modelo 1: A Conversa (Um "título" para o chat)
 model Chat {
-  id        String    @id @default(uuid())
-  title     String    @default("Nova Conversa") // Título (ex: "Resumo sobre IA")
-  provider  String    @default("groq") // Provider travado para este chat
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        String   @id @default(uuid())
+  title     String   @default("Nova Conversa") // Título (ex: "Resumo sobre IA")
+  provider  String   @default("groq") // Provider travado para este chat
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  messages  Message[] // Link para as mensagens
+  messages Message[] // Link para as mensagens
 
   @@map("chats")
 }
@@ -102,8 +102,8 @@ model Message {
   createdAt DateTime @default(now())
   isPinned  Boolean  @default(false)
 
-  chatId    String
-  chat      Chat     @relation(fields: [chatId], references: [id])
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id])
 
   // --- TELEMETRIA "INTELIGENTE" (só para 'assistant') ---
   provider  String?
@@ -125,43 +125,43 @@ model Message {
 
 // 1. O Provedor (ex: OpenAI, Groq, Anthropic)
 model AIProvider {
-  id          String   @id @default(uuid())
-  name        String   // Ex: "OpenAI", "Groq"
-  slug        String   @unique // Ex: "openai", "groq" (usado no código para carregar o driver)
-  isActive    Boolean  @default(true) // O "Disjuntor" Geral
-  websiteUrl  String?
-  logoUrl     String?
-  
+  id         String  @id @default(uuid())
+  name       String // Ex: "OpenAI", "Groq"
+  slug       String  @unique // Ex: "openai", "groq" (usado no código para carregar o driver)
+  isActive   Boolean @default(true) // O "Disjuntor" Geral
+  websiteUrl String?
+  logoUrl    String?
+
   // Configurações técnicas
-  baseUrl     String?  // Caso precise sobrescrever (ex: proxies locais)
-  
+  baseUrl String? // Caso precise sobrescrever (ex: proxies locais)
+
   models      AIModel[]
   credentials UserProviderCredential[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("ai_providers")
 }
 
 // 2. Os Modelos (ex: gpt-4, llama-3-70b)
 model AIModel {
-  id            String   @id @default(uuid())
-  name          String   // Nome visível: "GPT-4 Turbo"
-  apiModelId    String   // ID técnico: "gpt-4-0125-preview"
-  contextWindow Int      @default(4096)
-  
+  id            String @id @default(uuid())
+  name          String // Nome visível: "GPT-4 Turbo"
+  apiModelId    String // ID técnico: "gpt-4-0125-preview"
+  contextWindow Int    @default(4096)
+
   // Custos (para cálculo de telemetria)
-  costPer1kInput  Float  @default(0)
-  costPer1kOutput Float  @default(0)
+  costPer1kInput  Float @default(0)
+  costPer1kOutput Float @default(0)
 
-  isActive      Boolean  @default(true) // Pode desativar só um modelo específico
+  isActive Boolean @default(true) // Pode desativar só um modelo específico
 
-  providerId    String
-  provider      AIProvider @relation(fields: [providerId], references: [id])
+  providerId String
+  provider   AIProvider @relation(fields: [providerId], references: [id])
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("ai_models")
 }
@@ -169,14 +169,14 @@ model AIModel {
 // 3. Credenciais do Usuário (Para o sistema BYOK - Bring Your Own Key)
 // Isso substitui as colunas soltas no UserSettings a longo prazo
 model UserProviderCredential {
-  id          String   @id @default(uuid())
-  apiKey      String   // Criptografar antes de salvar!
-  
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  
-  providerId  String
-  provider    AIProvider @relation(fields: [providerId], references: [id])
+  id     String @id @default(uuid())
+  apiKey String // Criptografar antes de salvar!
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  providerId String
+  provider   AIProvider @relation(fields: [providerId], references: [id])
 
   @@unique([userId, providerId]) // Um usuário só tem uma chave por provider
   @@map("user_provider_credentials")

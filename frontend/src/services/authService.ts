@@ -1,20 +1,18 @@
 import { api } from './api';
 
-export interface RegisterData {
-  email: string;
-  password: string;
-  name?: string;
-}
-
-export interface LoginData {
-  email: string;
-  password: string;
+// 1. Interfaces alinhadas ao JSend
+interface JSendResponse<T> {
+  status: 'success' | 'fail' | 'error';
+  data: T;
+  message?: string;
 }
 
 export interface User {
   id: string;
   email: string;
   name: string | null;
+  // Adicionado para suportar o que o Google/Github trarão
+  avatarUrl?: string; 
 }
 
 export interface LoginResponse {
@@ -23,34 +21,27 @@ export interface LoginResponse {
 }
 
 export const authService = {
-  async register(data: RegisterData): Promise<{ userId: string }> {
-    const response = await api.post('/auth/register', {
-      email: data.email,
-      password: data.password,
-      name: data.name
-    });
-    return response.data;
+  // O Backend agora retorna { status: 'success', data: { user: { id: ... } } }
+  async register(data: any): Promise<User> {
+    const response = await api.post<JSendResponse<{ user: User }>>('/auth/register', data);
+    return response.data.data.user;
   },
 
-  login: async (data: LoginData) => {
-    const payload = {
-      email: data.email,
-      password: data.password
-    };
+  async login(data: any): Promise<LoginResponse> {
+    const response = await api.post<JSendResponse<LoginResponse>>('/auth/login', data);
     
-    const response = await api.post('/auth/login', payload);
-    const { token, user } = response.data;
+    // Pegamos os dados de dentro do envelope 'data' do JSend
+    const { token, user } = response.data.data;
     
-    // Salvar no localStorage
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     
-    return response.data;
+    return { token, user };
   },
 
   async getMe(): Promise<User> {
-    const response = await api.get('/auth/me');
-    return response.data;
+    const response = await api.get<JSendResponse<{ user: User }>>('/auth/me');
+    return response.data.data.user;
   },
 
   logout(): void {
@@ -60,18 +51,14 @@ export const authService = {
 
   getStoredUser(): User | null {
     const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
   },
 
   getStoredToken(): string | null {
     return localStorage.getItem('token');
-  },
-
-  async changePassword(data: { oldPassword: string; newPassword: string }): Promise<void> {
-    const response = await api.post('/auth/change-password', {
-      oldPassword: data.oldPassword,
-      newPassword: data.newPassword
-    });
-    return response.data;
-  },
+  }
 };
