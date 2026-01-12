@@ -29,7 +29,7 @@ const HeaderLeft: React.FC<HeaderLeftProps> = ({ isChatPage, isHistoryOpen, setI
                 background: isHistoryOpen ? theme.palette.gradients.primary : 'transparent',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  color: 'primary.main',
+                  color: 'divider',
                   background: theme.palette.gradients.primary,
                   opacity: 0.9,
                 },

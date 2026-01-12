@@ -70,9 +70,9 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
         contrastText: '#fff',
       },
       secondary: {
-        main: '#ff9800',      // Laranja principal
-        light: '#ffc947',    // Laranja claro
-        dark: '#c66900',     // Laranja escuro
+        main: '#ff8e53',      // Laranja principal
+        light: '#ffb78fff',   // Laranja claro
+        dark: '#bf5c00ff',       // Laranja escuro
         contrastText: '#fff',
       },
       error: {
@@ -82,7 +82,7 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
         contrastText: '#fff',
       },
       warning: {
-        main: '#ffb300',
+        main: '#ffb300',  
         light: '#ffe082',
         dark: '#c68400',
         contrastText: '#fff',
@@ -128,7 +128,7 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
       },
       action: {
         active: mode === 'dark' ? '#fff' : '#212121',
-        hover: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(33,33,33,0.08)',
+        hover: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(33,33,33,0.08)',
         selected: mode === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(33,33,33,0.16)',
         disabled: mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(33,33,33,0.3)',
         disabledBackground: mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(33,33,33,0.12)',

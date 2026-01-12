@@ -22,12 +22,12 @@ export const PinnedMessagesTab = () => {
   const pinnedMessages = chatHistorySnapshot.filter(msg => msg.isPinned);
 
   return (
-    <Box>
+    <Box sx={{ px: 2 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PushPinIcon color="primary" /> Mensagens Fixadas
+            <PushPinIcon color="secondary" /> Mensagens Fixadas
           </Typography>
           <HelpTooltip 
             title="Mensagens Fixadas (Pinned)"
@@ -38,7 +38,7 @@ export const PinnedMessagesTab = () => {
         <Chip 
           label={`${pinnedMessages.length} pinadas`}
           size="small"
-          color="primary"
+          color="secondary"
           variant="outlined"
         />
       </Box>
@@ -68,9 +68,9 @@ export const PinnedMessagesTab = () => {
                 sx={{
                   borderBottom: '1px solid',
                   borderColor: 'divider',
-                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  bgcolor: alpha(theme.palette.secondary.main, 0.05),
                   '&:hover': { 
-                    bgcolor: alpha(theme.palette.primary.main, 0.1) 
+                    bgcolor: alpha(theme.palette.secondary.main, 0.1) 
                   }
                 }}
                 secondaryAction={

@@ -72,7 +72,7 @@ export default function LoginPage() {
                   underline="hover"
                   sx={{
                     color: theme.palette.secondary.main,
-                    fontWeight: 500,
+                    fontWeight: 700,
                   }}
                 >
                   Cadastre-se

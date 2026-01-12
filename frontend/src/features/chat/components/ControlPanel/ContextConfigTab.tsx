@@ -45,7 +45,7 @@ export const ContextConfigTab = () => {
   };
 
   return (
-    <Box>
+    <Box sx={{ px: 2 }}>
       {/* Aviso de Modo Manual Ativo */}
       {isManualMode && (
         <Alert 
@@ -61,7 +61,7 @@ export const ContextConfigTab = () => {
       {/* Header com Reset */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <BrainIcon color="primary" /> Pipeline de Contexto
+          <BrainIcon color="secondary" /> Pipeline de Contexto
         </Typography>
         <Tooltip title="Restaurar padrões">
           <span>
@@ -304,13 +304,13 @@ export const ContextConfigTab = () => {
       <Box sx={{ 
         mt: 3, 
         p: 2, 
-        bgcolor: alpha(isManualMode ? theme.palette.warning.main : theme.palette.primary.main, 0.05), 
+        bgcolor: alpha(isManualMode ? theme.palette.warning.main : theme.palette.secondary.main, 0.05), 
         borderRadius: 2,
         border: '1px dashed',
         borderColor: isManualMode ? 'warning.main' : 'divider'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-          <Typography variant="caption" fontWeight="bold" color={isManualMode ? 'warning.main' : 'primary.main'}>
+          <Typography variant="caption" fontWeight="bold" color={isManualMode ? 'warning.main' : 'secondary.main'}>
             {isManualMode ? '⚠️ Modo Manual Ativo' : '📋 Ordem do Pipeline Ativo:'}
           </Typography>
           {!isManualMode && (

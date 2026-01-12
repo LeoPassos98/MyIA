@@ -28,7 +28,7 @@ export default function ControlPanel() {
       
       {/* Header Fixo */}
       <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha(theme.palette.background.paper, 0.8), backdropFilter: 'blur(10px)' }}>
-        <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
+        <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.primary' }}>
           <TuneIcon /> Painel de Controle
         </Typography>
       </Box>
@@ -42,7 +42,8 @@ export default function ControlPanel() {
           borderBottom: 1,
           borderColor: 'divider',
           '& .MuiTab-root': { fontWeight: 600, minWidth: 0, py: 1.5 },
-          '& .Mui-selected': { color: 'primary.main' }
+          '& .Mui-selected': { color: 'secondary.main' },
+          '& .MuiTabs-indicator': { backgroundColor: theme.palette.secondary.main },
         }}
       >
         <Tab icon={<BotIcon fontSize="small" />} label="Modelo" />

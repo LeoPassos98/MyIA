@@ -25,11 +25,11 @@ const HeaderRight: React.FC<HeaderRightProps> = ({ isChatPage, isEditorOpen, set
               onClick={() => setIsEditorOpen(!isEditorOpen)}
               disabled={isHistoryOpen && !isEditorOpen}
               sx={{
-                color: isEditorOpen ? 'secondary.main' : 'text.secondary',
+                color: isEditorOpen ? 'secondary.dark' : 'text.secondary',
                 background: isEditorOpen ? theme.palette.gradients.secondary : 'transparent',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  color: 'secondary.main',
+                  color: 'divider',
                   background: theme.palette.gradients.secondary,
                   opacity: 0.9,
                 },

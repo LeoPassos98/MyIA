@@ -22,6 +22,7 @@ import Login from "./features/login/LoginPage";
 import Register from "./features/register/RegisterPage";
 import Chat from "./features/chat";
 import Settings from './features/settings';
+import LandingPage from './features/landing/components/LandingPage';
 
 function AppRoutes() {
   return (
@@ -29,6 +30,7 @@ function AppRoutes() {
       <CssBaseline />
 
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
@@ -39,10 +41,10 @@ function AppRoutes() {
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/prompt-trace" element={<PromptTracePage />} />
           <Route path="/prompt-trace/:traceId" element={<PromptTracePage />} />
-
         </Route>
 
-        <Route path="/" element={<Navigate to="/chat" replace />} />
+        {/* catch-all: redireciona para landing */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

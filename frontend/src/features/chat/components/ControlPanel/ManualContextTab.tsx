@@ -20,7 +20,7 @@ export const ManualContextTab = () => {
   const isActive = manualContext.hasAdditionalContext && selectedCount > 0;
 
   return (
-    <Box>
+    <Box sx={{ px: 2 }}>
       {/* Aviso do Modo */}
       <Alert 
         severity={isActive ? 'warning' : 'info'} 
@@ -44,7 +44,7 @@ export const ManualContextTab = () => {
               />
             }
             label={
-              <Typography fontWeight="bold" color={manualContext.hasAdditionalContext ? 'warning.main' : 'text.primary'}>
+              <Typography fontWeight="bold" color={manualContext.hasAdditionalContext ? 'warning.main' : 'secondary.main'}>
                 Modo de Injeção Manual
               </Typography>
             }

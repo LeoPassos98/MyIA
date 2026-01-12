@@ -5,9 +5,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Box, Button, List, ListItem, ListItemButton, ListItemText,
-  Typography, Divider, ListItemIcon, useTheme, alpha, ListSubheader, Skeleton
+  Typography, Divider, ListItemIcon, useTheme, alpha, ListSubheader, Skeleton,
+
 } from '@mui/material';
-import { Add as AddIcon, ChatBubbleOutline, Settings as SettingsIcon, History as HistoryIcon } from '@mui/icons-material';
+import { Add as AddIcon, ChatBubbleOutline, Settings as SettingsIcon, History as HistoryIcon, LightModeOutlined as LightModeIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { chatHistoryService, ChatSession } from '../../../../services/chatHistoryService';
 import { useLayout } from '../../../../contexts/LayoutContext';
@@ -220,17 +221,25 @@ export default function HistorySidebar() {
       </List>
       {/* Rodapé: botão para configurações */}
       <Divider />
-      <Box sx={{ p: 1 }}>
-        <ListItemButton
+
+      <Box sx={{ width: '100%', px: 1, py: 1, display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+        <Button
+          variant="text"
+          startIcon={<SettingsIcon />}
           onClick={() => { setIsHistoryOpen(false); navigate('/settings'); }}
-          sx={{ borderRadius: 2, color: 'text.secondary' }}
+          sx={{ borderRadius: 2, color: 'text.secondary', minWidth: 120, justifyContent: 'center', alignItems: 'center', display: 'flex' }}
         >
-          <ListItemIcon sx={{ color: 'inherit' }}>
-            <SettingsIcon />
-          </ListItemIcon>
-          <ListItemText primary="Configurações" />
-        </ListItemButton>
+          Configurações
+        </Button>
+        <Button
+          variant="text"
+          sx={{ minWidth: 40, color: 'text.secondary', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          // onClick={handleThemeToggle} // futuro seletor de tema
+        >
+          <LightModeIcon sx={{ fontSize: 20 }} />
+        </Button>
       </Box>
-    </Box>
+
+    </Box >
   );
 }

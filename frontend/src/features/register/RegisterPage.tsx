@@ -70,7 +70,7 @@ export default function RegisterPage() {
                   component={RouterLink}
                   to="/login"
                   underline="hover"
-                  sx={{ color: theme.palette.secondary.main, fontWeight: 500 }}
+                  sx={{ color: theme.palette.secondary.main, fontWeight: 700 }}
                 >
                   Faça login
                 </Link>
