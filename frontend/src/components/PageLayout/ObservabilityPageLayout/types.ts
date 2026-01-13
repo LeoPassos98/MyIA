@@ -33,6 +33,8 @@ export interface ObservabilityPageLayoutProps {
   onOpenDrawer: () => void;
   /** Callback para fechar drawer */
   onCloseDrawer: () => void;
+  /** Callback customizado ao clicar em seção (se não fornecido, usa scroll padrão) */
+  onSectionClick?: (sectionId: string) => void;
 }
 
 /**

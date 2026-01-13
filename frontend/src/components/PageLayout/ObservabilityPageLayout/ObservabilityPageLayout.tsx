@@ -24,6 +24,7 @@ export function ObservabilityPageLayout({
   topOffset = HEADER_HEIGHT,
   drawerOpen,
   onCloseDrawer,
+  onSectionClick,
 }: ObservabilityPageLayoutProps) {
   const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
 
@@ -37,10 +38,14 @@ export function ObservabilityPageLayout({
 
   const handleSectionClick = useCallback(
     (sectionId: string) => {
-      scrollToSection(sectionId);
+      if (onSectionClick) {
+        onSectionClick(sectionId);
+      } else {
+        scrollToSection(sectionId);
+      }
       onCloseDrawer();
     },
-    [scrollToSection, onCloseDrawer]
+    [onSectionClick, scrollToSection, onCloseDrawer]
   );
 
   return (

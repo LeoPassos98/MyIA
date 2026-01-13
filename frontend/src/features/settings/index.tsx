@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('profile');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -41,24 +42,36 @@ export default function SettingsPage() {
     { id: 'api-keys', label: 'Chaves de API', icon: <Key /> },
   ];
 
+  const handleSectionClick = (sectionId: string) => {
+    setActiveSection(sectionId);
+    setDrawerOpen(false);
+  };
+
   return (
     <ObservabilityPageLayout
       sections={sections}
       drawerOpen={drawerOpen}
       onOpenDrawer={() => setDrawerOpen(true)}
       onCloseDrawer={() => setDrawerOpen(false)}
+      onSectionClick={handleSectionClick}
     >
-      <ObservabilitySection id="profile" title="Perfil">
-        <ProfileTab />
-      </ObservabilitySection>
+      {activeSection === 'profile' && (
+        <ObservabilitySection id="profile" title="Perfil">
+          <ProfileTab />
+        </ObservabilitySection>
+      )}
 
-      <ObservabilitySection id="appearance" title="Aparência">
-        <AppearanceTab />
-      </ObservabilitySection>
+      {activeSection === 'appearance' && (
+        <ObservabilitySection id="appearance" title="Aparência">
+          <AppearanceTab />
+        </ObservabilitySection>
+      )}
 
-      <ObservabilitySection id="api-keys" title="Chaves de API">
-        <ApiKeysTab />
-      </ObservabilitySection>
+      {activeSection === 'api-keys' && (
+        <ObservabilitySection id="api-keys" title="Chaves de API">
+          <ApiKeysTab />
+        </ObservabilitySection>
+      )}
     </ObservabilityPageLayout>
   );
 }
