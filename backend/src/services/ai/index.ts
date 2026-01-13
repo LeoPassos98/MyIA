@@ -4,6 +4,7 @@
 import { StreamChunk } from './types';
 import { AIProviderFactory } from './providers/factory';
 import { getEmbedding, getEmbeddingsBatch, EmbeddingResponse } from './client/azureEmbeddingClient';
+import { prisma } from '../../lib/prisma';
 
 export interface AIStreamOptions {
   providerSlug: string;
@@ -27,28 +28,25 @@ export const aiService = {
     console.log(`[AI Service] Stream init: ${options.providerSlug} / ${options.modelId}`);
 
     try {
-      // 1. Instancia o driver (OpenAI, Groq, etc) via Factory
       const provider = await AIProviderFactory.getProviderInstance(options.providerSlug);
 
-      // 2. Busca a credencial (Do usuário ou Fallback do sistema)
+      const providerRecord = await prisma.aIProvider.findUnique({
+        where: { slug: options.providerSlug }
+      });
+
+      if (!providerRecord) {
+        yield { type: 'error', error: `Provider ${options.providerSlug} não encontrado.` };
+        return;
+      }
+
       let apiKey = "";
       try {
-        // Fallback temporário de variáveis de ambiente até termos o painel frontend pronto
-        if (options.providerSlug === 'openai') apiKey = process.env.OPENAI_API_KEY || "";
-        if (options.providerSlug === 'groq') apiKey = process.env.GROQ_API_KEY || "";
-        if (options.providerSlug === 'together') apiKey = process.env.TOGETHER_API_KEY || "";
-        
-        // Futuro: apiKey = await AIProviderFactory.getUserApiKey(options.userId, options.providerSlug);
-      } catch (e) {
-        console.warn("Chave não encontrada, usando variáveis de ambiente...");
+        apiKey = await AIProviderFactory.getApiKey(options.userId, providerRecord.id);
+      } catch (e: any) {
+        yield { type: 'error', error: e.message };
+        return;
       }
 
-      if (!apiKey) {
-         yield { type: 'error', error: `Chave de API não configurada para ${options.providerSlug}.` };
-         return;
-      }
-
-      // 3. Inicia o streaming usando o Driver unificado
       const streamGenerator = provider.streamChat(messages, {
         modelId: options.modelId,
         apiKey: apiKey,

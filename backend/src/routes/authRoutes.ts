@@ -4,7 +4,6 @@ import { authController } from '../controllers/authController';
 import { validateRequest } from '../middleware/validateRequest';
 import { loginSchema, registerSchema, changePasswordSchema } from '../middleware/validators/authValidator';
 import passport from 'passport';
-import { AuthController } from '../features/auth/auth.controller'; // Se estiver usando a classe
 import { authMiddleware, protect } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -13,13 +12,13 @@ const router = Router();
 router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
 router.get('/github/callback', 
   passport.authenticate('github', { failureRedirect: '/login', session: false }),
-  AuthController.socialLoginCallback
+  authController.socialLoginCallback
 );
 
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 router.get('/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login', session: false }),
-  AuthController.socialLoginCallback
+  authController.socialLoginCallback
 );
 
 // --- Autenticação Manual ---

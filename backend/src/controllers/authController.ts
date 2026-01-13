@@ -84,4 +84,18 @@ export const authController = {
       return next(error);
     }
   },
+
+  async socialLoginCallback(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = req.user as any;
+      if (!user || !user.token) {
+        throw new AppError('Falha na autenticação social', 401);
+      }
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(`${frontendUrl}/auth-success?token=${user.token}`);
+    } catch (error) {
+      return next(error);
+    }
+  },
 };

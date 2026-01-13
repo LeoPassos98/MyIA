@@ -98,6 +98,11 @@ cd ../frontend
 npm install
 ```
 
+> ℹ️ **Nota:** O `npm install` já instala todas as dependências necessárias, incluindo:
+> - AWS SDK (`@aws-sdk/client-bedrock-runtime`)
+> - Passport OAuth (`passport`, `passport-github2`, `passport-google-oauth20`)
+> - Todas as outras dependências listadas em `package.json`
+
 ### 3️⃣ Configuração do Backend (.env)
 
 Crie um arquivo `backend/.env` com base no `backend/.env.example`:
@@ -129,6 +134,13 @@ ANTHROPIC_API_KEY="sk-ant-..."
 TOGETHER_API_KEY="..."
 PERPLEXITY_API_KEY="..."
 MISTRAL_API_KEY="..."
+
+# AWS Bedrock (Opcional)
+# Formato: ACCESS_KEY:SECRET_KEY
+# IMPORTANTE: A SECRET_KEY só aparece UMA VEZ ao criar a Access Key!
+# Se perdeu, delete a key antiga e crie uma nova.
+AWS_BEDROCK_CREDENTIALS="AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+AWS_BEDROCK_REGION="us-east-1"
 ```
 
 > 🔒 **SEGURANÇA CRÍTICA**: Gere secrets fortes (≥32 chars) para produção:
