@@ -1,58 +1,29 @@
-import { useState, useEffect } from 'react';
-import { Box, TextField, Button, Grid, Alert } from '@mui/material';
-import { useAuth } from '../../../contexts/AuthContext';
-import { userService } from '../../../services/userService';
-import { authService } from '../../../services/authService';
-import { SettingsSection } from './SettingsSection';
+// frontend/src/features/settings/components/ProfileTab.tsx
+
+import { 
+  Box, TextField, Button, Grid, Alert, 
+  Card, CardContent, Avatar, Typography, Divider, Chip 
+} from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import GitHubIcon from '@mui/icons-material/GitHub'; // Se não tiver, use um ícone de pessoa
+import { SettingsSection } from './SettingsSection';
+import { useProfileTab } from '../hooks/useProfileTab';
 
 export default function ProfileTab() {
   const theme = useTheme();
-  const { user, setUser } = useAuth();
-  
-  // States para Nome
-  const [name, setName] = useState(user?.name || '');
-  const [isSavingName, setIsSavingName] = useState(false);
-  const [nameMsg, setNameMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-
-  // States para Senha
-  const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
-  const [isChangingPass, setIsChangingPass] = useState(false);
-  const [passMsg, setPassMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-
-  useEffect(() => { if (user?.name) setName(user.name); }, [user]);
-
-  const handleSaveName = async () => {
-    try {
-      setIsSavingName(true);
-      await userService.updateProfile({ name });
-      if (setUser && user) setUser({ ...user, name });
-      setNameMsg({ type: 'success', text: 'Nome atualizado!' });
-    } catch (error) {
-      setNameMsg({ type: 'error', text: 'Erro ao atualizar nome.' });
-    } finally {
-      setIsSavingName(false);
-      setTimeout(() => setNameMsg(null), 3000);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (passwords.new !== passwords.confirm) {
-      setPassMsg({ type: 'error', text: 'Senhas não conferem.' });
-      return;
-    }
-    try {
-      setIsChangingPass(true);
-      await authService.changePassword({ oldPassword: passwords.current, newPassword: passwords.new });
-      setPasswords({ current: '', new: '', confirm: '' });
-      setPassMsg({ type: 'success', text: 'Senha alterada!' });
-    } catch (error) {
-      setPassMsg({ type: 'error', text: 'Erro ao alterar senha.' });
-    } finally {
-      setIsChangingPass(false);
-      setTimeout(() => setPassMsg(null), 3000);
-    }
-  };
+  const {
+    user,
+    name,
+    setName,
+    isSavingName,
+    nameMsg,
+    handleSaveName,
+    passwords,
+    setPasswords,
+    isChangingPass,
+    passMsg,
+    handleChangePassword,
+  } = useProfileTab();
 
   const inputStyle = {
     '& .MuiOutlinedInput-root': { borderRadius: 2 }
@@ -60,16 +31,65 @@ export default function ProfileTab() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      
+      {/* 💳 CARD DE IDENTIDADE DO USUÁRIO */}
+      <Card sx={{ 
+        background: theme.palette.background.paper, 
+        borderRadius: 3, 
+        border: `1px solid ${theme.palette.divider}`,
+        boxShadow: 3
+      }}>
+        <CardContent sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Avatar 
+              sx={{ 
+                width: 80, 
+                height: 80, 
+                fontSize: '2rem',
+                background: theme.palette.gradients?.primary || theme.palette.primary.main,
+                boxShadow: 4
+              }}
+            >
+              {user?.name?.charAt(0) || user?.email?.charAt(0)}
+            </Avatar>
+            
+            <Box sx={{ flexGrow: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                  {user?.name || 'Usuário MyIA'}
+                </Typography>
+                {/* Tag indicando que veio do GitHub */}
+                <Chip 
+                  icon={<GitHubIcon style={{ fontSize: 16 }} />} 
+                  label="GitHub" 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ borderRadius: 1 }}
+                />
+              </Box>
+              <Typography variant="body1" color="text.secondary">
+                {user?.email}
+              </Typography>
+              <Typography variant="caption" sx={{ color: theme.palette.success.main, fontWeight: 'bold' }}>
+                Conta verificada via Social Login
+              </Typography>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Divider />
+
       {/* Seção Dados Pessoais */}
       <SettingsSection title="Dados Pessoais">
         {nameMsg && <Alert severity={nameMsg.type} sx={{ mb: 2 }}>{nameMsg.text}</Alert>}
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <TextField fullWidth label="Email" value={user?.email} disabled sx={inputStyle} />
+            <TextField fullWidth label="Email" value={user?.email || ''} disabled sx={inputStyle} />
           </Grid>
           <Grid item xs={12} md={6}>
             <TextField 
-              fullWidth label="Nome" value={name} 
+              fullWidth label="Nome de Exibição" value={name} 
               onChange={(e) => setName(e.target.value)} sx={inputStyle} 
             />
           </Grid>
@@ -78,9 +98,14 @@ export default function ProfileTab() {
               variant="contained" 
               onClick={handleSaveName}
               disabled={isSavingName}
-              sx={{ background: theme.palette.gradients.primary, fontWeight: 'bold' }}
+              sx={{ 
+                background: theme.palette.gradients?.primary || theme.palette.primary.main, 
+                fontWeight: 'bold',
+                px: 4,
+                borderRadius: 2
+              }}
             >
-              {isSavingName ? 'Salvando...' : 'Salvar Nome'}
+              {isSavingName ? 'Salvando...' : 'Atualizar Nome'}
             </Button>
           </Grid>
         </Grid>
@@ -108,7 +133,7 @@ export default function ProfileTab() {
           </Grid>
           <Grid item xs={12} md={4}>
             <TextField 
-              fullWidth type="password" label="Confirmar" 
+              fullWidth type="password" label="Confirmar Nova Senha" 
               value={passwords.confirm}
               onChange={(e) => setPasswords({...passwords, confirm: e.target.value})}
               sx={inputStyle}
@@ -120,7 +145,7 @@ export default function ProfileTab() {
               color="warning"
               onClick={handleChangePassword}
               disabled={isChangingPass}
-              sx={{ fontWeight: 'bold' }}
+              sx={{ fontWeight: 'bold', borderRadius: 2 }}
             >
               Alterar Senha
             </Button>
