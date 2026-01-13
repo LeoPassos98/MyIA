@@ -1,7 +1,11 @@
+// backend/src/controllers/userController.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
+import { jsend } from '../utils/jsend';
 
 export const userController = {
 
@@ -20,7 +24,7 @@ export const userController = {
         throw new AppError('Usuário não encontrado', 404);
       }
 
-      res.json(user);
+      res.json(jsend.success({ user }));
     } catch (error) {
       next(error);
     }
@@ -43,7 +47,7 @@ export const userController = {
         select: { id: true, email: true, name: true }
       });
 
-      res.json(updatedUser);
+      res.json(jsend.success({ user: updatedUser }));
 
     } catch (error) {
       next(error);

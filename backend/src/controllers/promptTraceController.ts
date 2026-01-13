@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
 import { get_encoding } from 'tiktoken';
+import { jsend } from '../utils/jsend';
 
 // Encoder para contagem de tokens (mesmo usado no contextService)
 const encoding = get_encoding('cl100k_base');
@@ -28,7 +29,7 @@ class PromptTraceController {
     const userId = req.userId;
 
     if (!traceId) {
-      return res.status(400).json({ error: 'traceId é obrigatório' });
+      return res.status(400).json(jsend.fail({ traceId: 'Campo obrigatório' }));
     }
 
     try {
@@ -38,22 +39,22 @@ class PromptTraceController {
       });
 
       if (!message) {
-        return res.status(404).json({ error: 'Mensagem não encontrada' });
+        return res.status(404).json(jsend.fail({ message: 'Mensagem não encontrada' }));
       }
 
       if (message.chat.userId !== userId) {
-        return res.status(403).json({ error: 'Acesso negado' });
+        return res.status(403).json(jsend.fail({ access: 'Acesso negado' }));
       }
 
       if (!message.sentContext) {
-        return res.status(404).json({ error: 'Trace não encontrado (sentContext vazio)' });
+        return res.status(404).json(jsend.fail({ trace: 'Trace não encontrado (sentContext vazio)' }));
       }
 
       let sentContext: any;
       try {
         sentContext = JSON.parse(message.sentContext);
       } catch (err) {
-        return res.status(500).json({ error: 'sentContext inválido (JSON malformado)' });
+        return res.status(500).json(jsend.error('sentContext inválido (JSON malformado)'));
       }
 
       const config = sentContext.config_V47 || {};
@@ -139,10 +140,10 @@ class PromptTraceController {
         },
       };
 
-      return res.json(trace);
+      return res.json(jsend.success({ trace }));
     } catch (error) {
       logger.error('Erro ao carregar prompt trace', error);
-      return res.status(500).json({ error: 'Erro ao carregar prompt trace' });
+      return res.status(500).json(jsend.error('Erro ao carregar prompt trace'));
     }
   }
 }
