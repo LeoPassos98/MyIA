@@ -2,8 +2,9 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../lib/prisma'; // <--- Agora usamos o Banco!
+import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
+import { jsend } from '../utils/jsend';
 
 export const aiController = {
   /**
@@ -35,7 +36,7 @@ export const aiController = {
       
       logger.info(`Providers list requested. Found: ${providers.length}`);
       
-      res.status(200).json(providers);
+      res.status(200).json(jsend.success({ providers }));
     } catch (error) {
       next(error);
     }
@@ -56,15 +57,15 @@ export const aiController = {
       });
 
       if (!providerExists) {
-        return res.status(404).json({
-          error: `Provider '${providerSlug}' não encontrado ou não cadastrado no sistema via banco de dados.`,
-        });
+        return res.status(404).json(jsend.fail({
+          provider: `Provider '${providerSlug}' não encontrado ou não cadastrado no sistema.`
+        }));
       }
 
       if (!providerExists.isActive) {
-        return res.status(400).json({
-          error: `Provider '${providerExists.name}' está desativado no painel administrativo.`,
-        });
+        return res.status(400).json(jsend.fail({
+          provider: `Provider '${providerExists.name}' está desativado no painel administrativo.`
+        }));
       }
 
       logger.info(`Testing provider connectivity: ${providerSlug}`);
@@ -75,11 +76,10 @@ export const aiController = {
       // Para o fluxo de chat (o mais importante), já está 100% migrado.
       
       // Mock de sucesso temporário para não bloquear o frontend enquanto refatoramos o teste profundo
-      return res.json({ 
-        success: true, 
+      return res.json(jsend.success({ 
         message: `Conexão com ${providerExists.name} simulada com sucesso (V2 Modular).`,
         latency: 120 
-      });
+      }));
 
     } catch (error) {
       next(error);

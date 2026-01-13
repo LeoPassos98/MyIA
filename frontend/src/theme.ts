@@ -21,8 +21,8 @@ declare module '@mui/material/styles' {
   }
   interface PaletteOptions {
     custom?: {
-      matrix: string;
-      hackerBg: string;
+      matrix?: string;
+      hackerBg?: string;
     };
     gradients?: {
       primary?: string;
@@ -33,30 +33,40 @@ declare module '@mui/material/styles' {
   }
 
   // --- Tipografia Personalizada ---
-  // Adicionamos 'monospace' como string válida dentro de theme.typography
+  // Extendemos para suportar variantes customizadas como objetos de estilo
   interface TypographyVariants {
-    monospace: string;
+    monospace: React.CSSProperties;
+    code: React.CSSProperties;
+    title: React.CSSProperties;
   }
   interface TypographyVariantsOptions {
-    monospace?: string;
+    monospace?: React.CSSProperties;
+    code?: React.CSSProperties;
+    title?: React.CSSProperties;
   }
-  
-  // Essas interfaces garantem que theme.typography.monospace seja reconhecido
-  interface Typography {
-    monospace: string;
-  }
-  interface TypographyOptions {
-    monospace?: string;
+}
+
+// Suporte para o componente Typography do MUI reconhecer as variantes novas
+declare module '@mui/material/Typography' {
+  interface TypographyPropsVariantOverrides {
+    monospace: true;
+    code: true;
+    title: true;
   }
 }
 
 // 2. Definição das Cores e Gradientes
 const getDesignTokens = (mode: 'light' | 'dark') => {
   
+  // Pilhas de fontes robustas
+  const fontSans = '"Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+  const fontTitle = '"Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  const fontMono = '"Fira Code", "JetBrains Mono", "Cascadia Code", "Source Code Pro", Menlo, Monaco, "Consolas", monospace';
+
   const gradients = {
     primary: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
     secondary: 'linear-gradient(45deg, #FF8E53 30%, #FE6B8B 90%)',
-    glass: 'rgba(255, 255, 255, 0.1)',
+    glass: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
     shimmer: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%)',
   };
 
@@ -70,95 +80,96 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
         contrastText: '#fff',
       },
       secondary: {
-        main: '#ff8e53',      // Laranja principal
-        light: '#ffb78fff',   // Laranja claro
-        dark: '#bf5c00ff',       // Laranja escuro
+        main: '#ff8e53',
+        light: '#ffb78fff',
+        dark: '#bf5c00ff',
         contrastText: '#fff',
-      },
-      error: {
-        main: '#e53935',
-        light: '#ff6659',
-        dark: '#b71c1c',
-        contrastText: '#fff',
-      },
-      warning: {
-        main: '#ffb300',  
-        light: '#ffe082',
-        dark: '#c68400',
-        contrastText: '#fff',
-      },
-      info: {
-        main: '#0288d1',
-        light: '#03a9f4',
-        dark: '#01579b',
-        contrastText: '#fff',
-      },
-      success: {
-        main: '#43a047',
-        light: '#66bb6a',
-        dark: '#2e7d32',
-        contrastText: '#fff',
-      },
-      grey: {
-        50: '#fafafa',
-        100: '#f5f5f5',
-        200: '#eeeeee',
-        300: '#e0e0e0',
-        400: '#bdbdbd',
-        500: '#9e9e9e',
-        600: '#757575',
-        700: '#616161',
-        800: '#424242',
-        900: '#212121',
-        A100: '#d5d5d5',
-        A200: '#aaaaaa',
-        A400: '#303030',
-        A700: '#616161',
-      },
-      common: {
-        black: '#000',
-        white: '#fff',
-      },
-      divider: mode === 'dark' ? '#333' : '#e0e0e0',
-      text: {
-        primary: mode === 'dark' ? '#fff' : '#212121',
-        secondary: mode === 'dark' ? '#bdbdbd' : '#757575',
-        disabled: mode === 'dark' ? '#616161' : '#bdbdbd',
-        hint: mode === 'dark' ? '#bdbdbd' : '#9e9e9e',
-      },
-      action: {
-        active: mode === 'dark' ? '#fff' : '#212121',
-        hover: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(33,33,33,0.08)',
-        selected: mode === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(33,33,33,0.16)',
-        disabled: mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(33,33,33,0.3)',
-        disabledBackground: mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(33,33,33,0.12)',
       },
       background: {
         default: mode === 'dark' ? '#121212' : '#f5f5f5',
         paper: mode === 'dark' ? '#1e1e1e' : '#ffffff',
       },
+      text: {
+        primary: mode === 'dark' ? '#fff' : '#212121',
+        secondary: mode === 'dark' ? '#bdbdbd' : '#757575',
+      },
       custom: {
         matrix: '#00FF41',
         hackerBg: '#0d1117',
       },
-      gradients, // Injeta gradients dentro do palette
-      status: {
-        warning: '#ffb300',
-        info: '#0288d1',
-        success: '#43a047',
-        error: '#e53935',
+      gradients,
+    },
+    
+    // --- TIPOGRAFIA REFINADA (RECOMENDAÇÃO PRO) ---
+    typography: {
+      fontFamily: fontSans,
+      
+      // Títulos principais
+      h1: { fontFamily: fontTitle, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em' },
+      h2: { fontFamily: fontTitle, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em' },
+      h3: { fontFamily: fontTitle, fontWeight: 600, lineHeight: 1.3 },
+      
+      // Variantes de texto corrido
+      body1: { 
+        fontSize: '1rem', 
+        lineHeight: 1.6, // Conforto para leitura de logs ou mensagens de IA
+        letterSpacing: '0.009em' 
+      },
+      body2: { 
+        fontSize: '0.875rem', 
+        lineHeight: 1.57, 
+        letterSpacing: '0.007em' 
+      },
+
+      // Estilos específicos para a sua aplicação técnica
+      title: {
+        fontFamily: fontTitle,
+        fontWeight: 700,
+        lineHeight: 1.2,
+      },
+      subtitle1: {
+        fontFamily: fontSans,
+        lineHeight: 1.5,
+        fontWeight: 500,
+      },
+      caption: {
+        fontSize: '0.75rem',
+        lineHeight: 1.4,
+        letterSpacing: '0.033em',
+      },
+      button: {
+        fontWeight: 600,
+        letterSpacing: '0.05em',
+        textTransform: 'none' as const, // Mais moderno que o UPPERCASE padrão
+      },
+
+      // Suporte a código (Essencial para seu sistema de IA)
+      monospace: {
+        fontFamily: fontMono,
+        fontWeight: 450,
+      },
+      code: {
+        fontFamily: fontMono,
+        fontSize: '0.9em',
+        lineHeight: 1.5,
+        backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)',
+        padding: '2px 4px',
+        borderRadius: '4px',
       },
     },
-    typography: {
-      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-      // Aqui definimos o valor real da fonte
-      monospace: '"Fira Code", "Consolas", "Monaco", "Andale Mono", "Ubuntu Mono", monospace',
-    },
+
     components: {
       MuiPaper: {
         styleOverrides: {
           root: {
             backgroundImage: 'none',
+          },
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: '8px', // Botões levemente arredondados combinam com Montserrat
           },
         },
       },

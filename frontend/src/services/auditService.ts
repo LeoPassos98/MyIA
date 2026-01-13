@@ -76,8 +76,9 @@ class AuditService {
     if (filters?.order) params.append('order', filters.order);
     if (filters?.limit) params.append('limit', filters.limit.toString());
 
-    const response = await api.get<AuditRecord[]>(`/audit/messages?${params.toString()}`);
-    return response.data;
+    const response = await api.get(`/audit/messages?${params.toString()}`);
+    // Interceptor desembrulha JSend: response.data.audits
+    return response.data.audits;
   }
 
   /**
@@ -88,8 +89,9 @@ class AuditService {
    * @throws Error se a requisição falhar
    */
   async getAuditByMessageId(messageId: string): Promise<AuditRecord> {
-    const response = await api.get<AuditRecord>(`/audit/messages/${messageId}`);
-    return response.data;
+    const response = await api.get(`/audit/messages/${messageId}`);
+    // Interceptor desembrulha JSend: response.data.audit
+    return response.data.audit;
   }
 }
 

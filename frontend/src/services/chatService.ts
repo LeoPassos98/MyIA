@@ -1,3 +1,6 @@
+// frontend/src/services/chatService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { api } from './api';
 
 // O novo "protocolo" que esperamos do backend
@@ -51,9 +54,17 @@ export const chatService = {
     signal?: AbortSignal // <--- 1. NOVO PARÂMETRO
   ) {
     try {
+      // 🔧 FIX: Leitura síncrona do token (evita race condition)
       const token = localStorage.getItem('token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       
+      if (!token || token === 'null' || token === 'undefined') {
+        throw new Error('Token de autenticação não encontrado. Faça login novamente.');
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      console.log(`[StreamChat] Iniciando request para ${apiUrl}/chat/message`);
+      console.log(`[StreamChat] Token: ${token.substring(0, 20)}...`);
+
       const response = await fetch(`${apiUrl}/chat/message`, {
         method: 'POST',
         headers: {
@@ -68,6 +79,8 @@ export const chatService = {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      console.log(`[StreamChat] Resposta recebida: status=${response.status}`);
 
       if (!response.body) {
         throw new Error('Stream não disponível.');

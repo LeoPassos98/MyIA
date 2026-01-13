@@ -1,3 +1,4 @@
+// frontend/src/features/login/LoginPage.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { useEffect } from 'react';
@@ -22,7 +23,7 @@ export default function LoginPage() {
   const handleSuccess = () => {
     navigate('/chat');
   };
-
+  
   return (
     <>
       <MainHeader />

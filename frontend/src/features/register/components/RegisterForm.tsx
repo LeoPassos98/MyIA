@@ -17,10 +17,20 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
   const [name, setName] = useState('');
   const { register, loading, error } = useRegister();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const ok = await register(name, email, password);
-    if (ok) onSuccess();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    console.log('[RegisterForm] Submetendo registro:', { email, password, name });
+    const ok = await register(email, password, name);
+    console.log('[RegisterForm] Resultado do registro:', ok);
+    if (ok) {
+      if (onSuccess) {
+        console.log('[RegisterForm] Registro bem-sucedido, chamando onSuccess');
+        onSuccess();
+      } else {
+        console.log('[RegisterForm] Registro bem-sucedido, redirecionando para /chat');
+        window.location.href = '/chat';
+      }
+    }
   };
 
   return (

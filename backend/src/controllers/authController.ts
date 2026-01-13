@@ -1,3 +1,4 @@
+// backend/src/controllers/authController.ts
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -8,14 +9,15 @@ export const authController = {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, password, name } = req.body;
-
       const result = await authService.register(email, password, name);
 
       logger.info(`User registered: ${email}`);
 
       return res.status(201).json({
-        message: 'User registered successfully',
-        userId: result.userId,
+        status: 'success',
+        data: {
+          user: { id: result.userId, email, name }
+        }
       });
     } catch (error) {
       return next(error);
@@ -24,7 +26,6 @@ export const authController = {
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('Login request body:', req.body); // Debug
       const { email, password } = req.body;
 
       if (!email || !password) {
@@ -35,7 +36,11 @@ export const authController = {
 
       logger.info(`User logged in: ${email}`);
 
-      return res.status(200).json(result);
+      // result = { token, user: { id, email, name, ... } }
+      return res.status(200).json({
+        status: 'success',
+        data: result
+      });
     } catch (error) {
       return next(error);
     }
@@ -44,12 +49,15 @@ export const authController = {
   async getMe(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       if (!req.userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        throw new AppError('Não autorizado', 401);
       }
 
       const user = await authService.getUserById(req.userId);
 
-      return res.status(200).json(user);
+      return res.status(200).json({
+        status: 'success',
+        data: { user }
+      });
     } catch (error) {
       return next(error);
     }
@@ -66,9 +74,12 @@ export const authController = {
         throw new AppError('Todos os campos são obrigatórios', 400);
       }
 
-      const result = await authService.changePassword(req.userId, oldPassword, newPassword);
-      return res.json(result);
-
+      await authService.changePassword(req.userId, oldPassword, newPassword);
+      
+      return res.status(200).json({
+        status: 'success',
+        data: null
+      });
     } catch (error) {
       return next(error);
     }

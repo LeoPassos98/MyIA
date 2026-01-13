@@ -41,8 +41,8 @@ export default function Logo({ brandText = 'MyIA' }: { brandText?: string }) {
       {/* Logo SVG importado via <img> para compatibilidade Vite */}
       <Box
         sx={{
-          width: 28,
-          height: 28,
+          width: 35,
+          height: 35,
           borderRadius: '50%',
           overflow: 'hidden',
           display: 'flex',
@@ -50,7 +50,7 @@ export default function Logo({ brandText = 'MyIA' }: { brandText?: string }) {
           justifyContent: 'center',
         }}
       >
-        <img src={brandLogoUrl} alt="Logo MyIA" width={28} height={28} style={{ display: 'block' }} />
+        <img src={brandLogoUrl} alt="Logo MyIA" width={35} height={35} style={{ display: 'block' }} />
       </Box>
 
       {/* Texto simples */}
@@ -58,10 +58,11 @@ export default function Logo({ brandText = 'MyIA' }: { brandText?: string }) {
         variant="h6"
         sx={{
           fontWeight: 700,
-          fontSize: '1.1rem',
+          fontSize: '1.41rem',
           color: theme.palette.text.primary,
-          letterSpacing: '-0.5px',
-        }}
+          letterSpacing: '0px',
+          fontFamily: theme.typography.title,
+        }} 
       >
         {brandText}
       </Typography>

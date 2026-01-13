@@ -3,6 +3,7 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline } from '@mui/material';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Contexts
 import { AuthProvider } from './contexts/AuthContext';
@@ -24,7 +25,7 @@ import Register from "./features/register/RegisterPage";
 import Chat from "./features/chat";
 import Settings from './features/settings';
 import LandingPage from './features/landing/components/LandingPage';
-import AuthSuccess from './pages/AuthSuccess';
+import { AuthSuccess } from './pages/AuthSuccess';
 
 function AppRoutes() {
   return (
@@ -32,25 +33,27 @@ function AppRoutes() {
       <CssBaseline />
 
       <Routes>
+        {/* Páginas públicas */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         {/* Social Auth Success */}
         <Route path="/auth-success" element={<AuthSuccess />} />
-import AuthSuccess from './pages/AuthSuccess';
-
-        <Route element={<MainLayout />}>
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/chat/:chatId" element={<Chat />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/audit" element={<AuditPage />} />
-          <Route path="/prompt-trace" element={<PromptTracePage />} />
-          <Route path="/prompt-trace/:traceId" element={<PromptTracePage />} />
+        {/* Rotas protegidas */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/chat/:chatId" element={<Chat />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/audit" element={<AuditPage />} />
+            <Route path="/prompt-trace" element={<PromptTracePage />} />
+            <Route path="/prompt-trace/:traceId" element={<PromptTracePage />} />
+          </Route>
         </Route>
 
         {/* catch-all: redireciona para landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </Routes >
     </>
   );
 }

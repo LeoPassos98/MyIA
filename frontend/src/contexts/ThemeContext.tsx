@@ -22,6 +22,8 @@ export const CustomThemeProvider = ({ children }: { children: React.ReactNode })
 
   const fetchTheme = useCallback(async () => {
     if (isAuthenticated) {
+      const token = localStorage.getItem('token');
+      console.log('[ThemeContext] Token antes de buscar tema:', token);
       try {
         const settings = await userSettingsService.getSettings();
         // Garante que o valor vindo do banco seja válido, senão usa light

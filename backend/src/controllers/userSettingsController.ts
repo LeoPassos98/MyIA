@@ -1,10 +1,14 @@
+// backend/src/controllers/userSettingsController.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../middleware/authMiddleware'; // <--- IMPORTANTE: AuthRequest
+import { AuthRequest } from '../middleware/authMiddleware';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { encryptionService } from '../services/encryptionService';
+import { jsend } from '../utils/jsend';
 
 // Helper: Encontrar ou criar configurações
 async function findOrCreateSettings(userId: string) {
@@ -49,28 +53,25 @@ export const userSettingsController = {
   getSettings: async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.userId) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return; // <-- FIX: Adicionar return explícito
+        res.status(401).json(jsend.fail({ auth: 'Não autorizado' }));
+        return;
       }
 
       const settings = await findOrCreateSettings(req.userId);
 
       // --- LÓGICA DO COFRE (GET) ---
-      // Crie uma cópia segura para enviar ao frontend
       const safeSettings = { ...settings };
 
       for (const key of encryptedKeys) {
         const encryptedValue = settings[key as keyof typeof settings] as string;
         if (encryptedValue) {
-          // 1. Descriptografe para verificar (mas não use o valor)
           const decryptedKey = encryptionService.decrypt(encryptedValue);
-          // 2. Substitua o "rabisco" por um placeholder
           (safeSettings as any)[key] = encryptionService.getPlaceholder(decryptedKey);
         }
       }
       // --- FIM DA LÓGICA ---
 
-      return res.json(safeSettings);
+      return res.json(jsend.success(safeSettings));
 
     } catch (error) {
       return next(error);
@@ -113,7 +114,7 @@ export const userSettingsController = {
         }
       }
 
-      return res.json(safeSettings);
+      return res.json(jsend.success(safeSettings));
 
     } catch (error) {
       return next(error);
@@ -133,7 +134,7 @@ export const userSettingsController = {
         keyMap[cred.provider.slug] = cred.apiKey;
       });
 
-      return res.json(keyMap);
+      return res.json(jsend.success({ credentials: keyMap }));
     } catch (error) {
       return next(error);
     }
@@ -142,17 +143,14 @@ export const userSettingsController = {
   // POST /api/settings/credentials
   async updateCredentials(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      // TypeScript estava reclamando que req.body podia ser null stream. 
-      // Forçamos a tipagem aqui:
       const keys = req.body as Record<string, string>; 
       const userId = req.userId!;
 
       if (!keys || typeof keys !== 'object') {
-        return res.status(400).json({ error: 'Body inválido' });
+        return res.status(400).json(jsend.fail({ body: 'Body inválido' }));
       }
 
       const updatePromises = Object.entries(keys).map(async ([providerSlug, apiKey]) => {
-        // Retornamos null explicitamente se falhar, para o TypeScript entender o tipo
         if (!apiKey || typeof apiKey !== 'string') return null;
 
         const provider = await prisma.aIProvider.findUnique({ where: { slug: providerSlug } });
@@ -175,7 +173,7 @@ export const userSettingsController = {
       });
 
       await Promise.all(updatePromises);
-      return res.json({ success: true });
+      return res.json(jsend.success({ message: 'Credenciais atualizadas com sucesso' }));
     } catch (error) {
       return next(error);
     }

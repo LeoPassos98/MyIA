@@ -5,8 +5,8 @@ import { AIProvider } from '../types/ai';
 
 export const aiProvidersService = {
   getAll: async (): Promise<AIProvider[]> => {
-    // Chama a rota que criamos: /api/ai/providers
-    const response = await api.get<AIProvider[]>('/ai/providers');
-    return response.data;
+    const response = await api.get('/ai/providers');
+    // Interceptor já desembrulha JSend: response.data.providers
+    return response.data.providers;
   },
 };

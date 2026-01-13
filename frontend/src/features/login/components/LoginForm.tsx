@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { TextField, Button, Box, Alert } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useLogin from '../hooks/useLogin';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -12,14 +13,25 @@ interface LoginFormProps {
 
 export default function LoginForm({ onSuccess }: LoginFormProps) {
   const theme = useTheme();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loading, error } = useLogin();
+  const { loading, error } = useLogin();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = await login(email, password);
-    if (ok) onSuccess();
+    console.log('[LoginForm] Submetendo login:', { email, password });
+    try {
+      await login(email, password);
+      console.log('[LoginForm] Login bem-sucedido');
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        window.location.href = '/chat';
+      }
+    } catch (err) {
+      console.error('[LoginForm] Erro no login:', err);
+    }
   };
 
   return (

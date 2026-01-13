@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuditRecordBuilder } from '../audit';
 import { logger } from '../utils/logger';
+import { jsend } from '../utils/jsend';
 
 class AuditController {
   /**
@@ -65,10 +66,10 @@ class AuditController {
         AuditRecordBuilder.build({ message, userId: userId! })
       );
 
-      return res.json(auditRecords);
+      return res.json(jsend.success({ audits: auditRecords }));
     } catch (error) {
       logger.error('Erro ao listar auditorias', error);
-      return res.status(500).json({ error: 'Erro ao listar auditorias' });
+      return res.status(500).json(jsend.error('Erro ao listar auditorias'));
     }
   }
 
@@ -84,7 +85,7 @@ class AuditController {
     const userId = req.userId; // vem do authMiddleware
 
     if (!messageId) {
-      return res.status(400).json({ error: 'messageId é obrigatório' });
+      return res.status(400).json(jsend.fail({ messageId: 'Campo obrigatório' }));
     }
 
     try {
@@ -97,12 +98,12 @@ class AuditController {
       });
 
       if (!message) {
-        return res.status(404).json({ error: 'Mensagem não encontrada' });
+        return res.status(404).json(jsend.fail({ messageId: 'Mensagem não encontrada' }));
       }
 
       // 2️⃣ Garantir ownership
       if (message.chat.userId !== userId) {
-        return res.status(403).json({ error: 'Acesso negado' });
+        return res.status(403).json(jsend.fail({ access: 'Acesso negado' }));
       }
 
       // 3️⃣ Construir AuditRecord
@@ -112,10 +113,10 @@ class AuditController {
       });
 
       // 4️⃣ Retornar auditoria
-      return res.json(auditRecord);
+      return res.json(jsend.success({ audit: auditRecord }));
     } catch (error) {
       logger.error('Erro ao gerar auditoria', error);
-      return res.status(500).json({ error: 'Erro interno ao gerar auditoria' });
+      return res.status(500).json(jsend.error('Erro interno ao gerar auditoria'));
     }
   }
 }

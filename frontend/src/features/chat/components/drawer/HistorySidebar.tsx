@@ -5,13 +5,14 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Box, Button, List, ListItem, ListItemButton, ListItemText,
-  Typography, Divider, ListItemIcon, useTheme, alpha, ListSubheader, Skeleton,
+  Typography, Divider, ListItemIcon, useTheme, alpha, ListSubheader, Skeleton, Tooltip,
 
 } from '@mui/material';
-import { Add as AddIcon, ChatBubbleOutline, Settings as SettingsIcon, History as HistoryIcon, LightModeOutlined as LightModeIcon } from '@mui/icons-material';
+import { Add as AddIcon, ChatBubbleOutline, Settings as SettingsIcon, History as HistoryIcon, LightModeOutlined as LightModeIcon, DarkMode as DarkModeIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { chatHistoryService, ChatSession } from '../../../../services/chatHistoryService';
 import { useLayout } from '../../../../contexts/LayoutContext';
+import { useTheme as useAppTheme } from '../../../../contexts/ThemeContext';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 /**
@@ -30,21 +31,21 @@ export default function HistorySidebar() {
   const location = useLocation();
   // Tema MUI para estilização
   const theme = useTheme();
+  const appTheme = useAppTheme();
 
   // 1. Carrega os chats do serviço ao montar o componente
   useEffect(() => {
     const fetchChats = async () => {
       try {
         setIsLoading(true);
-        // Busca todas as sessões de chat do usuário
+        // ✅ Agora 'allChats' é realmente um Chat[] (Array puro)
         const allChats = await chatHistoryService.getAllChats();
-        // Ordena do mais novo para o mais antigo
-        const sortedChats = allChats.sort((a, b) =>
+
+        const sortedChats = [...allChats].sort((a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setChats(sortedChats);
       } catch (error) {
-        // Log de erro caso falhe a busca
         console.error('Erro ao carregar histórico:', error);
       } finally {
         setIsLoading(false);
@@ -223,21 +224,40 @@ export default function HistorySidebar() {
       <Divider />
 
       <Box sx={{ width: '100%', px: 1, py: 1, display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
-        <Button
-          variant="text"
-          startIcon={<SettingsIcon />}
-          onClick={() => { setIsHistoryOpen(false); navigate('/settings'); }}
-          sx={{ borderRadius: 2, color: 'text.secondary', minWidth: 120, justifyContent: 'center', alignItems: 'center', display: 'flex' }}
-        >
-          Configurações
-        </Button>
-        <Button
-          variant="text"
-          sx={{ minWidth: 40, color: 'text.secondary', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          // onClick={handleThemeToggle} // futuro seletor de tema
-        >
-          <LightModeIcon sx={{ fontSize: 20 }} />
-        </Button>
+        <Tooltip title="Abrir configurações">
+          <Button
+            variant="text"
+            startIcon={<SettingsIcon />}
+            onClick={() => { setIsHistoryOpen(false); navigate('/settings'); }}
+            sx={{ borderRadius: 2, color: 'text.secondary', minWidth: 120, justifyContent: 'center', alignItems: 'center', display: 'flex' }}
+          >
+            Configurações
+          </Button>
+        </Tooltip>
+        <Tooltip title={appTheme.mode === 'dark' ? 'Alternar para modo claro' : 'Alternar para modo escuro'}>
+          <Button
+            variant="text"
+            onClick={appTheme.toggleTheme}
+            sx={{
+              minWidth: 40,
+              color: 'text.secondary',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              '&:hover': {
+                color: appTheme.mode === 'dark' ? 'primary.main' : 'warning.main',
+                transform: 'scale(1.1)',
+              }
+            }}
+          >
+            {appTheme.mode === 'dark'
+              ? <LightModeIcon sx={{ fontSize: 20, color: 'warning.main' }} />
+              : <DarkModeIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+            }
+          </Button>
+        </Tooltip>
       </Box>
 
     </Box >

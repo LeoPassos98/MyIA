@@ -30,12 +30,14 @@ export type ChatSession = Chat;
 export const chatHistoryService = {
   getAllChats: async (): Promise<Chat[]> => {
     const response = await api.get('/chat-history');
-    return response.data;
+    // 💡 O interceptor entrega { chats: [...] }
+    return response.data.chats;
   },
 
   getChatMessages: async (chatId: string): Promise<Message[]> => {
     const response = await api.get(`/chat-history/${chatId}`);
-    return response.data;
+    // 💡 O interceptor entrega { messages: [...] }
+    return response.data.messages;
   },
 
   deleteChat: async (chatId: string): Promise<void> => {
@@ -44,11 +46,13 @@ export const chatHistoryService = {
 
   toggleMessagePin: async (messageId: string): Promise<{ messageId: string; isPinned: boolean }> => {
     const response = await api.patch(`/chat-history/message/${messageId}/pin`);
+    // O interceptor entrega o conteúdo de data diretamente
     return response.data;
   },
 
   getPinnedMessages: async (chatId: string): Promise<Message[]> => {
     const response = await api.get(`/chat-history/${chatId}/pinned`);
-    return response.data;
+    // 💡 O interceptor entrega { pinnedMessages: [...] }
+    return response.data.pinnedMessages;
   },
 };

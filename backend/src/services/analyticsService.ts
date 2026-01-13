@@ -1,3 +1,6 @@
+// backend/src/services/analyticsService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { prisma } from '../lib/prisma';
 
 export const analyticsService = {

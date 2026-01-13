@@ -201,7 +201,9 @@ const messages = await prisma.message.findMany({
 });
 ```
 
-## 8. Versionamento de Mensagens (Arquitetura Preparada)
+---
+
+## 11. Versionamento de Mensagens (Arquitetura Preparada)
 
 Quando a edição de mensagens for implementada, o sistema **DEVE** preservar a integridade do histórico de traces.
 
@@ -249,7 +251,57 @@ Até a edição ser implementada:
 - O código deve ser escrito de forma **defensiva** (assume `version: 1` se ausente)
 - `messageIds` no `sentContext` já garante rastreabilidade futura
 
-## 9. Identidade Visual e Design System
+## 9. Segurança (Padrões Obrigatórios)
+
+### 9.1 Regra de Segurança Zero-Trust
+
+**TODA aplicação DEVE seguir os padrões de segurança desde o primeiro commit.**
+
+- Secrets validados na inicialização (exit se ausentes/inseguros)
+- Rate limiting aplicado em TODAS as rotas expostas
+- Validação Zod em TODAS as rotas POST/PUT/PATCH/DELETE
+- Helmet configurado com CSP em produção
+- HTTPS obrigatório em produção (redirect automático)
+
+### 9.2 Documento de Referência
+
+Para padrões detalhados de segurança, consulte: **[SECURITY-STANDARDS.md](SECURITY-STANDARDS.md)**
+
+### 9.3 Checklist Pré-Commit (Segurança)
+
+Antes de qualquer commit que modifique:
+- Rotas de API → Verificar rate limiting + validação Zod
+- Autenticação → Verificar authMiddleware aplicado
+- Variáveis de ambiente → Verificar validação obrigatória
+- Queries ao banco → Verificar uso de Prisma (NUNCA raw SQL)
+
+### 9.4 Testes de Segurança Obrigatórios
+
+```bash
+# Executar ANTES de push/deploy
+cd backend
+./security-tests.sh
+
+# Resultado esperado: 100% PASS (7/7 testes)
+```
+
+### 9.5 Princípio de Fail-Secure
+
+```typescript
+// ❌ PROIBIDO - Fail-open (inseguro)
+const secret = process.env.JWT_SECRET || 'dev-secret';
+const user = await findUser(input) || { role: 'guest' };
+
+// ✅ OBRIGATÓRIO - Fail-secure (exit/error se inseguro)
+if (!process.env.JWT_SECRET) process.exit(1);
+if (!user) throw new AppError('Unauthorized', 401);
+```
+
+**Regra:** Em caso de falha de segurança, o sistema DEVE falhar de forma segura (negar acesso, exit), NUNCA permitir por padrão.
+
+---
+
+## 10. Identidade Visual e Design System
 
 > **Documento Completo:** [docs/VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md)
 
@@ -350,7 +402,9 @@ gap: 3     // 24px (seções)
 
 > **Para mais detalhes:** Consulte [VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md)
 
-## 🌐 Padronização de API e Respostas (JSend)
+---
+
+## 12. Padronização de API e Respostas (JSend)
 
 Toda comunicação entre Backend e Frontend deve seguir o padrão **JSend** para garantir previsibilidade.
 

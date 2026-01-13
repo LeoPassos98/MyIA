@@ -1,3 +1,6 @@
+// backend/src/config/env.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+
 import dotenv from 'dotenv';
 import { logger } from '../utils/logger';
 
