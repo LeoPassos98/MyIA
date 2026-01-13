@@ -8,8 +8,8 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      callbackURL: 'http://localhost:3000/api/auth/github/callback',
-      scope: ['user:email'], // Garante que pediremos permissão para o e-mail
+      callbackURL: process.env.GITHUB_OAUTH_CALLBACK_URL || 'http://localhost:3001/auth/github/callback',
+      scope: ['user:email'],
     },
     async (accessToken: string, _refreshToken: string, profile: any, done: any) => {
       try {

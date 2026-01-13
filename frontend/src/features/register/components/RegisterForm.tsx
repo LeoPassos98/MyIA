@@ -2,8 +2,9 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { useState } from 'react';
-import { TextField, Button, Box, Alert } from '@mui/material';
+import { TextField, Button, Box, Alert, Divider } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import GitHubIcon from '@mui/icons-material/GitHub';
 import useRegister from '../hooks/useRegister';
 
 interface RegisterFormProps {
@@ -31,6 +32,11 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
         window.location.href = '/chat';
       }
     }
+  };
+
+  const handleGithubLogin = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    window.location.href = `${apiUrl}/api/auth/github`;
   };
 
   return (
@@ -95,6 +101,28 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
         disabled={loading}
       >
         Cadastrar
+      </Button>
+
+      <Divider sx={{ my: 2 }}>ou</Divider>
+
+      <Button
+        fullWidth
+        variant="outlined"
+        startIcon={<GitHubIcon />}
+        onClick={handleGithubLogin}
+        sx={{
+          py: 1.5,
+          borderRadius: 2,
+          fontWeight: 600,
+          borderColor: theme.palette.divider,
+          color: theme.palette.text.primary,
+          '&:hover': {
+            borderColor: theme.palette.primary.main,
+            bgcolor: theme.palette.action.hover,
+          },
+        }}
+      >
+        Continuar com GitHub
       </Button>
     </Box>
   );
