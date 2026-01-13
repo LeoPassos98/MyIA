@@ -1,3 +1,6 @@
+// frontend/src/components/Layout/AppDrawers.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Drawer, useTheme, alpha } from '@mui/material';
 import { HEADER_HEIGHT } from '../../components/Layout/layoutConstants';
 import { useLayout } from '../../contexts/LayoutContext';

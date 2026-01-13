@@ -1,3 +1,6 @@
+// backend/src/services/ragService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { prisma } from '../lib/prisma';
 import { aiService } from './ai';
 

@@ -1,3 +1,6 @@
+// frontend/src/components/PageLayout/ObservabilityPageLayout/ObservabilitySection.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { HEADER_HEIGHT } from '@/components/Layout/layoutConstants';

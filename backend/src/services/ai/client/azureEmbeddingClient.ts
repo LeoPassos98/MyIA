@@ -1,3 +1,6 @@
+// backend/src/services/ai/client/azureEmbeddingClient.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import OpenAI from 'openai';
 import { getProviderInfo } from '../../../config/providerMap';
 

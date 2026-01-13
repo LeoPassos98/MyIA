@@ -1,3 +1,6 @@
+// frontend/src/services/userSettingsService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { api } from './api';
 
 export interface UserSettings {

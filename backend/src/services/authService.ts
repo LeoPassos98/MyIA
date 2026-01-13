@@ -1,3 +1,6 @@
+// backend/src/services/authService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { prisma } from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
@@ -33,10 +36,21 @@ export const authService = {
 
   async login(email: string, password: string) {
     // Buscar usuário
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ 
+      where: { email },
+      include: { providerCredentials: true } // Importante para saber se é social
+    });
 
     if (!user) {
-      throw new AppError('Invalid credentials', 401);
+      throw new AppError('Credenciais inválidas', 401);
+    }
+
+    // 💡 Se o usuário não tem senha mas tem credencial de provedor (GitHub)
+    if (!user.password && user.providerCredentials.length > 0) {
+      throw new AppError(
+        'Esta conta foi criada via GitHub. Por favor, use o botão de Login Social.', 
+        401
+      );
     }
 
     // Verificar senha

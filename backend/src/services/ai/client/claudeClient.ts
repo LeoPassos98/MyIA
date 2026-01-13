@@ -1,3 +1,6 @@
+// backend/src/services/ai/client/claudeClient.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import axios from 'axios';
 import { ChatMessage, AiServiceResponse, StreamChunk } from '../types';
 import { getProviderConfig } from '../utils/providerUtils';

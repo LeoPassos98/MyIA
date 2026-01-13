@@ -1,3 +1,6 @@
+// backend/src/middleware/validateRequest.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Request, Response, NextFunction } from 'express';
 import { ZodSchema } from 'zod';
 import { AppError } from './errorHandler';

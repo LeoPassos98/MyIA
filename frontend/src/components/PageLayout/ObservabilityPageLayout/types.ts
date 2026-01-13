@@ -1,3 +1,6 @@
+// frontend/src/components/PageLayout/ObservabilityPageLayout/types.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import type { ReactNode } from 'react';
 
 /**

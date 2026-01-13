@@ -1,3 +1,6 @@
+// backend/src/config/database.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { PrismaClient } from '@prisma/client';
 
 export const prisma = new PrismaClient({

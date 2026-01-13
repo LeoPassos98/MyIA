@@ -1,3 +1,6 @@
+// backend/src/types/express/index.d.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 // Nós estamos dizendo ao TypeScript:
 // "Ei, abra o namespace 'Express' e, dentro da interface 'Request',
 // adicione esta propriedade opcional 'userId'."

@@ -1,3 +1,6 @@
+// frontend/src/components/Layout/LayoutToggleButton.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import React from 'react';
 import { IconButton, Tooltip, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';

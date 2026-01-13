@@ -1,64 +1,54 @@
-import { api } from './api';
+// frontend/src/services/authService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-// 1. Interfaces alinhadas ao JSend
-interface JSendResponse<T> {
-  status: 'success' | 'fail' | 'error';
-  data: T;
-  message?: string;
-}
+import { api } from './api';
 
 export interface User {
   id: string;
   email: string;
-  name: string | null;
-  // Adicionado para suportar o que o Google/Github trarão
-  avatarUrl?: string; 
+  name?: string;
+  avatarUrl?: string;
 }
 
+// 1. Defina exatamente o que o seu Backend retorna no Login
 export interface LoginResponse {
-  token: string;
-  user: User;
+  status: 'success' | 'error';
+  data: {
+    token: string;
+    user: User;
+  };
 }
 
 export const authService = {
-  // O Backend agora retorna { status: 'success', data: { user: { id: ... } } }
-  async register(data: any): Promise<User> {
-    const response = await api.post<JSendResponse<{ user: User }>>('/auth/register', data);
-    return response.data.data.user;
-  },
-
   async login(data: any): Promise<LoginResponse> {
-    const response = await api.post<JSendResponse<LoginResponse>>('/auth/login', data);
-    
-    // Pegamos os dados de dentro do envelope 'data' do JSend
-    const { token, user } = response.data.data;
-    
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    return { token, user };
+    console.log('[authService] Enviando login:', data);
+    const response = await api.post<LoginResponse>('/auth/login', data);
+    console.log('[authService] Resposta do backend (login):', response.data);
+    return response.data; // Sempre JSend: { status, data: { token, user } }
   },
 
-  async getMe(): Promise<User> {
-    const response = await api.get<JSendResponse<{ user: User }>>('/auth/me');
-    return response.data.data.user;
+  async register(data: any): Promise<User> {
+    console.log('[authService] Enviando registro:', data);
+    const response = await api.post<{ status: string; data: { user: User } }>('/auth/register', data);
+    console.log('[authService] Resposta do backend (register):', response.data);
+    return response.data.data.user; // Sempre JSend: { status, data: { user } }
+  },
+
+  async changePassword(data: any): Promise<void> {
+    await api.post('/auth/change-password', data);
+  },
+
+  getStoredUser(): User | null {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  },
+
+  getStoredToken(): string | null {
+    return localStorage.getItem('token');
   },
 
   logout(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-  },
-
-  getStoredUser(): User | null {
-    const userStr = localStorage.getItem('user');
-    try {
-      return userStr ? JSON.parse(userStr) : null;
-    } catch {
-      return null;
-    }
-  },
-
-  getStoredToken(): string | null {
-    return localStorage.getItem('token');
   }
 };

@@ -1,3 +1,6 @@
+// frontend/src/features/chat/components/ControlPanel/useControlPanelLogic.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import React from 'react';
 import { useLayout } from '../../../../contexts/LayoutContext';
 

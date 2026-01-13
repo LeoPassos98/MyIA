@@ -1,3 +1,6 @@
+// backend/src/routes/userSettingsRoutes.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Router } from 'express';
 import { userSettingsController } from '../controllers/userSettingsController';
 import { authMiddleware } from '../middleware/authMiddleware';

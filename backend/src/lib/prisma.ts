@@ -1,3 +1,6 @@
+// backend/src/lib/prisma.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { PrismaClient } from '@prisma/client';
 
 // O 'globalThis' é um truque para garantir que em desenvolvimento (com 'npm run dev')

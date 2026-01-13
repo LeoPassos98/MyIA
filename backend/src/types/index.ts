@@ -1,3 +1,6 @@
+// backend/src/types/index.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { z } from 'zod';
 
 // Auth schemas

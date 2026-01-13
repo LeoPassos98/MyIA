@@ -1,3 +1,6 @@
+// frontend/src/features/settings/components/SettingsSection.tsx
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { Paper, Box, Typography, alpha, useTheme } from '@mui/material';
 import { ReactNode } from 'react';
 

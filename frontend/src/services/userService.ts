@@ -1,3 +1,6 @@
+// frontend/src/services/userService.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 import { api } from './api';
 
 export const userService = {
