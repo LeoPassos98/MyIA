@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test GitHub OAuth</title>
+</head>
+<body>
+    <h1>Test GitHub OAuth</h1>
+    <button onclick="testOAuth()">Login with GitHub</button>
+    
+    <script>
+        function testOAuth() {
+            console.log('Redirecting to backend OAuth...');
+            window.location.href = 'http://localhost:3001/api/auth/github';
+        }
+    </script>
+</body>
+</html>

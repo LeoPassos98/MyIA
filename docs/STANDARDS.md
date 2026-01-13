@@ -450,6 +450,41 @@ Toda comunicação entre Backend e Frontend deve seguir o padrão **JSend** para
    - O objeto de usuário retornado jamais deve incluir o campo `password`.
 4. **Erros:** Proibido o uso de `try/catch` genérico dentro dos controllers para retornar erro. Os erros devem ser lançados (`throw`) e capturados pelo `errorHandler` global.
 
+### Frontend: Interceptor JSend (Desembrulhamento Automático)
+
+**Regra Arquitetural:** O frontend possui um interceptor Axios (`frontend/src/services/api.ts`) que **desembrulha automaticamente** respostas JSend.
+
+**Comportamento:**
+```typescript
+// Backend retorna (JSend completo):
+{ "status": "success", "data": { "user": {...} } }
+
+// Interceptor transforma em:
+{ "user": {...} }
+
+// Frontend acessa:
+const user = response.data.user; // ✅ CORRETO
+const user = response.data.data.user; // ❌ ERRADO
+```
+
+**Implementação do Interceptor:**
+```typescript
+api.interceptors.response.use(
+  (response) => {
+    if (response.data && response.data.status === 'success') {
+      return { ...response, data: response.data.data };
+    }
+    return response;
+  }
+);
+```
+
+**Padrão Obrigatório:**
+- ✅ Backend SEMPRE retorna JSend completo: `jsend.success({ user })`
+- ✅ Frontend SEMPRE acessa dados desembrulhados: `response.data.user`
+- ❌ NUNCA acessar `response.data.data.X` no frontend (duplicação)
+- ❌ NUNCA retornar dados sem JSend no backend
+
 ### 12.5 Tratamento de Erros (Error Handling)
 
 **Princípio:** Erros devem ser informativos para o desenvolvedor, mas seguros para o usuário final.

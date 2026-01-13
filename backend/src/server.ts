@@ -72,12 +72,16 @@ app.use(cors({
 app.options('*', cors());
 app.use(express.json());
 
-// Inicializa Passport para OAuth
-app.use(passport.initialize() as any); 
+// Inicializa Passport para OAuth (ANTES das rotas)
+app.use(passport.initialize());
 
 // Log de requisições
 app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`);
+  console.log(`📡 [Request] ${req.method} ${req.path}`);
+  if (req.query && Object.keys(req.query).length > 0) {
+    console.log(`📡 [Query]:`, req.query);
+  }
   next();
 });
 
@@ -101,7 +105,8 @@ app.use('/api/audit', apiLimiter, auditRoutes);
 app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
 
 // Rota 404
-app.use((_req, res) => {
+app.use((req, res) => {
+  console.log(`❌ [404] Rota não encontrada: ${req.method} ${req.path}`);
   res.status(404).json({ error: 'Route not found' });
 });
 

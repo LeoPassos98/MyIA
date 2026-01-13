@@ -29,9 +29,9 @@ export const authService = {
 
   async register(data: any): Promise<User> {
     console.log('[authService] Enviando registro:', data);
-    const response = await api.post<{ status: string; data: { user: User } }>('/auth/register', data);
+    const response = await api.post<{ user: User }>('/auth/register', data);
     console.log('[authService] Resposta do backend (register):', response.data);
-    return response.data.data.user; // Sempre JSend: { status, data: { user } }
+    return response.data.user; // Interceptor desembrulha JSend
   },
 
   async changePassword(data: any): Promise<void> {

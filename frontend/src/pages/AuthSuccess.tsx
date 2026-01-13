@@ -22,21 +22,25 @@ export const AuthSuccess = () => {
       return;
     }
 
+    // Salva o token primeiro
     localStorage.setItem('token', token);
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-    api.get('/user/me')
-      .then(response => {
-        const userData = response.data.data.user;
-        localStorage.setItem('user', JSON.stringify(userData));
-        setUser(userData);
-        navigate('/chat');
-      })
-      .catch(err => {
-        console.error('Erro ao buscar usuário:', err);
-        setError('Erro ao autenticar');
-        setTimeout(() => navigate('/login'), 2000);
-      });
+    // Aguarda um pouco antes de buscar o usuário
+    setTimeout(() => {
+      api.get('/user/me')
+        .then(response => {
+          const userData = response.data.user;
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+          navigate('/chat');
+        })
+        .catch(err => {
+          console.error('Erro ao autenticar:', err);
+          setError('Erro ao autenticar');
+          setTimeout(() => navigate('/login'), 2000);
+        });
+    }, 100);
   }, [searchParams, navigate, setUser]);
 
   return (

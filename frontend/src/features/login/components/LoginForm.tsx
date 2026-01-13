@@ -36,8 +36,12 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
   };
 
   const handleGithubLogin = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    window.location.href = `${apiUrl}/api/auth/github`;
+    // Extrai o callbackUrl da URL atual se existir
+    const searchParams = new URLSearchParams(window.location.search);
+    const callbackUrl = searchParams.get('callbackUrl') || '/';
+    
+    // Redireciona para o backend OAuth com o callbackUrl correto
+    window.location.href = `http://localhost:3001/api/auth/github?callbackUrl=${encodeURIComponent(callbackUrl)}`;
   };
 
   return (

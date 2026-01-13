@@ -4,6 +4,7 @@ import { authService } from '../services/authService';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
+import { generateToken } from '../utils/jwt';
 
 export const authController = {
   async register(req: Request, res: Response, next: NextFunction) {
@@ -87,14 +88,27 @@ export const authController = {
 
   async socialLoginCallback(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log('\n=== SOCIAL LOGIN CALLBACK ===');
+      console.log('[socialLoginCallback] req.user:', JSON.stringify(req.user, null, 2));
       const user = req.user as any;
-      if (!user || !user.token) {
+      
+      if (!user || !user.id) {
+        console.error('[socialLoginCallback] ❌ Usuário não encontrado em req.user');
         throw new AppError('Falha na autenticação social', 401);
       }
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      return res.redirect(`${frontendUrl}/auth-success?token=${user.token}`);
+      console.log('[socialLoginCallback] ✅ Gerando JWT para:', user.id, user.email);
+      const token = generateToken({ userId: user.id, email: user.email });
+      console.log('[socialLoginCallback] ✅ Token gerado:', token.substring(0, 20) + '...');
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectUrl = `${frontendUrl}/auth-success?token=${token}`;
+      console.log('[socialLoginCallback] ✅ Redirecionando para:', redirectUrl);
+      console.log('=== END SOCIAL LOGIN CALLBACK ===\n');
+      
+      return res.redirect(redirectUrl);
     } catch (error) {
+      console.error('[socialLoginCallback] ❌ Erro:', error);
       return next(error);
     }
   },

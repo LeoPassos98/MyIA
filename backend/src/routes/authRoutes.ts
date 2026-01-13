@@ -5,15 +5,95 @@ import { validateRequest } from '../middleware/validateRequest';
 import { loginSchema, registerSchema, changePasswordSchema } from '../middleware/validators/authValidator';
 import passport from 'passport';
 import { authMiddleware, protect } from '../middleware/authMiddleware';
+import { prisma } from '../lib/prisma';
+import { generateToken } from '../utils/jwt';
 
 const router = Router();
 
 // --- OAuth (Google/GitHub) ---
-router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
-router.get('/github/callback', 
-  passport.authenticate('github', { failureRedirect: '/login', session: false }),
-  authController.socialLoginCallback
-);
+router.get('/test-callback', async (req, res) => {
+  console.log('\n=== TEST CALLBACK (BYPASS GITHUB) ===');
+  
+  try {
+    // Simula um usuário do GitHub
+    const testUser = await prisma.user.upsert({
+      where: { email: 'test@github.com' },
+      update: { name: 'Test GitHub User' },
+      create: {
+        email: 'test@github.com',
+        name: 'Test GitHub User',
+        password: '',
+        settings: { create: { theme: 'dark' } }
+      }
+    });
+    
+    console.log('✅ Usuário de teste criado:', testUser.id);
+    
+    const token = generateToken({ userId: testUser.id, email: testUser.email });
+    console.log('✅ Token gerado:', token.substring(0, 20) + '...');
+    
+    const redirectUrl = `http://localhost:3000/auth-success?token=${token}`;
+    console.log('✅ Redirecionando para:', redirectUrl);
+    
+    return res.redirect(redirectUrl);
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    return res.status(500).json({ error: 'Erro no teste' });
+  }
+});
+
+router.get('/test-redirect', (req, res) => {
+  console.log('🧪 [Test] Testando redirect simples');
+  res.redirect('https://github.com');
+});
+
+router.get('/github', (req, res) => {
+  console.log('\n=== GITHUB OAUTH START ===');
+  console.log('🔵 [OAuth] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID);
+  console.log('🔵 [OAuth] GITHUB_OAUTH_CALLBACK_URL:', process.env.GITHUB_OAUTH_CALLBACK_URL);
+  
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const redirectUri = encodeURIComponent(process.env.GITHUB_OAUTH_CALLBACK_URL || 'http://localhost:3001/api/auth/github/callback');
+  const scope = encodeURIComponent('user:email');
+  
+  const githubUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+  console.log('🔵 [OAuth] Redirecionando para:', githubUrl);
+  
+  res.redirect(githubUrl);
+});
+
+router.get('/github/callback', (req, res, next) => {
+  console.log('\n=== GITHUB OAUTH CALLBACK ===');
+  console.log('🔵 [OAuth] GitHub callback recebido');
+  console.log('🔵 [OAuth] Query params:', JSON.stringify(req.query, null, 2));
+  console.log('🔵 [OAuth] URL completa:', req.url);
+  console.log('🔵 [OAuth] Headers:', JSON.stringify(req.headers, null, 2));
+  
+  passport.authenticate('github', { 
+    failureRedirect: 'http://localhost:3000/login?error=auth_failed', 
+    session: false 
+  }, (err, user, info) => {
+    console.log('\n=== PASSPORT CALLBACK ===');
+    console.log('🔵 [OAuth] Passport authenticate callback');
+    console.log('🔵 [OAuth] Error:', err);
+    console.log('🔵 [OAuth] User:', user ? { id: user.id, email: user.email } : null);
+    console.log('🔵 [OAuth] Info:', info);
+    
+    if (err) {
+      console.error('❌ [OAuth] Erro na autenticação:', err);
+      return res.redirect(`http://localhost:3000/login?error=auth_failed`);
+    }
+    
+    if (!user) {
+      console.error('❌ [OAuth] Usuário não encontrado');
+      return res.redirect(`http://localhost:3000/login?error=no_user`);
+    }
+    
+    console.log('✅ [OAuth] Usuário autenticado, passando para socialLoginCallback');
+    req.user = user;
+    next();
+  })(req, res, next);
+}, authController.socialLoginCallback);
 
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 router.get('/google/callback', 

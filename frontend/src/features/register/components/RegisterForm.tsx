@@ -35,8 +35,9 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
   };
 
   const handleGithubLogin = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    window.location.href = `${apiUrl}/api/auth/github`;
+    const searchParams = new URLSearchParams(window.location.search);
+    const callbackUrl = searchParams.get('callbackUrl') || '/';
+    window.location.href = `http://localhost:3001/api/auth/github?callbackUrl=${encodeURIComponent(callbackUrl)}`;
   };
 
   return (

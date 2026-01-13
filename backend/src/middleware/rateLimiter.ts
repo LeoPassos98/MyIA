@@ -11,7 +11,7 @@ import { jsend } from '../utils/jsend';
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // Máximo de 5 tentativas por IP
+  max: 100, // Aumentado temporariamente para testes
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
