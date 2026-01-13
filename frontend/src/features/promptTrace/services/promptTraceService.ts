@@ -13,7 +13,8 @@ class PromptTraceService {
    */
   async getPromptTraceById(traceId: string): Promise<PromptTraceRecord> {
     const response = await api.get(`/prompt-trace/${traceId}`);
-    return mapPromptTraceRecord(response.data);
+    // Interceptor desembrulha JSend: response.data.trace
+    return mapPromptTraceRecord(response.data.trace);
   }
 }
 
