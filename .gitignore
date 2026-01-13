@@ -35,3 +35,9 @@ temp/
 
 # Arquivos removidos temporariamente
 .trash/
+
+# .amazonq files
+.amazonq/
+
+# .github files
+.github/
