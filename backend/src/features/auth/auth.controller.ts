@@ -37,7 +37,7 @@ export class AuthController {
     }
   }
 
-  static async register(req: Request, res: Response, next: NextFunction) {
+  static async register(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
     try {
       const { name, email, password } = req.body;
 
@@ -77,7 +77,7 @@ export class AuthController {
     }
   }
 
-  static async login(req: Request, res: Response, next: NextFunction) {
+  static async login(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
     try {
       const { email, password } = req.body;
 

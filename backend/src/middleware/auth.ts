@@ -1,10 +1,10 @@
 // backend/src/middleware/auth.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-export const protect = (req: any, res: Response, next: NextFunction) => {
+export const protect = (req: any, res: Response, next: NextFunction): Response | void => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {

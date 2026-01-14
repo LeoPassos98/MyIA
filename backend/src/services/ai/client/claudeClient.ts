@@ -4,7 +4,6 @@
 import axios from 'axios';
 import { ChatMessage, AiServiceResponse, StreamChunk } from '../types';
 import { getProviderConfig } from '../utils/providerUtils';
-import { COST_PER_1M_TOKENS } from '../../../config/costMap';
 
 export async function callClaudeAPI(
   messages: ChatMessage[]
@@ -152,9 +151,8 @@ export async function* streamClaudeChat(
       }
     }
 
-    // Calcular custo
-    type CostMapKey = keyof typeof COST_PER_1M_TOKENS;
-    const costs = COST_PER_1M_TOKENS[model as CostMapKey] || { input: 0, output: 0 };
+    // Calcular custo (valores hardcoded temporariamente)
+    const costs = { input: 3, output: 15 }; // Claude Sonnet pricing per 1M tokens
     const totalCost = ((inputTokens / 1_000_000) * costs.input) + 
                       ((outputTokens / 1_000_000) * costs.output);
 

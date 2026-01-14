@@ -646,13 +646,23 @@ git merge feature/jsend-migration
 
 Antes de cada commit, verificar:
 
+- [ ] **ESLint passa sem erros** (`npm run lint` - 0 errors obrigatório)
+- [ ] **TypeScript compila** (`npm run type-check` - 0 errors obrigatório)
 - [ ] Código compila sem erros (`npm run build`)
 - [ ] Testes passam (`npm test` se aplicável)
-- [ ] Linter sem erros (`npm run lint` se configurado)
 - [ ] Headers obrigatórios em novos arquivos (Seção 1)
 - [ ] Sem cores hardcoded (Seção 3.2)
 - [ ] JSend em novas rotas (Seção 12)
 - [ ] Segurança validada se modificou rotas (Seção 9.3)
+
+**Quality Gates (Portões de Qualidade):**
+```bash
+# Executar ANTES de cada commit
+npm run lint        # Deve retornar: 0 errors (warnings são aceitáveis)
+npm run type-check  # Deve retornar: exit code 0
+```
+
+**Regra:** Commits com erros de ESLint ou TypeScript são **proibidos**.
 
 ### 14.5 Versionamento Semântico (SemVer)
 

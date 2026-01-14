@@ -87,7 +87,7 @@ router.get('/configured', protect, async (req: any, res: Response, next: NextFun
   }
 });
 
-router.post('/bedrock/validate', protect, async (req: any, res: Response, _next: NextFunction) => {
+router.post('/bedrock/validate', protect, async (req: any, res: Response, _next: NextFunction): Promise<Response | void> => {
   const startTime = Date.now();
   const userId = req.userId!;
   const { accessKey, secretKey, region } = req.body;

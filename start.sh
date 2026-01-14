@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
-# start.sh - script simples para iniciar/parar o backend (e opcionalmente frontend)
-# Local: /workspaces/MyIA
+# start.sh - Gerenciador de Processos MyIA
+# Documentação completa: START-SH-DOCS.md
+#
 # Uso: ./start.sh [start|stop|restart|status] [backend|frontend|both]
+#
+# Exemplos:
+#   ./start.sh start both      # Inicia backend + frontend
+#   ./start.sh stop backend    # Para apenas backend
+#   ./start.sh restart both    # Reinicia ambos
+#   ./start.sh status          # Mostra status
+#
+# Features:
+#   - Quality Gates automáticos (ESLint + TypeScript)
+#   - Gerenciamento de processos em background
+#   - Logs estruturados em logs/
+#   - Limpeza automática de portas
+#   - Health check com timeout
 
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -39,6 +53,32 @@ ensure_node() {
     exit 2
   fi
   echo -e "${GREEN}✓${NC} Node.js $(node --version) detectado"
+}
+
+run_quality_gates() {
+  echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}🔍 Quality Gates - Validação Pré-Start${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  
+  # ESLint
+  echo -e "${BLUE}📝${NC} Verificando ESLint..."
+  if npm run lint --silent 2>&1 | grep -q "0 errors"; then
+    echo -e "${GREEN}✓${NC} ESLint passou (0 errors)"
+  else
+    echo -e "${RED}✗${NC} ESLint falhou! Execute: ${YELLOW}npm run lint${NC}"
+    echo -e "${YELLOW}⚠${NC}  Continuando mesmo assim..."
+  fi
+  
+  # TypeScript
+  echo -e "${BLUE}🔧${NC} Verificando TypeScript..."
+  if npm run type-check --silent >/dev/null 2>&1; then
+    echo -e "${GREEN}✓${NC} TypeScript passou (0 errors)"
+  else
+    echo -e "${RED}✗${NC} TypeScript falhou! Execute: ${YELLOW}npm run type-check${NC}"
+    echo -e "${YELLOW}⚠${NC}  Continuando mesmo assim..."
+  fi
+  
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 }
 
 check_dependencies() {
@@ -119,6 +159,7 @@ start_backend() {
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   
   ensure_node
+  run_quality_gates
   check_dependencies "$BACKEND_DIR" "backend"
   
   # Limpar porta antes de iniciar

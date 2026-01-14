@@ -18,7 +18,7 @@ passport.use(
         console.log('[GitHub OAuth] Access Token:', accessToken.substring(0, 10) + '...');
         
         // 1. Tenta pegar o e-mail do array de e-mails (que vem do scope user:email)
-        let email = profile.emails && profile.emails.length > 0 
+        const email = profile.emails && profile.emails.length > 0 
                     ? profile.emails[0].value 
                     : null;
 
@@ -33,7 +33,7 @@ passport.use(
         console.log('[GitHub OAuth] Buscando/criando usuário...');
         
         // 3. Busca ou cria o usuário (Upsert)
-        let user = await prisma.user.upsert({
+        const user = await prisma.user.upsert({
           where: { email },
           update: {
             name: profile.displayName || profile.username,

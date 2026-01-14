@@ -185,19 +185,27 @@ O projeto inclui um script de gerenciamento na raiz:
 ./start.sh start both
 
 # Ou individualmente
-./start.sh start be    # Apenas backend
-./start.sh start fe    # Apenas frontend
+./start.sh start backend    # Apenas backend
+./start.sh start frontend   # Apenas frontend
 
-# Ver logs em tempo real
-./start.sh logs be     # Logs do backend
-./start.sh logs fe     # Logs do frontend
+# Ver status
+./start.sh status
 
 # Parar os servidores
 ./start.sh stop both
 
-# Ver status
-./start.sh status
+# Reiniciar
+./start.sh restart both
 ```
+
+> 📚 **Documentação completa:** [START-SH-DOCS.md](START-SH-DOCS.md)
+
+**Features do start.sh:**
+- ✅ Quality Gates automáticos (ESLint + TypeScript)
+- ✅ Gerenciamento de processos em background
+- ✅ Logs estruturados em `logs/`
+- ✅ Limpeza automática de portas
+- ✅ Health check com timeout
 
 **Método Manual**:
 
@@ -236,6 +244,12 @@ npm run dev
 ---
 
 ## 📝 Documentação
+
+### 📚 Scripts & Ferramentas
+
+- **[START-SH-DOCS.md](START-SH-DOCS.md)** - Documentação completa do `start.sh`
+- **[QUALITY-GATES-SETUP.md](QUALITY-GATES-SETUP.md)** - Git Hooks e Quality Gates
+- **[.husky/README.md](.husky/README.md)** - Documentação dos Git Hooks
 
 ### 🔐 Segurança (LEITURA OBRIGATÓRIA)
 

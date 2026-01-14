@@ -11,7 +11,7 @@ import { generateToken } from '../utils/jwt';
 const router = Router();
 
 // --- OAuth (Google/GitHub) ---
-router.get('/test-callback', async (req, res) => {
+router.get('/test-callback', async (_req, res) => {
   console.log('\n=== TEST CALLBACK (BYPASS GITHUB) ===');
   
   try {
@@ -42,12 +42,12 @@ router.get('/test-callback', async (req, res) => {
   }
 });
 
-router.get('/test-redirect', (req, res) => {
+router.get('/test-redirect', (_req, res) => {
   console.log('🧪 [Test] Testando redirect simples');
   res.redirect('https://github.com');
 });
 
-router.get('/github', (req, res) => {
+router.get('/github', (_req, res) => {
   console.log('\n=== GITHUB OAUTH START ===');
   console.log('🔵 [OAuth] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID);
   console.log('🔵 [OAuth] GITHUB_OAUTH_CALLBACK_URL:', process.env.GITHUB_OAUTH_CALLBACK_URL);
@@ -72,7 +72,7 @@ router.get('/github/callback', (req, res, next) => {
   passport.authenticate('github', { 
     failureRedirect: 'http://localhost:3000/login?error=auth_failed', 
     session: false 
-  }, (err, user, info) => {
+  }, (err: any, user: any, info: any) => {
     console.log('\n=== PASSPORT CALLBACK ===');
     console.log('🔵 [OAuth] Passport authenticate callback');
     console.log('🔵 [OAuth] Error:', err);

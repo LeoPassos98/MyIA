@@ -11,6 +11,8 @@ import { getProviderInfo } from '../config/providerMap';
 import { prepareForEmbedding } from '../services/embeddingUtils';
 import { logger } from '../utils/logger';
 
+import crypto from 'crypto';
+
 // Controle de Concorrência (Evita spam de requisições iguais)
 const processingRequests = new Set<string>();
 
@@ -36,7 +38,6 @@ export const chatController = {
       }
 
       // 1. Prevenção de Duplicidade
-      const crypto = require('crypto');
       const requestId = `${req.userId}-${chatId || 'new'}-${crypto.createHash('sha256').update(messageContent).digest('hex').substring(0, 8)}`;
 
       if (processingRequests.has(requestId)) {

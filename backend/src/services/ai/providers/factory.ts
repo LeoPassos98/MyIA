@@ -63,10 +63,11 @@ export class AIProviderFactory {
         return new OpenAIProvider(providerConfig.baseUrl);
 
       case 'bedrock':
-      case 'aws':
+      case 'aws': {
         const { BedrockProvider } = await import('./bedrock');
         const region = providerConfig.baseUrl || 'us-east-1';
         return new BedrockProvider(region);
+      }
 
       case 'anthropic':
         throw new Error("Anthropic ainda não implementado na nova arquitetura.");
