@@ -50,7 +50,7 @@ export function ModelTab() {
     async function loadData() {
       try {
         setLoading(true);
-        const data = await aiProvidersService.getAll();
+        const data = await aiProvidersService.getConfigured(); // Apenas providers configurados
         setProviders(data);
 
         // Lógica de Auto-seleção Inteligente

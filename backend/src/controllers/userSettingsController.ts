@@ -46,7 +46,9 @@ const encryptedKeys: string[] = [
   'claudeApiKey',
   'togetherApiKey',
   'perplexityApiKey',
-  'mistralApiKey'
+  'mistralApiKey',
+  'awsAccessKey',
+  'awsSecretKey'
 ];
 
 export const userSettingsController = {

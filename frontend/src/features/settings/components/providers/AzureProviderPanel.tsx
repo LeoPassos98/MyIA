@@ -1,7 +1,7 @@
 // frontend/src/features/settings/components/providers/AzureProviderPanel.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { Box, TextField, Button, Alert, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { Construction } from '@mui/icons-material';
 
 export default function AzureProviderPanel() {

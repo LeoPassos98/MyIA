@@ -14,7 +14,7 @@ import ApiKeysTab from './components/ApiKeysTab';
 
 export default function SettingsPage() {
   const { isAuthenticated } = useAuth();
-  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const [_userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('profile');

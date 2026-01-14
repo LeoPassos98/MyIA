@@ -31,6 +31,7 @@ model User {
   chats Chat[]
 
   providerCredentials UserProviderCredential[]
+  credentialValidations ProviderCredentialValidation[]
 
   @@map("users")
 }
@@ -60,6 +61,24 @@ model UserSettings {
   user   User   @relation(fields: [userId], references: [id])
 
   @@map("user_settings")
+}
+
+// Validação de Credenciais de Providers
+model ProviderCredentialValidation {
+  id              String    @id @default(uuid())
+  userId          String
+  provider        String    // 'bedrock', 'azure', etc
+  status          String    // 'not_configured', 'validating', 'valid', 'invalid', 'expired'
+  lastValidatedAt DateTime?
+  lastError       String?   // Mensagem de erro detalhada
+  errorCode       String?   // AWS error code (ex: InvalidAccessKeyId)
+  validatedModels String[]  @default([]) // Quais modelos foram testados
+  latencyMs       Int?      // Tempo de resposta do teste
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, provider])
+  @@map("provider_credential_validations")
 }
 
 // 3. ADICIONE ESTE NOVO MODELO (Analytics)

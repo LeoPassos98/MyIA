@@ -45,7 +45,7 @@ export function useAuditLoader(messageId: string | null | undefined): AuditLoade
       try {
         setState({ audit: null, loading: true, error: null });
         
-        const data = await auditService.getAuditByMessageId(messageId);
+        const data = await auditService.getAuditByMessageId(messageId!);
         
         if (isMounted) {
           setState({ audit: data, loading: false, error: null });

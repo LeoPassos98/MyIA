@@ -6,7 +6,10 @@ import { api } from './api';
 export interface UserSettings {
   id: string;
   theme: 'light' | 'dark';
-  // ...outros campos que virão no futuro...
+  awsAccessKey?: string;
+  awsSecretKey?: string;
+  awsRegion?: string;
+  awsEnabledModels?: string[];
 }
 
 export const userSettingsService = {
