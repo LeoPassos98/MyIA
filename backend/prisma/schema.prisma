@@ -49,6 +49,12 @@ model UserSettings {
   perplexityApiKey String?
   mistralApiKey    String?
 
+  // --- AWS Bedrock Configuration ---
+  awsAccessKey     String?
+  awsSecretKey     String?
+  awsRegion        String?   @default("us-east-1")
+  awsEnabledModels String[]  @default([]) // Array de apiModelId habilitados
+
   // --- O Link de volta ao User ---
   userId String @unique // O '@unique' garante a relação 1-para-1
   user   User   @relation(fields: [userId], references: [id])

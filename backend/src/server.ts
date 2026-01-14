@@ -18,6 +18,7 @@ import userRoutes from './routes/userRoutes';
 import chatHistoryRoutes from './routes/chatHistoryRoutes';
 import auditRoutes from './routes/auditRoutes';
 import promptTraceRoutes from './routes/promptTraceRoutes';
+import providersRoutes from './routes/providers';
 import passport from './config/passport';
 
 
@@ -103,6 +104,7 @@ app.use('/api/user', apiLimiter, userRoutes);
 app.use('/api/chat-history', apiLimiter, chatHistoryRoutes);
 app.use('/api/audit', apiLimiter, auditRoutes);
 app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
+app.use('/api/providers', apiLimiter, providersRoutes);
 
 // Rota 404
 app.use((req, res) => {
