@@ -440,10 +440,10 @@ async function main() {
     console.log('🌱 Populando Provedores de IA...');
 
     const providers = [
-      { name: 'Google', slug: 'google' },
-      { name: 'GitHub', slug: 'github' },
       { name: 'OpenAI', slug: 'openai' },
-      { name: 'Groq', slug: 'groq' }
+      { name: 'Groq', slug: 'groq' },
+      { name: 'Together AI', slug: 'together' },
+      { name: 'AWS Bedrock', slug: 'bedrock' }
     ];
 
     for (const p of providers) {

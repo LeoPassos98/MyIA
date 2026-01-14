@@ -107,7 +107,7 @@ export class BedrockProvider extends BaseAIProvider {
       };
 
       const command = new InvokeModelWithResponseStreamCommand({
-        modelId: 'anthropic.claude-3-haiku-20240307-v1:0',
+        modelId: 'us.anthropic.claude-3-haiku-20240307-v1:0',
         contentType: 'application/json',
         accept: 'application/json',
         body: JSON.stringify(testPayload),

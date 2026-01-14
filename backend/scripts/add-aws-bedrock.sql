@@ -1,11 +1,12 @@
 -- backend/scripts/add-aws-bedrock.sql
--- Adiciona modelos AWS Bedrock (Claude 3)
+-- Adiciona modelos AWS Bedrock (Claude 3.5)
 
+-- Claude 3.5 Sonnet v2 (Cross-Region Inference Profile)
 INSERT INTO ai_models (id, "apiModelId", name, "providerId", "costPer1kInput", "costPer1kOutput", "isActive", "updatedAt")
 SELECT 
   gen_random_uuid(),
-  'anthropic.claude-3-5-sonnet-20241022-v2:0',
-  'Claude 3.5 Sonnet',
+  'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+  'Claude 3.5 Sonnet v2',
   id,
   3.0,
   15.0,
@@ -14,10 +15,25 @@ SELECT
 FROM ai_providers WHERE slug = 'bedrock'
 ON CONFLICT DO NOTHING;
 
+-- Claude 3.5 Sonnet v1
 INSERT INTO ai_models (id, "apiModelId", name, "providerId", "costPer1kInput", "costPer1kOutput", "isActive", "updatedAt")
 SELECT 
   gen_random_uuid(),
-  'anthropic.claude-3-haiku-20240307-v1:0',
+  'us.anthropic.claude-3-5-sonnet-20240620-v1:0',
+  'Claude 3.5 Sonnet v1',
+  id,
+  3.0,
+  15.0,
+  true,
+  CURRENT_TIMESTAMP
+FROM ai_providers WHERE slug = 'bedrock'
+ON CONFLICT DO NOTHING;
+
+-- Claude 3 Haiku
+INSERT INTO ai_models (id, "apiModelId", name, "providerId", "costPer1kInput", "costPer1kOutput", "isActive", "updatedAt")
+SELECT 
+  gen_random_uuid(),
+  'us.anthropic.claude-3-haiku-20240307-v1:0',
   'Claude 3 Haiku',
   id,
   0.25,
@@ -27,14 +43,15 @@ SELECT
 FROM ai_providers WHERE slug = 'bedrock'
 ON CONFLICT DO NOTHING;
 
+-- Claude 3 Opus
 INSERT INTO ai_models (id, "apiModelId", name, "providerId", "costPer1kInput", "costPer1kOutput", "isActive", "updatedAt")
 SELECT 
   gen_random_uuid(),
-  'anthropic.claude-v2:1',
-  'Claude 2.1',
+  'us.anthropic.claude-3-opus-20240229-v1:0',
+  'Claude 3 Opus',
   id,
-  8.0,
-  24.0,
+  15.0,
+  75.0,
   true,
   CURRENT_TIMESTAMP
 FROM ai_providers WHERE slug = 'bedrock'
