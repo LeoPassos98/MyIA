@@ -54,11 +54,12 @@ export async function callClaudeAPI(
 
     return standardizedResponse;
 
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(`Claude API error: ${error.response.data.error?.message || error.message}`);
+  } catch (error: unknown) {
+    // Axios errors have a response property
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(`Claude API error: ${error.response.data?.error?.message || error.message}`);
     }
-    throw error;
+    throw error instanceof Error ? error : new Error('Unknown error');
   }
 }
 
@@ -108,7 +109,6 @@ export async function* streamClaudeChat(
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let fullResponse = '';
     let inputTokens = 0;
     let outputTokens = 0;
 
@@ -134,7 +134,6 @@ export async function* streamClaudeChat(
             if (parsed.type === 'content_block_delta') {
               const content = parsed.delta?.text || '';
               if (content) {
-                fullResponse += content;
                 yield { type: 'chunk', content };
               }
             }
@@ -168,9 +167,10 @@ export async function* streamClaudeChat(
       }
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no stream Claude';
     console.error('Erro no stream (Claude):', error);
-    yield { type: 'error', error: error.message || 'Erro desconhecido no stream Claude' };
+    yield { type: 'error', error: errorMessage };
   }
 }
 

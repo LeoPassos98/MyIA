@@ -1,15 +1,14 @@
 // backend/src/middlewares/error-handler.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+import { Request, Response, ErrorRequestHandler } from 'express';
 import { ApiResponse } from '../utils/api-response';
 
 // Middleware global de tratamento de erros (JSend, JWT, sintaxe, credenciais)
 export const errorHandler: ErrorRequestHandler = (
   err: any,
   _req: Request,
-  res: Response,
-  _next: NextFunction
+  res: Response
 ) => {
   // 1. Erro de autenticação JWT (express-jwt, etc)
   if (err.name === 'UnauthorizedError') {

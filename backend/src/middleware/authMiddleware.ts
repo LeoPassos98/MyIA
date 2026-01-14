@@ -60,7 +60,7 @@ export const authMiddleware = async (
     req.userId = decoded.userId;
 
     return next();
-  } catch (error) {
+  } catch {
     return next(new AppError('Invalid token', 401));
   }
 };

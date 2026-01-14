@@ -23,7 +23,7 @@ export const validateRequest = (schema: ZodSchema) => {
       
       console.log('Validação OK!');
       next();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro no validateRequest:', error);
       next(error);
     }

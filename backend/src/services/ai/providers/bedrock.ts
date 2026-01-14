@@ -81,11 +81,12 @@ export class BedrockProvider extends BaseAIProvider {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no AWS Bedrock';
       console.error(`[BedrockProvider] Erro no stream:`, error);
       yield {
         type: 'error',
-        error: error.message || 'Erro desconhecido no AWS Bedrock',
+        error: errorMessage,
       };
     }
   }
@@ -115,7 +116,7 @@ export class BedrockProvider extends BaseAIProvider {
 
       await client.send(command);
       return true;
-    } catch (e) {
+    } catch (_e) {
       return false;
     }
   }

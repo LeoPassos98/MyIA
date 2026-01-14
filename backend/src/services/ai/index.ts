@@ -42,8 +42,9 @@ export const aiService = {
       let apiKey = "";
       try {
         apiKey = await AIProviderFactory.getApiKey(options.userId, providerRecord.id);
-      } catch (e: any) {
-        yield { type: 'error', error: e.message };
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : 'Erro ao obter API key';
+        yield { type: 'error', error: errorMessage };
         return;
       }
 
@@ -59,11 +60,12 @@ export const aiService = {
         yield chunk;
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro interno no serviço de IA';
       console.error(`[AI Service] Erro fatal:`, error);
       yield {
         type: 'error',
-        error: error.message || 'Erro interno no serviço de IA',
+        error: errorMessage,
       };
     }
   },

@@ -1,7 +1,7 @@
 // backend/src/routes/providers.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { jsend } from '../utils/jsend';
 import { protect } from '../middleware/auth';
@@ -38,7 +38,7 @@ router.get('/bedrock/models', protect, async (_req, res: Response, next: NextFun
 });
 
 // Endpoint para listar providers configurados pelo usuário
-router.get('/configured', protect, async (req: any, res: Response, next: NextFunction) => {
+router.get('/configured', protect, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
 
@@ -87,7 +87,7 @@ router.get('/configured', protect, async (req: any, res: Response, next: NextFun
   }
 });
 
-router.post('/bedrock/validate', protect, async (req: any, res: Response, _next: NextFunction): Promise<Response | void> => {
+router.post('/bedrock/validate', protect, async (req: Request, res: Response, _next: NextFunction): Promise<Response | void> => {
   const startTime = Date.now();
   const userId = req.userId!;
   const { accessKey, secretKey, region } = req.body;
@@ -150,10 +150,10 @@ router.post('/bedrock/validate', protect, async (req: any, res: Response, _next:
       latencyMs,
       message: 'Credenciais válidas! Você pode selecionar os modelos agora.' 
     }));
-  } catch (error: any) {
+  } catch (error: unknown) {
     const latencyMs = Date.now() - startTime;
-    const errorCode = error.name || 'UnknownError';
-    const errorMessage = error.message || 'Erro desconhecido';
+    const errorCode = error instanceof Error ? error.name : 'UnknownError';
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
 
     // Mapear erros AWS para mensagens amigáveis
     let userMessage = 'Erro ao validar credenciais';

@@ -67,6 +67,7 @@ export class AuthController {
       });
 
       // 4. Remover senha do retorno
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password: _, ...userWithoutPassword } = newUser;
 
       return res.status(201).json(
@@ -105,6 +106,7 @@ export class AuthController {
       );
 
       // 4. Retorno padronizado
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password: _, ...userWithoutPassword } = user;
       
       return res.json(ApiResponse.success({

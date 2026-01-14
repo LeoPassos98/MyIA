@@ -63,8 +63,9 @@ export async function getEmbedding(text: string): Promise<EmbeddingResponse | nu
       model: deploymentName
     };
 
-  } catch (error: any) {
-    console.error("❌ Erro ao gerar embedding (Azure V9.2):", error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error("❌ Erro ao gerar embedding (Azure V9.2):", errorMessage);
     return null;
   }
 }
@@ -109,8 +110,9 @@ export async function getEmbeddingsBatch(texts: string[]): Promise<EmbeddingResp
         });
       });
 
-    } catch (error: any) {
-      console.error(`❌ Erro no batch ${i}-${i + batch.length}:`, error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error(`❌ Erro no batch ${i}-${i + batch.length}:`, errorMessage);
       // Retornar null para cada texto que falhou
       batch.forEach(() => {
         results.push({

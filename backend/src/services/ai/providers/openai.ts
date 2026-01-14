@@ -49,11 +49,12 @@ export class OpenAIProvider extends BaseAIProvider {
           };
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no provedor OpenAI';
       console.error(`[OpenAIProvider] Erro no stream:`, error);
       yield {
         type: 'error',
-        error: error.message || 'Erro desconhecido no provedor OpenAI',
+        error: errorMessage,
       };
     }
   }
@@ -63,7 +64,7 @@ export class OpenAIProvider extends BaseAIProvider {
       const client = new OpenAI({ apiKey, baseURL: this.baseURL });
       await client.models.list();
       return true;
-    } catch (e) {
+    } catch (_e) {
       return false;
     }
   }

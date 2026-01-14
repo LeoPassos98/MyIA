@@ -67,8 +67,9 @@ export const ragService = {
 
       return results;
 
-    } catch (error: any) {
-      console.error("Erro na busca V9.4 (ragService):", error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error("Erro na busca V9.4 (ragService):", errorMessage);
       return [];
     }
   }

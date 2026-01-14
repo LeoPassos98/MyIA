@@ -115,7 +115,7 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
         h3: ({ children }) => <Typography variant="h5" gutterBottom sx={{ mt: 2, fontSize: '1.25rem', fontWeight: 600 }}>{children}</Typography>,
 
         // 8. CÓDIGO (Syntax Highlighting - Mantido e Melhorado)
-        code({ inline, className, children, node, ...props }: any) {
+        code({ inline, className, children, _node, ...props }: any) {
           const match = /language-(\w+)/.exec(className || '');
           const language = match ? match[1] : null;
           

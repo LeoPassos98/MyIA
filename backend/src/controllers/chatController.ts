@@ -82,7 +82,13 @@ export const chatController = {
       // 4. Construção do Contexto (Histórico)
       const targetModel = model || 'default-model';
       const isManualMode = context !== undefined || (selectedMessageIds && selectedMessageIds.length > 0);
-      let historyMessages: any[] = [];
+      interface HistoryMessage {
+        id: string;
+        role: string;
+        content: string;
+        isPinned?: boolean;
+      }
+      let historyMessages: HistoryMessage[] = [];
 
       let messageOrigins: Record<string, 'pinned' | 'rag' | 'recent' | 'rag+recent'> = {};
       
@@ -183,7 +189,7 @@ export const chatController = {
         },
         // LEAN: Salva systemPrompt (único!) e IDs em vez de conteúdo
         systemPrompt: systemPrompt,
-        messageIds: historyMessages.map((m: any) => m.id),
+        messageIds: historyMessages.map(m => m.id),
         userMessageId: userMsgRecord.id,
         pinnedStepIndices,
         stepOrigins,
@@ -398,17 +404,21 @@ export const chatController = {
           })();
         }
 
-      } catch (streamError: any) {
+      } catch (streamError: unknown) {
+        const errorMessage = streamError instanceof Error ? streamError.message : "Erro na geração";
+        const errorCode = streamError instanceof Error && 'code' in streamError ? (streamError as any).code : undefined;
+        const errorStatus = streamError instanceof Error && 'status' in streamError ? (streamError as any).status : undefined;
+        
         console.error("Stream Error:", streamError);
         
         // 🔥 NOVO: Salva mensagem de erro com audit trace para debug
-        const errorContent = `[ERRO] ${streamError.message || "Erro na geração"}`;
+        const errorContent = `[ERRO] ${errorMessage}`;
         const errorAuditObject = {
           ...auditObject,
           error: {
-            message: streamError.message,
-            code: streamError.code,
-            status: streamError.status,
+            message: errorMessage,
+            code: errorCode,
+            status: errorStatus,
           }
         };
         
@@ -447,7 +457,7 @@ export const chatController = {
           console.error("Erro ao salvar audit de erro:", saveErr);
         }
         
-        writeSSE({ type: 'error', error: streamError.message || "Erro na geração" });
+        writeSSE({ type: 'error', error: errorMessage });
         res.end();
       } finally {
         cleanup();

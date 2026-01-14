@@ -50,10 +50,20 @@ class PromptTraceController {
         return res.status(404).json(jsend.fail({ trace: 'Trace não encontrado (sentContext vazio)' }));
       }
 
-      let sentContext: any;
+      interface SentContext {
+        config_V47?: Record<string, unknown>;
+        pinnedStepIndices?: number[];
+        stepOrigins?: Record<string, string>;
+        messageIds?: string[];
+        systemPrompt?: string;
+        userMessageId?: string;
+        payloadSent_V23?: Array<{ role: string; content: string }>;
+      }
+      
+      let sentContext: SentContext;
       try {
         sentContext = JSON.parse(message.sentContext);
-      } catch (err) {
+      } catch {
         return res.status(500).json(jsend.error('sentContext inválido (JSON malformado)'));
       }
 
