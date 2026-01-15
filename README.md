@@ -245,6 +245,11 @@ npm run dev
 
 ## 📝 Documentação
 
+### 🎯 Início Rápido
+
+- **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - ⚡ Referência rápida para desenvolvimento
+- **[CODEBASE-INDEX.md](CODEBASE-INDEX.md)** - 📚 Indexação completa da codebase (para IAs e desenvolvedores)
+
 ### 📚 Scripts & Ferramentas
 
 - **[START-SH-DOCS.md](START-SH-DOCS.md)** - Documentação completa do `start.sh`
