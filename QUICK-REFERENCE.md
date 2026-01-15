@@ -308,6 +308,29 @@ VALUES (...);
 | ESLint errors | `npm run lint:fix` |
 | TypeScript errors | `npm run type-check` |
 | Porta ocupada | `./start.sh stop backend` |
+| **AWS Bedrock 404** | Ver seção abaixo ⬇️ |
+
+### AWS Bedrock - Erro 404 nos Modelos
+
+**Problema:**
+```
+❌ 404 The model us.anthropic.claude-3-haiku-20240307-v1:0 does not exist
+```
+
+**Causa:** Modelos cadastrados com IDs regionais antigos (sem prefixo `us.`)
+
+**Solução Rápida:**
+```bash
+./backend/scripts/fix-bedrock-models.sh
+```
+
+**Documentação Completa:** [`docs/AWS-BEDROCK-MODEL-FIX.md`](docs/AWS-BEDROCK-MODEL-FIX.md)
+
+**Modelos Corretos:**
+- `us.anthropic.claude-3-5-sonnet-20241022-v2:0` (Claude 3.5 Sonnet v2)
+- `us.anthropic.claude-3-5-sonnet-20240620-v1:0` (Claude 3.5 Sonnet v1)
+- `us.anthropic.claude-3-haiku-20240307-v1:0` (Claude 3 Haiku)
+- `us.anthropic.claude-3-opus-20240229-v1:0` (Claude 3 Opus)
 
 ---
 
