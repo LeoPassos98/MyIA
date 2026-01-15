@@ -1,12 +1,14 @@
 // backend/src/routes/providers.ts
-// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { jsend } from '../utils/jsend';
 import { protect } from '../middleware/auth';
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { logger } from '../utils/logger';
+import { providersController } from '../controllers/providersController';
+import { validateRequest } from '../middleware/validateRequest';
+import { apiLimiter } from '../middleware/rateLimiter'; // Corrigido: usar apiLimiter
+import { bedrockConfigSchema } from '../schemas/bedrockSchema';
 
 const router = Router();
 
@@ -87,131 +89,12 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
   }
 });
 
-router.post('/bedrock/validate', protect, async (req: Request, res: Response, _next: NextFunction): Promise<Response | void> => {
-  const startTime = Date.now();
-  const userId = req.userId!;
-  const { accessKey, secretKey, region } = req.body;
-
-  logger.info('AWS_VALIDATION_START', { userId, region, timestamp: new Date() });
-
-  try {
-    if (!accessKey || !secretKey || !region) {
-      return res.status(400).json(jsend.fail({ message: 'Credenciais incompletas' }));
-    }
-
-    const client = new BedrockRuntimeClient({
-      region,
-      credentials: { accessKeyId: accessKey, secretAccessKey: secretKey }
-    });
-
-    // Testa com modelo mais barato (Haiku)
-    const testModelId = 'us.anthropic.claude-3-haiku-20240307-v1:0';
-    const payload = {
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 10,
-      messages: [{ role: 'user', content: 'Hi' }]
-    };
-
-    const command = new InvokeModelCommand({
-      modelId: testModelId,
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify(payload)
-    });
-
-    await client.send(command);
-    const latencyMs = Date.now() - startTime;
-
-    // Salvar validação bem-sucedida
-    await prisma.providerCredentialValidation.upsert({
-      where: { userId_provider: { userId, provider: 'bedrock' } },
-      update: {
-        status: 'valid',
-        lastValidatedAt: new Date(),
-        lastError: null,
-        errorCode: null,
-        validatedModels: [testModelId],
-        latencyMs
-      },
-      create: {
-        userId,
-        provider: 'bedrock',
-        status: 'valid',
-        lastValidatedAt: new Date(),
-        validatedModels: [testModelId],
-        latencyMs
-      }
-    });
-
-    logger.info('AWS_VALIDATION_SUCCESS', { userId, region, latencyMs, timestamp: new Date() });
-
-    res.json(jsend.success({ 
-      status: 'valid', 
-      latencyMs,
-      message: 'Credenciais válidas! Você pode selecionar os modelos agora.' 
-    }));
-  } catch (error: unknown) {
-    const latencyMs = Date.now() - startTime;
-    const errorCode = error instanceof Error ? error.name : 'UnknownError';
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-
-    // Mapear erros AWS para mensagens amigáveis
-    let userMessage = 'Erro ao validar credenciais';
-    let suggestion = 'Verifique suas credenciais e tente novamente';
-
-    if (errorCode.includes('InvalidSignature') || errorCode.includes('InvalidAccessKeyId')) {
-      userMessage = 'Access Key ou Secret Key inválidos';
-      suggestion = 'Verifique se copiou as credenciais corretamente';
-    } else if (errorCode.includes('UnrecognizedClient')) {
-      userMessage = 'Credenciais não reconhecidas';
-      suggestion = 'Verifique se a Access Key está ativa no console AWS';
-    } else if (errorCode.includes('AccessDenied')) {
-      userMessage = 'Sem permissão para acessar Bedrock';
-      suggestion = 'Adicione a policy AmazonBedrockFullAccess ao usuário IAM';
-    } else if (errorCode.includes('ResourceNotFound')) {
-      userMessage = 'Modelo não disponível nesta região';
-      suggestion = `Tente usar us-east-1 ou us-west-2`;
-    }
-
-    // Salvar validação com erro
-    await prisma.providerCredentialValidation.upsert({
-      where: { userId_provider: { userId, provider: 'bedrock' } },
-      update: {
-        status: 'invalid',
-        lastValidatedAt: new Date(),
-        lastError: errorMessage,
-        errorCode,
-        latencyMs
-      },
-      create: {
-        userId,
-        provider: 'bedrock',
-        status: 'invalid',
-        lastValidatedAt: new Date(),
-        lastError: errorMessage,
-        errorCode,
-        latencyMs
-      }
-    });
-
-    logger.error('AWS_VALIDATION_FAILED', { 
-      userId, 
-      region, 
-      errorCode, 
-      errorMessage, 
-      suggestion,
-      latencyMs,
-      timestamp: new Date() 
-    });
-
-    res.json(jsend.success({ 
-      status: 'invalid', 
-      error: userMessage,
-      suggestion,
-      errorCode,
-      latencyMs
-    }));
-  }
-});
+router.post(
+  '/bedrock/validate',
+  protect,
+  apiLimiter, // Corrigido: usar apiLimiter do rateLimiter.ts
+  validateRequest(bedrockConfigSchema),
+  providersController.validateAWS
+);
 
 export default router;

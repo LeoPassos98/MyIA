@@ -78,6 +78,31 @@ export class AIProviderFactory {
   }
 
   static async getApiKey(userId: string, providerId: string): Promise<string> {
+    // Buscar informações do provider
+    const provider = await prisma.aIProvider.findUnique({
+      where: { id: providerId },
+      select: { slug: true }
+    });
+
+    if (!provider) throw new Error("Provider não encontrado.");
+
+    // Caso especial: AWS Bedrock usa userSettings ao invés de userProviderCredential
+    if (provider.slug === 'bedrock' || provider.slug === 'aws') {
+      const { encryptionService } = await import('../../../services/encryptionService');
+      const settings = await prisma.userSettings.findUnique({
+        where: { userId },
+        select: { awsAccessKey: true, awsSecretKey: true, awsRegion: true }
+      });
+
+      if (settings?.awsAccessKey && settings?.awsSecretKey) {
+        const accessKey = encryptionService.decrypt(settings.awsAccessKey);
+        const secretKey = encryptionService.decrypt(settings.awsSecretKey);
+        console.log(`[Factory] Usando credenciais AWS do userSettings para usuário ${userId}`);
+        return `${accessKey}:${secretKey}`;
+      }
+    }
+
+    // Buscar na tabela userProviderCredential (outros providers)
     const userCred = await prisma.userProviderCredential.findUnique({
       where: { userId_providerId: { userId, providerId } }
     });
@@ -87,13 +112,6 @@ export class AIProviderFactory {
     }
 
     // Fallback: .env system keys
-    const provider = await prisma.aIProvider.findUnique({
-      where: { id: providerId },
-      select: { slug: true }
-    });
-
-    if (!provider) throw new Error("Provider não encontrado.");
-
     const envKeyMap: Record<string, string> = {
       'openai': process.env.OPENAI_API_KEY || '',
       'groq': process.env.GROQ_API_KEY || '',

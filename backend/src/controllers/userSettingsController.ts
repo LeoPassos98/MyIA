@@ -90,9 +90,25 @@ export const userSettingsController = {
 
       // --- LÓGICA DO COFRE (UPDATE) ---
       for (const key of encryptedKeys) {
-        if (updateData[key]) {
+        const value = updateData[key];
+        
+        // Se o campo foi enviado no payload
+        if (value !== undefined) {
+          // Ignorar strings vazias, null ou placeholders (proteção contra corrupção)
+          // String vazia significa "não modificado" no frontend
+          if (!value || value === '' || value.trim() === '') {
+            delete updateData[key]; // Não atualizar este campo, manter valor existente
+            continue;
+          }
+          
+          // Ignorar placeholders comuns (ex: "********", "AKIA...EKEY")
+          if (value.match(/^\*+$/) || value.match(/^.{4}\.\.\..{4}$/)) {
+            delete updateData[key]; // Não atualizar este campo, manter valor existente
+            continue;
+          }
+          
           // 1. Pegue a chave em texto puro enviada pelo frontend
-          const plainTextKey = updateData[key];
+          const plainTextKey = value;
           // 2. Criptografe-a
           updateData[key] = encryptionService.encrypt(plainTextKey);
         }

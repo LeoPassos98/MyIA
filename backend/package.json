@@ -26,6 +26,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
+    "@aws-sdk/client-bedrock": "^3.967.0",
     "@aws-sdk/client-bedrock-runtime": "^3.967.0",
     "@prisma/client": "^5.22.0",
     "@types/passport": "^1.0.17",
@@ -45,6 +46,7 @@
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "tiktoken": "^1.0.22",
+    "winston": "^3.19.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

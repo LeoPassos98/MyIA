@@ -75,6 +75,18 @@ export function ModelTab() {
       }
     }
     loadData();
+    
+    // 2. Listener para recarregar quando credenciais AWS forem atualizadas
+    const handleAWSUpdate = () => {
+      console.log('🔄 Credenciais AWS atualizadas, recarregando providers...');
+      loadData();
+    };
+    
+    window.addEventListener('aws-credentials-updated', handleAWSUpdate);
+    
+    return () => {
+      window.removeEventListener('aws-credentials-updated', handleAWSUpdate);
+    };
   }, []);
 
   // 2. Handlers

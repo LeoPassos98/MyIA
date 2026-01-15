@@ -5,6 +5,7 @@ import {
   BedrockRuntimeClient,
   InvokeModelWithResponseStreamCommand,
 } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockClient, ListFoundationModelsCommand } from '@aws-sdk/client-bedrock'; // Adicionado
 import { BaseAIProvider, AIRequestOptions } from './base';
 import { StreamChunk } from '../types';
 
@@ -96,28 +97,28 @@ export class BedrockProvider extends BaseAIProvider {
     if (!accessKeyId || !secretAccessKey) return false;
 
     try {
-      const client = new BedrockRuntimeClient({
+      const client = new BedrockClient({
         region: this.region,
         credentials: { accessKeyId, secretAccessKey },
       });
 
-      const testPayload = {
-        anthropic_version: 'bedrock-2023-05-31',
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'Hi' }],
-      };
-
-      const command = new InvokeModelWithResponseStreamCommand({
-        modelId: 'us.anthropic.claude-3-haiku-20240307-v1:0',
-        contentType: 'application/json',
-        accept: 'application/json',
-        body: JSON.stringify(testPayload),
-      });
-
-      await client.send(command);
+      // Dry run real: ListFoundationModelsCommand
+      await client.send(new ListFoundationModelsCommand({}));
       return true;
-    } catch (_e) {
+    } catch {
       return false;
     }
+  }
+
+  // Novo método para obter contagem de modelos (usado na validação)
+  async getModelsCount(apiKey: string): Promise<number> {
+    const [accessKeyId, secretAccessKey] = apiKey.split(':');
+    const client = new BedrockClient({
+      region: this.region,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    const response = await client.send(new ListFoundationModelsCommand({}));
+    return response.modelSummaries?.length || 0;
   }
 }
