@@ -80,10 +80,35 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
       // AWS Bedrock: só mostrar se validado
       if (provider.slug === 'bedrock') {
         if (awsValidation?.status === 'valid' && settings?.awsEnabledModels?.length) {
-          // Filtrar apenas modelos habilitados
-          provider.models = provider.models.filter(m => 
+          // Criar modelos dinâmicos para IDs que não existem no banco
+          const existingModels = provider.models.filter(m =>
             settings.awsEnabledModels.includes(m.apiModelId)
           );
+          
+          // Para modelos que não estão no banco, criar objetos dinâmicos
+          const missingModelIds = settings.awsEnabledModels.filter(
+            (modelId: string) => !provider.models.some(m => m.apiModelId === modelId)
+          );
+          
+          const dynamicModels = missingModelIds.map((apiModelId: string) => ({
+            id: `dynamic-${apiModelId}`,
+            name: apiModelId.split('.').pop()?.replace(/-/g, ' ').toUpperCase() || apiModelId,
+            apiModelId,
+            contextWindow: 200000, // Default para modelos novos
+            costPer1kInput: 0,
+            costPer1kOutput: 0,
+            isActive: true,
+            providerId: provider.id,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }));
+          
+          provider.models = [...existingModels, ...dynamicModels];
+          
+          console.log('✅ [Bedrock] Modelos configurados:', provider.models.length);
+          console.log('  - Do banco:', existingModels.length);
+          console.log('  - Dinâmicos:', dynamicModels.length);
+          
           return provider.models.length > 0;
         }
         return false;

@@ -10,7 +10,20 @@ export const updateSettingsSchema = z.object({
   theme: z.enum(['light', 'dark', 'auto']).optional(),
   language: z.string().optional(),
   notifications: z.boolean().optional(),
-  // Adicione outros campos de settings conforme necessário
+  
+  // Campos AWS Bedrock
+  awsAccessKey: z.string().optional(),
+  awsSecretKey: z.string().optional(),
+  awsRegion: z.string().optional(),
+  awsEnabledModels: z.array(z.string()).optional(),
+  
+  // Outras chaves de API
+  openaiApiKey: z.string().optional(),
+  groqApiKey: z.string().optional(),
+  claudeApiKey: z.string().optional(),
+  togetherApiKey: z.string().optional(),
+  perplexityApiKey: z.string().optional(),
+  mistralApiKey: z.string().optional(),
 }).strict(); // strict() impede campos desconhecidos
 
 /**

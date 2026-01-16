@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useAWSConfig } from '../../hooks/useAWSConfig';
+import { EnrichedAWSModel } from '../../../../types/ai';
 
 // Regiões AWS atualizadas conforme padrão Amazon
 const REGION_GROUPS = [
@@ -68,7 +69,7 @@ const ModelCheckboxItem = memo(({
   onToggle,
   disabled
 }: {
-  model: any;
+  model: EnrichedAWSModel; // Tipagem correta
   isSelected: boolean;
   onToggle: (id: string) => void;
   disabled: boolean;
@@ -412,6 +413,21 @@ export default function AWSProviderPanel() {
                 </Accordion>
               );
             })}
+
+            {/* Botão para salvar seleção de modelos */}
+            {canSelectModels && (
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleSave}
+                  disabled={isSaving || !selectedModels.length}
+                  sx={{ fontWeight: 'bold', px: 4 }}
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar Modelos Selecionados'}
+                </Button>
+              </Box>
+            )}
           </>
         )}
       </Box>

@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { userSettingsService } from '../../../services/userSettingsService';
 import { api } from '../../../services/api';
+import { EnrichedAWSModel } from '../../../types/ai';
 
 type FormState = {
   accessKey: string;
@@ -23,7 +24,7 @@ type UseAWSConfigReturn = {
   success: string | null;
   validationStatus: ValidationStatus;
   validationResult: any;
-  availableModels: any[];
+  availableModels: EnrichedAWSModel[]; // Tipagem correta
   selectedModels: string[];
   setSelectedModels: (ids: string[]) => void;
   handleFieldChange: (field: keyof FormState, value: string) => void;
@@ -48,7 +49,7 @@ export function useAWSConfig(): UseAWSConfigReturn {
   const [isSaving, setIsSaving] = useState(false);
   const [validationStatus, setValidationStatus] = useState<ValidationStatus>('idle');
   const [validationResult, setValidationResult] = useState<any>(null);
-  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const [availableModels, setAvailableModels] = useState<EnrichedAWSModel[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
