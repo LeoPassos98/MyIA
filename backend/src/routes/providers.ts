@@ -39,6 +39,15 @@ router.get('/bedrock/models', protect, async (_req, res: Response, next: NextFun
   }
 });
 
+// Endpoint para buscar modelos disponíveis na AWS do usuário
+router.get('/bedrock/available-models', protect, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await providersController.getAvailableModels(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Endpoint para listar providers configurados pelo usuário
 router.get('/configured', protect, async (req: Request, res: Response, next: NextFunction) => {
   try {

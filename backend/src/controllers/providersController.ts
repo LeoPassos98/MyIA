@@ -171,4 +171,127 @@ export const providersController = {
       return res.status(500).json(jsend.error('Erro interno na validação AWS', 500));
     }
   },
+
+  /**
+   * GET /api/providers/bedrock/available-models
+   * Retorna os modelos disponíveis na conta AWS do usuário
+   */
+  async getAvailableModels(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.userId!;
+      if (!userId) {
+        return res.status(401).json(jsend.fail({ auth: 'Não autorizado' }));
+      }
+
+      // Buscar credenciais salvas do usuário
+      const userSettings = await prisma.userSettings.findUnique({
+        where: { userId },
+        select: { awsAccessKey: true, awsSecretKey: true, awsRegion: true },
+      });
+
+      if (!userSettings?.awsAccessKey || !userSettings?.awsSecretKey) {
+        return res.status(400).json(jsend.fail({
+          credentials: 'Nenhuma credencial AWS configurada. Configure suas credenciais primeiro.',
+        }));
+      }
+
+      // Descriptografar credenciais
+      const accessKey = encryptionService.decrypt(userSettings.awsAccessKey);
+      const secretKey = encryptionService.decrypt(userSettings.awsSecretKey);
+      const region = userSettings.awsRegion || 'us-east-1';
+
+      // Buscar modelos disponíveis na AWS
+      const bedrockProvider = new BedrockProvider(region);
+      const apiKey = `${accessKey}:${secretKey}`;
+      
+      const awsModels = await bedrockProvider.getAvailableModels(apiKey);
+
+      // Buscar modelos cadastrados no banco para enriquecer com informações de custo
+      const dbModels = await prisma.aIModel.findMany({
+        where: {
+          provider: {
+            slug: 'bedrock',
+            isActive: true
+          },
+          isActive: true
+        },
+        select: {
+          apiModelId: true,
+          name: true,
+          costPer1kInput: true,
+          costPer1kOutput: true,
+          contextWindow: true
+        }
+      });
+
+      // Criar mapa de modelos do banco para lookup rápido
+      const dbModelsMap = new Map(dbModels.map(m => [m.apiModelId, m]));
+
+      // Combinar informações da AWS com informações do banco
+      const enrichedModels = awsModels.map(awsModel => {
+        const dbModel = dbModelsMap.get(awsModel.modelId);
+        
+        return {
+          id: awsModel.modelId,
+          apiModelId: awsModel.modelId,
+          name: dbModel?.name || awsModel.modelName,
+          providerName: awsModel.providerName,
+          costPer1kInput: dbModel?.costPer1kInput || 0,
+          costPer1kOutput: dbModel?.costPer1kOutput || 0,
+          contextWindow: dbModel?.contextWindow || 0,
+          inputModalities: awsModel.inputModalities,
+          outputModalities: awsModel.outputModalities,
+          responseStreamingSupported: awsModel.responseStreamingSupported,
+          isInDatabase: !!dbModel
+        };
+      });
+
+      // Filtrar apenas modelos de texto (TEXT input/output)
+      const textModels = enrichedModels.filter(model =>
+        model.inputModalities.includes('TEXT') &&
+        model.outputModalities.includes('TEXT')
+      );
+
+      // Lista de provedores/modelos compatíveis com chat conversacional
+      const chatCompatibleProviders = ['Anthropic', 'Meta', 'Mistral AI', 'Amazon', 'Cohere'];
+      const chatCompatibleKeywords = ['claude', 'llama', 'mistral', 'titan', 'command'];
+      
+      // Filtrar apenas modelos compatíveis com chat
+      const chatModels = textModels.filter(model => {
+        const providerMatch = chatCompatibleProviders.includes(model.providerName);
+        const nameMatch = chatCompatibleKeywords.some(keyword =>
+          model.apiModelId.toLowerCase().includes(keyword) ||
+          model.name.toLowerCase().includes(keyword)
+        );
+        return providerMatch || nameMatch;
+      });
+
+      logger.info('AWS Bedrock models fetched', {
+        userId,
+        region,
+        totalModels: awsModels.length,
+        textModels: textModels.length,
+        chatModels: chatModels.length,
+        timestamp: new Date().toISOString(),
+      });
+
+      return res.json(jsend.success({
+        models: chatModels,
+        totalCount: chatModels.length,
+        region
+      }));
+
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      const err = isError(error) ? error : new Error(String(error));
+      logger.error('Error fetching AWS Bedrock models', {
+        userId: req.userId,
+        error: err.message,
+        stack: err.stack,
+      });
+      return res.status(500).json(jsend.error('Erro ao buscar modelos AWS', 500));
+    }
+  },
 };

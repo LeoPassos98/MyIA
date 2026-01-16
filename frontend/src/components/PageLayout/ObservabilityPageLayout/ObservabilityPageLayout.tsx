@@ -49,11 +49,11 @@ export function ObservabilityPageLayout({
   );
 
   return (
-    <Box 
-      sx={{ 
+    <Box
+      sx={{
         height: '100%',
-        overflow: 'auto', // Scroll do conteúdo da página
-        ...scrollbarStyles, // Estilos unificados de scrollbar
+        overflow: 'auto',
+        ...scrollbarStyles,
       }}
     >
       {/* Container principal */}

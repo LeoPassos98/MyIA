@@ -31,6 +31,30 @@
 
 ---
 
+## 🔧 AWS Bedrock
+
+### [AWS-BEDROCK-SETUP.md](AWS-BEDROCK-SETUP.md)
+**Guia completo de configuração**
+- Criar IAM User e Access Key
+- Habilitar modelos Claude
+- Configurar credenciais
+- Testes e troubleshooting
+
+### [AWS-BEDROCK-MODEL-FIX.md](AWS-BEDROCK-MODEL-FIX.md)
+**Correção de IDs de modelos**
+- Problema com IDs regionais antigos
+- Migração para Cross-Region Inference Profiles
+- Script de correção automática
+
+### [AWS-BEDROCK-RATE-LIMITING.md](AWS-BEDROCK-RATE-LIMITING.md) 🆕
+**Solução para rate limiting**
+- Retry logic com backoff exponencial
+- Detecção automática de throttling
+- Mensagens amigáveis ao usuário
+- Melhores práticas para evitar limites
+
+---
+
 ## 📖 Guias Práticos
 
 ### Setup e Configuração

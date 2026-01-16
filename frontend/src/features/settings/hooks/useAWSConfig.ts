@@ -64,19 +64,42 @@ export function useAWSConfig(): UseAWSConfigReturn {
     setError(null);
     setSuccess(null);
     try {
-      const [settings, modelsRes] = await Promise.all([
-        userSettingsService.getSettings(),
-        api.get('/providers/bedrock/models')
-      ]);
+      const settings = await userSettingsService.getSettings();
+      
       setFormState({
         accessKey: settings.awsAccessKey || '',
         secretKey: '', // nunca retorna do backend
         region: settings.awsRegion || 'us-east-1'
       });
-      setAvailableModels(modelsRes.data.models || []);
       setSelectedModels(settings.awsEnabledModels || []);
       setValidationStatus(settings.awsAccessKey ? 'valid' : 'idle');
       setIsDirty(false);
+
+      // Se já tem credenciais configuradas, buscar modelos disponíveis dinamicamente
+      if (settings.awsAccessKey) {
+        try {
+          const modelsRes = await api.get('/providers/bedrock/available-models');
+          if (modelsRes.data?.models) {
+            setAvailableModels(modelsRes.data.models);
+          }
+        } catch (modelsErr: any) {
+          // Fallback: buscar modelos estáticos do banco
+          try {
+            const fallbackModels = await api.get('/providers/bedrock/models');
+            setAvailableModels(fallbackModels.data.models || []);
+          } catch (fallbackErr) {
+            console.error('Erro ao buscar modelos:', fallbackErr);
+          }
+        }
+      } else {
+        // Sem credenciais, buscar modelos estáticos do banco
+        try {
+          const modelsRes = await api.get('/providers/bedrock/models');
+          setAvailableModels(modelsRes.data.models || []);
+        } catch (modelsErr) {
+          console.error('Erro ao buscar modelos:', modelsErr);
+        }
+      }
     } catch (err: any) {
       setError('Erro ao carregar configuração AWS');
     } finally {
@@ -135,6 +158,17 @@ export function useAWSConfig(): UseAWSConfigReturn {
         setValidationStatus('valid');
         setValidationResult(response.data);
         setSuccess(response.data.message);
+
+        // Após validação bem-sucedida, buscar modelos disponíveis dinamicamente
+        try {
+          const modelsRes = await api.get('/providers/bedrock/available-models');
+          if (modelsRes.data?.models) {
+            setAvailableModels(modelsRes.data.models);
+          }
+        } catch (modelsErr: any) {
+          console.error('Erro ao buscar modelos disponíveis:', modelsErr);
+          // Não falha a validação se não conseguir buscar modelos
+        }
       } else {
         setValidationStatus('invalid');
         setError(response.data.message || 'Credenciais inválidas');

@@ -1,12 +1,17 @@
 // frontend/src/features/settings/components/providers/AWSProviderPanel.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
+import { useState, useMemo, memo } from 'react';
 import {
   Box, TextField, Button, Alert, CircularProgress,
   FormGroup, FormControlLabel, Checkbox, Typography, Divider,
-  LinearProgress, Chip, Tooltip, Select, MenuItem, ListSubheader
+  LinearProgress, Chip, Tooltip, Select, MenuItem, ListSubheader,
+  Accordion, AccordionSummary, AccordionDetails, InputAdornment
 } from '@mui/material';
-import { CheckCircle, Error as ErrorIcon, Warning } from '@mui/icons-material';
+import {
+  CheckCircle, Error as ErrorIcon, Warning,
+  ExpandMore, Search
+} from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useAWSConfig } from '../../hooks/useAWSConfig';
 
@@ -56,8 +61,102 @@ const REGION_GROUPS = [
   }
 ];
 
+// Componente memoizado para item de modelo individual
+const ModelCheckboxItem = memo(({
+  model,
+  isSelected,
+  onToggle,
+  disabled
+}: {
+  model: any;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+  disabled: boolean;
+}) => {
+  const hasDbInfo = model.isInDatabase !== false;
+  const hasCostInfo = model.costPer1kInput > 0 || model.costPer1kOutput > 0;
+  
+  return (
+    <Tooltip
+      title={
+        <Box>
+          <div><strong>Modelo:</strong> {model.name}</div>
+          <div><strong>ID:</strong> {model.apiModelId}</div>
+          {model.providerName && <div><strong>Provedor:</strong> {model.providerName}</div>}
+          {hasCostInfo && (
+            <div><strong>Custo:</strong> ${model.costPer1kInput}/1k in, ${model.costPer1kOutput}/1k out</div>
+          )}
+          {model.contextWindow > 0 && (
+            <div><strong>Context Window:</strong> {model.contextWindow.toLocaleString()} tokens</div>
+          )}
+          {model.responseStreamingSupported && (
+            <div><strong>Streaming:</strong> Suportado</div>
+          )}
+          {!hasDbInfo && (
+            <div style={{ marginTop: '8px', color: '#ffa726' }}>
+              ⚠️ Modelo não cadastrado no banco (sem informações de custo)
+            </div>
+          )}
+        </Box>
+      }
+      placement="top"
+      arrow
+      PopperProps={{
+        modifiers: [
+          {
+            name: 'preventOverflow',
+            options: {
+              boundary: 'viewport',
+            },
+          },
+        ],
+      }}
+    >
+      <FormControlLabel
+        disabled={disabled}
+        control={
+          <Checkbox
+            checked={isSelected}
+            onChange={() => onToggle(model.apiModelId)}
+            tabIndex={0}
+          />
+        }
+        label={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2">{model.name}</Typography>
+                {!hasDbInfo && (
+                  <Chip
+                    label="Novo"
+                    size="small"
+                    color="warning"
+                    sx={{ height: 18, fontSize: '0.65rem' }}
+                  />
+                )}
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                {model.apiModelId}
+              </Typography>
+              {hasCostInfo && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                  ${model.costPer1kInput}/1k in • ${model.costPer1kOutput}/1k out
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        }
+      />
+    </Tooltip>
+  );
+});
+
+ModelCheckboxItem.displayName = 'ModelCheckboxItem';
+
 export default function AWSProviderPanel() {
   const theme = useTheme();
+  const [searchTerm, setSearchTerm] = useState('');
+  
   const {
     formState,
     isLoading,
@@ -73,6 +172,30 @@ export default function AWSProviderPanel() {
     handleSave,
     toggleModel,
   } = useAWSConfig();
+
+  // Agrupar modelos por provedor e filtrar por busca
+  const groupedModels = useMemo(() => {
+    const filtered = availableModels.filter(model => {
+      if (!searchTerm) return true;
+      const search = searchTerm.toLowerCase();
+      return (
+        model.name.toLowerCase().includes(search) ||
+        model.apiModelId.toLowerCase().includes(search) ||
+        (model.providerName && model.providerName.toLowerCase().includes(search))
+      );
+    });
+
+    const groups: Record<string, typeof availableModels> = {};
+    filtered.forEach(model => {
+      const provider = model.providerName || 'Outros';
+      if (!groups[provider]) {
+        groups[provider] = [];
+      }
+      groups[provider].push(model);
+    });
+
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [availableModels, searchTerm]);
 
   if (isLoading) {
     return (
@@ -109,6 +232,9 @@ export default function AWSProviderPanel() {
               onChange={e => handleFieldChange('accessKey', e.target.value.trim())}
               disabled={validationStatus === 'validating'}
               sx={{ mb: 1 }}
+              inputProps={{
+                autoComplete: 'username'
+              }}
             />
           </Tooltip>
           <Tooltip title="Sua chave secreta AWS. Nunca será exibida após salvar." arrow>
@@ -121,6 +247,9 @@ export default function AWSProviderPanel() {
               onChange={e => handleFieldChange('secretKey', e.target.value.trim())}
               disabled={validationStatus === 'validating'}
               sx={{ mb: 1 }}
+              inputProps={{
+                autoComplete: 'current-password'
+              }}
             />
           </Tooltip>
           <Tooltip title="Região AWS onde seus modelos estão disponíveis." arrow>
@@ -186,47 +315,105 @@ export default function AWSProviderPanel() {
       <Divider sx={{ my: 3 }} />
 
       <Box sx={{ mb: 4, opacity: canSelectModels ? 1 : 0.5 }}>
-        <Typography variant="h6" gutterBottom>Modelos Habilitados</Typography>
+        <Typography variant="h6" gutterBottom>Habilitar Modelos</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {canSelectModels
             ? 'Selecione os modelos que deseja usar. Apenas os selecionados aparecerão no chat.'
             : '⚠️ Valide as credenciais primeiro para habilitar a seleção de modelos'
           }
         </Typography>
-        <FormGroup>
-          {availableModels.map((model) => (
-            <Tooltip
-              key={model.id}
-              title={
-                <>
-                  <div>Modelo: {model.name} ({model.apiModelId})</div>
-                  <div>Custo: ${model.costPer1kInput}/1k in, ${model.costPer1kOutput}/1k out</div>
-                </>
-              }
-              placement="right"
-              arrow
-            >
-              <FormControlLabel
-                disabled={!canSelectModels}
-                control={
-                  <Checkbox
-                    checked={selectedModels.includes(model.apiModelId)}
-                    onChange={() => toggleModel(model.apiModelId)}
-                    tabIndex={0}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body1">{model.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {model.apiModelId} • ${model.costPer1kInput}/1k in • ${model.costPer1kOutput}/1k out
-                    </Typography>
-                  </Box>
-                }
+        
+        {availableModels.length === 0 && canSelectModels && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Nenhum modelo disponível encontrado. Verifique suas permissões AWS.
+          </Alert>
+        )}
+
+        {availableModels.length > 0 && (
+          <>
+            <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Chip
+                label={`${availableModels.length} modelos disponíveis`}
+                color="primary"
+                size="small"
               />
-            </Tooltip>
-          ))}
-        </FormGroup>
+              <Chip
+                label={`${selectedModels.length} selecionados`}
+                color="success"
+                size="small"
+              />
+              <Chip
+                label={`${groupedModels.length} provedores`}
+                color="info"
+                size="small"
+              />
+            </Box>
+
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar modelos por nome, ID ou provedor..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={!canSelectModels}
+              sx={{ mb: 2 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            {groupedModels.length === 0 && searchTerm && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Nenhum modelo encontrado para "{searchTerm}"
+              </Alert>
+            )}
+
+            {groupedModels.map(([providerName, models]) => {
+              const selectedInGroup = models.filter(m => selectedModels.includes(m.apiModelId)).length;
+              
+              return (
+                <Accordion key={providerName} defaultExpanded={groupedModels.length <= 3}>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                        {providerName}
+                      </Typography>
+                      <Chip
+                        label={`${models.length} modelos`}
+                        size="small"
+                        color="default"
+                      />
+                      {selectedInGroup > 0 && (
+                        <Chip
+                          label={`${selectedInGroup} selecionados`}
+                          size="small"
+                          color="success"
+                        />
+                      )}
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <FormGroup>
+                      {models.map((model) => (
+                        <ModelCheckboxItem
+                          key={model.id}
+                          model={model}
+                          isSelected={selectedModels.includes(model.apiModelId)}
+                          onToggle={toggleModel}
+                          disabled={!canSelectModels}
+                        />
+                      ))}
+                    </FormGroup>
+                  </AccordionDetails>
+                </Accordion>
+              );
+            })}
+          </>
+        )}
       </Box>
     </Box>
   );
