@@ -8,6 +8,7 @@ export interface AIRequestOptions {
   temperature?: number;
   maxTokens?: number;
   topK?: number;
+  topP?: number;
   apiKey: string;
 }
 

@@ -11,6 +11,251 @@ import { BaseAIProvider, AIRequestOptions } from './base';
 import { StreamChunk } from '../types';
 
 /**
+ * Modelos que requerem Inference Profile (cross-region)
+ * Esses modelos não podem ser invocados diretamente pelo modelId
+ */
+const REQUIRES_INFERENCE_PROFILE = [
+  'anthropic.claude-haiku-4-5-20251001-v1:0',
+  'anthropic.claude-sonnet-4-20250514-v1:0',
+  'amazon.nova-2-lite-v1:0',
+  'amazon.nova-2-lite-v1:0:256k',
+  'amazon.nova-2-micro-v1:0',
+  'amazon.nova-2-pro-v1:0'
+];
+
+/**
+ * Tipos de provedores de modelos no AWS Bedrock
+ */
+enum ModelProvider {
+  ANTHROPIC = 'anthropic',
+  COHERE = 'cohere',
+  AMAZON = 'amazon',
+  AI21 = 'ai21',
+  META = 'meta',
+  MISTRAL = 'mistral',
+  STABILITY = 'stability'
+}
+
+/**
+ * Detecta o provedor do modelo baseado no modelId
+ */
+function detectModelProvider(modelId: string): ModelProvider {
+  const prefix = modelId.split('.')[0].toLowerCase();
+  
+  switch (prefix) {
+    case 'anthropic':
+      return ModelProvider.ANTHROPIC;
+    case 'cohere':
+      return ModelProvider.COHERE;
+    case 'amazon':
+      return ModelProvider.AMAZON;
+    case 'ai21':
+      return ModelProvider.AI21;
+    case 'meta':
+      return ModelProvider.META;
+    case 'mistral':
+      return ModelProvider.MISTRAL;
+    case 'stability':
+      return ModelProvider.STABILITY;
+    default:
+      // Default para Anthropic (compatibilidade com código existente)
+      return ModelProvider.ANTHROPIC;
+  }
+}
+
+/**
+ * Converte modelId para Inference Profile ID se necessário
+ * @param modelId ID do modelo
+ * @param region Região AWS (ex: 'us-east-1')
+ * @returns Inference Profile ID ou modelId original
+ */
+function getInferenceProfileId(modelId: string, region: string): string {
+  if (REQUIRES_INFERENCE_PROFILE.includes(modelId)) {
+    // Usar system-defined inference profile
+    const regionPrefix = region.split('-')[0]; // 'us' de 'us-east-1'
+    const inferenceProfileId = `${regionPrefix}.${modelId}`;
+    console.log(`🔄 [Bedrock] Usando Inference Profile: ${inferenceProfileId} (região: ${region})`);
+    return inferenceProfileId;
+  }
+  return modelId;
+}
+
+/**
+ * Cria payload para modelos Anthropic Claude
+ */
+function createAnthropicPayload(messages: any[], options: AIRequestOptions): any {
+  const systemMessage = messages.find(m => m.role === 'system');
+  const conversationMessages = messages
+    .filter(m => m.role !== 'system')
+    .map(m => ({ role: m.role, content: m.content }));
+
+  const payload: any = {
+    anthropic_version: 'bedrock-2023-05-31',
+    max_tokens: options.maxTokens || 2048,
+    messages: conversationMessages,
+    temperature: options.temperature || 0.7,
+    top_k: options.topK || 250,
+    top_p: 0.999,
+  };
+
+  if (systemMessage) {
+    payload.system = systemMessage.content;
+  }
+
+  return payload;
+}
+
+/**
+ * Cria payload para modelos Cohere
+ */
+function createCoherePayload(messages: any[], options: AIRequestOptions): any {
+  // Cohere usa um formato diferente
+  // Combina system message com o histórico de mensagens
+  const systemMessage = messages.find(m => m.role === 'system');
+  const conversationMessages = messages.filter(m => m.role !== 'system');
+  
+  // Cohere usa 'message' (singular) para a última mensagem do usuário
+  // e 'chat_history' para mensagens anteriores
+  const chatHistory = conversationMessages.slice(0, -1).map(m => ({
+    role: m.role === 'assistant' ? 'CHATBOT' : 'USER',
+    message: m.content
+  }));
+  
+  const lastMessage = conversationMessages[conversationMessages.length - 1];
+  
+  const payload: any = {
+    message: lastMessage?.content || '',
+    temperature: options.temperature || 0.7,
+    max_tokens: options.maxTokens || 2048,
+  };
+
+  // Adiciona chat_history se houver mensagens anteriores
+  if (chatHistory.length > 0) {
+    payload.chat_history = chatHistory;
+  }
+
+  // Adiciona preamble (equivalente ao system message)
+  if (systemMessage) {
+    payload.preamble = systemMessage.content;
+  }
+
+  // Cohere suporta p (top_p) mas não top_k da mesma forma
+  if (options.topP !== undefined) {
+    payload.p = options.topP;
+  }
+
+  // NOTA: O streaming é controlado pelo InvokeModelWithResponseStreamCommand,
+  // não pelo payload. Não adicionar 'stream: true' aqui.
+
+  return payload;
+}
+
+/**
+ * Cria payload para modelos Amazon (Titan, Nova)
+ */
+function createAmazonPayload(messages: any[], options: AIRequestOptions): any {
+  // Amazon Titan/Nova usa formato próprio
+  const systemMessage = messages.find(m => m.role === 'system');
+  const conversationMessages = messages.filter(m => m.role !== 'system');
+  
+  const payload: any = {
+    inputText: conversationMessages.map(m =>
+      `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
+    ).join('\n\n'),
+    textGenerationConfig: {
+      maxTokenCount: options.maxTokens || 2048,
+      temperature: options.temperature || 0.7,
+      topP: options.topP || 0.9,
+    }
+  };
+
+  // Adiciona system prompt se houver
+  if (systemMessage) {
+    payload.inputText = `System: ${systemMessage.content}\n\n${payload.inputText}`;
+  }
+
+  return payload;
+}
+
+/**
+ * Cria payload baseado no provedor do modelo
+ */
+function createPayloadForProvider(
+  provider: ModelProvider,
+  messages: any[],
+  options: AIRequestOptions
+): any {
+  console.log(`📦 [Bedrock] Criando payload para provedor: ${provider}`);
+  
+  switch (provider) {
+    case ModelProvider.ANTHROPIC:
+      return createAnthropicPayload(messages, options);
+    
+    case ModelProvider.COHERE:
+      return createCoherePayload(messages, options);
+    
+    case ModelProvider.AMAZON:
+      return createAmazonPayload(messages, options);
+    
+    // Para outros provedores, usa formato Anthropic como fallback
+    // TODO: Implementar formatos específicos para AI21, Meta, Mistral, Stability
+    default:
+      console.warn(`⚠️ [Bedrock] Provedor ${provider} não tem formato específico, usando Anthropic como fallback`);
+      return createAnthropicPayload(messages, options);
+  }
+}
+
+/**
+ * Processa chunk de resposta baseado no provedor
+ */
+function* processChunkForProvider(
+  provider: ModelProvider,
+  chunk: any
+): Generator<StreamChunk> {
+  switch (provider) {
+    case ModelProvider.ANTHROPIC:
+      // Formato Anthropic
+      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+        yield { type: 'chunk', content: chunk.delta.text };
+      }
+      if (chunk.type === 'message_stop') {
+        return; // Sinaliza fim do stream
+      }
+      break;
+    
+    case ModelProvider.COHERE:
+      // Formato Cohere
+      if (chunk.text) {
+        yield { type: 'chunk', content: chunk.text };
+      }
+      if (chunk.is_finished) {
+        return; // Sinaliza fim do stream
+      }
+      break;
+    
+    case ModelProvider.AMAZON:
+      // Formato Amazon Titan/Nova
+      if (chunk.outputText) {
+        yield { type: 'chunk', content: chunk.outputText };
+      }
+      if (chunk.completionReason) {
+        return; // Sinaliza fim do stream
+      }
+      break;
+    
+    default:
+      // Fallback para formato Anthropic
+      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+        yield { type: 'chunk', content: chunk.delta.text };
+      }
+      if (chunk.type === 'message_stop') {
+        return;
+      }
+      break;
+  }
+}
+
+/**
  * Configuração de retry para rate limiting
  */
 interface RetryConfig {
@@ -98,32 +343,23 @@ export class BedrockProvider extends BaseAIProvider {
       credentials: { accessKeyId, secretAccessKey },
     });
 
-    // Prepara o payload uma vez
-    const systemMessage = messages.find(m => m.role === 'system');
-    const conversationMessages = messages
-      .filter(m => m.role !== 'system')
-      .map(m => ({ role: m.role, content: m.content }));
+    // Detecta o provedor do modelo
+    const provider = detectModelProvider(options.modelId);
+    console.log(`🔍 [Bedrock] Modelo: ${options.modelId}, Provedor detectado: ${provider}`);
 
-    const payload: any = {
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: options.maxTokens || 2048,
-      messages: conversationMessages,
-      temperature: options.temperature || 0.7,
-      top_k: options.topK || 250,
-      top_p: 0.999,
-    };
-
-    if (systemMessage) {
-      payload.system = systemMessage.content;
-    }
+    // Cria payload específico para o provedor
+    const payload = createPayloadForProvider(provider, messages, options);
 
     // Retry loop com backoff exponencial
     let lastError: any = null;
     
     for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
       try {
+        // Usar Inference Profile se necessário
+        const modelId = getInferenceProfileId(options.modelId, this.region);
+        
         const command = new InvokeModelWithResponseStreamCommand({
-          modelId: options.modelId,
+          modelId,
           contentType: 'application/json',
           accept: 'application/json',
           body: JSON.stringify(payload),
@@ -141,11 +377,19 @@ export class BedrockProvider extends BaseAIProvider {
           if (event.chunk) {
             const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
 
-            if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
-              yield { type: 'chunk', content: chunk.delta.text };
+            // Processa chunk baseado no provedor
+            const chunkResults = processChunkForProvider(provider, chunk);
+            for (const result of chunkResults) {
+              yield result;
             }
 
-            if (chunk.type === 'message_stop') {
+            // Verifica se é o fim do stream (específico por provedor)
+            const isFinished =
+              (provider === ModelProvider.ANTHROPIC && chunk.type === 'message_stop') ||
+              (provider === ModelProvider.COHERE && chunk.is_finished) ||
+              (provider === ModelProvider.AMAZON && chunk.completionReason);
+
+            if (isFinished) {
               break;
             }
           }
