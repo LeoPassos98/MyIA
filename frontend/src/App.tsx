@@ -34,7 +34,7 @@ function AppRoutes() {
 
       <Routes>
         {/* Páginas públicas */}
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         {/* Social Auth Success */}
@@ -42,6 +42,7 @@ function AppRoutes() {
         {/* Rotas protegidas */}
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
+            <Route path="/" element={<Chat />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/chat/:chatId" element={<Chat />} />
             <Route path="/settings" element={<Settings />} />
@@ -52,7 +53,7 @@ function AppRoutes() {
         </Route>
 
         {/* catch-all: redireciona para landing */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/chat" replace />} />
       </Routes >
     </>
   );
