@@ -9,59 +9,9 @@ import {
 import { BedrockClient, ListFoundationModelsCommand } from '@aws-sdk/client-bedrock';
 import { BaseAIProvider, AIRequestOptions } from './base';
 import { StreamChunk } from '../types';
-
-/**
- * Modelos que requerem Inference Profile (cross-region)
- * Esses modelos não podem ser invocados diretamente pelo modelId
- */
-const REQUIRES_INFERENCE_PROFILE = [
-  'anthropic.claude-haiku-4-5-20251001-v1:0',
-  'anthropic.claude-sonnet-4-20250514-v1:0',
-  'amazon.nova-2-lite-v1:0',
-  'amazon.nova-2-lite-v1:0:256k',
-  'amazon.nova-2-micro-v1:0',
-  'amazon.nova-2-pro-v1:0'
-];
-
-/**
- * Tipos de provedores de modelos no AWS Bedrock
- */
-enum ModelProvider {
-  ANTHROPIC = 'anthropic',
-  COHERE = 'cohere',
-  AMAZON = 'amazon',
-  AI21 = 'ai21',
-  META = 'meta',
-  MISTRAL = 'mistral',
-  STABILITY = 'stability'
-}
-
-/**
- * Detecta o provedor do modelo baseado no modelId
- */
-function detectModelProvider(modelId: string): ModelProvider {
-  const prefix = modelId.split('.')[0].toLowerCase();
-  
-  switch (prefix) {
-    case 'anthropic':
-      return ModelProvider.ANTHROPIC;
-    case 'cohere':
-      return ModelProvider.COHERE;
-    case 'amazon':
-      return ModelProvider.AMAZON;
-    case 'ai21':
-      return ModelProvider.AI21;
-    case 'meta':
-      return ModelProvider.META;
-    case 'mistral':
-      return ModelProvider.MISTRAL;
-    case 'stability':
-      return ModelProvider.STABILITY;
-    default:
-      // Default para Anthropic (compatibilidade com código existente)
-      return ModelProvider.ANTHROPIC;
-  }
-}
+import { AdapterFactory } from '../adapters';
+import { ModelRegistry } from '../registry';
+import type { Message, UniversalOptions } from '../adapters';
 
 /**
  * Converte modelId para Inference Profile ID se necessário
@@ -70,189 +20,18 @@ function detectModelProvider(modelId: string): ModelProvider {
  * @returns Inference Profile ID ou modelId original
  */
 function getInferenceProfileId(modelId: string, region: string): string {
-  if (REQUIRES_INFERENCE_PROFILE.includes(modelId)) {
+  // Check if model requires inference profile using registry
+  const platformRule = ModelRegistry.getPlatformRules(modelId, 'bedrock');
+  
+  if (platformRule?.rule === 'requires_inference_profile') {
     // Usar system-defined inference profile
     const regionPrefix = region.split('-')[0]; // 'us' de 'us-east-1'
     const inferenceProfileId = `${regionPrefix}.${modelId}`;
-    console.log(`🔄 [Bedrock] Usando Inference Profile: ${inferenceProfileId} (região: ${region})`);
+    console.log(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${region})`);
     return inferenceProfileId;
   }
+  
   return modelId;
-}
-
-/**
- * Cria payload para modelos Anthropic Claude
- */
-function createAnthropicPayload(messages: any[], options: AIRequestOptions): any {
-  const systemMessage = messages.find(m => m.role === 'system');
-  const conversationMessages = messages
-    .filter(m => m.role !== 'system')
-    .map(m => ({ role: m.role, content: m.content }));
-
-  const payload: any = {
-    anthropic_version: 'bedrock-2023-05-31',
-    max_tokens: options.maxTokens || 2048,
-    messages: conversationMessages,
-    temperature: options.temperature || 0.7,
-    top_k: options.topK || 250,
-    top_p: 0.999,
-  };
-
-  if (systemMessage) {
-    payload.system = systemMessage.content;
-  }
-
-  return payload;
-}
-
-/**
- * Cria payload para modelos Cohere
- */
-function createCoherePayload(messages: any[], options: AIRequestOptions): any {
-  // Cohere usa um formato diferente
-  // Combina system message com o histórico de mensagens
-  const systemMessage = messages.find(m => m.role === 'system');
-  const conversationMessages = messages.filter(m => m.role !== 'system');
-  
-  // Cohere usa 'message' (singular) para a última mensagem do usuário
-  // e 'chat_history' para mensagens anteriores
-  const chatHistory = conversationMessages.slice(0, -1).map(m => ({
-    role: m.role === 'assistant' ? 'CHATBOT' : 'USER',
-    message: m.content
-  }));
-  
-  const lastMessage = conversationMessages[conversationMessages.length - 1];
-  
-  const payload: any = {
-    message: lastMessage?.content || '',
-    temperature: options.temperature || 0.7,
-    max_tokens: options.maxTokens || 2048,
-  };
-
-  // Adiciona chat_history se houver mensagens anteriores
-  if (chatHistory.length > 0) {
-    payload.chat_history = chatHistory;
-  }
-
-  // Adiciona preamble (equivalente ao system message)
-  if (systemMessage) {
-    payload.preamble = systemMessage.content;
-  }
-
-  // Cohere suporta p (top_p) mas não top_k da mesma forma
-  if (options.topP !== undefined) {
-    payload.p = options.topP;
-  }
-
-  // NOTA: O streaming é controlado pelo InvokeModelWithResponseStreamCommand,
-  // não pelo payload. Não adicionar 'stream: true' aqui.
-
-  return payload;
-}
-
-/**
- * Cria payload para modelos Amazon (Titan, Nova)
- */
-function createAmazonPayload(messages: any[], options: AIRequestOptions): any {
-  // Amazon Titan/Nova usa formato próprio
-  const systemMessage = messages.find(m => m.role === 'system');
-  const conversationMessages = messages.filter(m => m.role !== 'system');
-  
-  const payload: any = {
-    inputText: conversationMessages.map(m =>
-      `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
-    ).join('\n\n'),
-    textGenerationConfig: {
-      maxTokenCount: options.maxTokens || 2048,
-      temperature: options.temperature || 0.7,
-      topP: options.topP || 0.9,
-    }
-  };
-
-  // Adiciona system prompt se houver
-  if (systemMessage) {
-    payload.inputText = `System: ${systemMessage.content}\n\n${payload.inputText}`;
-  }
-
-  return payload;
-}
-
-/**
- * Cria payload baseado no provedor do modelo
- */
-function createPayloadForProvider(
-  provider: ModelProvider,
-  messages: any[],
-  options: AIRequestOptions
-): any {
-  console.log(`📦 [Bedrock] Criando payload para provedor: ${provider}`);
-  
-  switch (provider) {
-    case ModelProvider.ANTHROPIC:
-      return createAnthropicPayload(messages, options);
-    
-    case ModelProvider.COHERE:
-      return createCoherePayload(messages, options);
-    
-    case ModelProvider.AMAZON:
-      return createAmazonPayload(messages, options);
-    
-    // Para outros provedores, usa formato Anthropic como fallback
-    // TODO: Implementar formatos específicos para AI21, Meta, Mistral, Stability
-    default:
-      console.warn(`⚠️ [Bedrock] Provedor ${provider} não tem formato específico, usando Anthropic como fallback`);
-      return createAnthropicPayload(messages, options);
-  }
-}
-
-/**
- * Processa chunk de resposta baseado no provedor
- */
-function* processChunkForProvider(
-  provider: ModelProvider,
-  chunk: any
-): Generator<StreamChunk> {
-  switch (provider) {
-    case ModelProvider.ANTHROPIC:
-      // Formato Anthropic
-      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
-        yield { type: 'chunk', content: chunk.delta.text };
-      }
-      if (chunk.type === 'message_stop') {
-        return; // Sinaliza fim do stream
-      }
-      break;
-    
-    case ModelProvider.COHERE:
-      // Formato Cohere
-      if (chunk.text) {
-        yield { type: 'chunk', content: chunk.text };
-      }
-      if (chunk.is_finished) {
-        return; // Sinaliza fim do stream
-      }
-      break;
-    
-    case ModelProvider.AMAZON:
-      // Formato Amazon Titan/Nova
-      if (chunk.outputText) {
-        yield { type: 'chunk', content: chunk.outputText };
-      }
-      if (chunk.completionReason) {
-        return; // Sinaliza fim do stream
-      }
-      break;
-    
-    default:
-      // Fallback para formato Anthropic
-      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
-        yield { type: 'chunk', content: chunk.delta.text };
-      }
-      if (chunk.type === 'message_stop') {
-        return;
-      }
-      break;
-  }
 }
 
 /**
@@ -343,112 +122,148 @@ export class BedrockProvider extends BaseAIProvider {
       credentials: { accessKeyId, secretAccessKey },
     });
 
-    // Detecta o provedor do modelo
-    const provider = detectModelProvider(options.modelId);
-    console.log(`🔍 [Bedrock] Modelo: ${options.modelId}, Provedor detectado: ${provider}`);
+    // Get adapter for this model
+    let adapter;
+    try {
+      adapter = AdapterFactory.getAdapterForModel(options.modelId);
+      console.log(`🔍 [Bedrock] Using adapter: ${adapter.displayName} for model: ${options.modelId}`);
+    } catch (error) {
+      yield {
+        type: 'error',
+        error: `Model ${options.modelId} is not supported. Please check the model ID.`,
+      };
+      return;
+    }
 
-    // Cria payload específico para o provedor
-    const payload = createPayloadForProvider(provider, messages, options);
+    // Convert to universal format
+    const universalMessages: Message[] = messages.map(m => ({
+      role: m.role as 'system' | 'user' | 'assistant',
+      content: m.content,
+    }));
 
-    // Retry loop com backoff exponencial
-    let lastError: any = null;
+    const universalOptions: UniversalOptions = {
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      topK: options.topK,
+      topP: options.topP,
+      modelId: options.modelId, // Pass modelId for adapters that need it
+    };
+
+    // Format request using adapter
+    const { body, contentType, accept } = adapter.formatRequest(
+      universalMessages,
+      universalOptions
+    );
+
+    // 🧪 AUTO-TEST: Tentar múltiplas variações do modelId até encontrar a correta
+    const originalModelId = options.modelId;
+    const modelIdWithProfile = getInferenceProfileId(options.modelId, this.region);
     
-    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
-      try {
-        // Usar Inference Profile se necessário
-        const modelId = getInferenceProfileId(options.modelId, this.region);
-        
-        const command = new InvokeModelWithResponseStreamCommand({
-          modelId,
-          contentType: 'application/json',
-          accept: 'application/json',
-          body: JSON.stringify(payload),
-        });
+    const modelIdVariations = [
+      // Variação 1: Sem "2" e sem sufixo (mais provável)
+      originalModelId.replace('nova-2-', 'nova-').replace(':256k', ''),
+      // Variação 2: Sem sufixo :256k
+      originalModelId.replace(':256k', ''),
+      // Variação 3: Sem "2" mas com sufixo
+      originalModelId.replace('nova-2-', 'nova-'),
+      // Variação 4: Original sem transformação
+      originalModelId,
+      // Variação 5: Com inference profile
+      modelIdWithProfile,
+    ];
+    
+    console.log(`🧪 [Bedrock Auto-Test] Testing ${modelIdVariations.length} variations for: ${originalModelId}`);
+    
+    let lastGlobalError: any = null;
+    
+    // Tentar cada variação
+    for (const testModelId of modelIdVariations) {
+      console.log(`🔍 [Bedrock Auto-Test] Trying: ${testModelId}`);
+      
+      // Retry loop com backoff exponencial para esta variação
+      for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
+        try {
+          const command = new InvokeModelWithResponseStreamCommand({
+            modelId: testModelId,
+            contentType: contentType || 'application/json',
+            accept: accept || 'application/json',
+            body: JSON.stringify(body),
+          });
 
-        const response = await client.send(command);
+          const response = await client.send(command);
 
-        if (!response.body) {
-          yield { type: 'error', error: 'No response body from Bedrock' };
+          if (!response.body) {
+            console.warn(`⚠️ [Bedrock Auto-Test] No response body for: ${testModelId}`);
+            break; // Tenta próxima variação
+          }
+
+          // ✅ Stream bem-sucedido! Processa chunks
+          console.log(`✅ [Bedrock Auto-Test] SUCCESS with: ${testModelId}`);
+          
+          for await (const event of response.body) {
+            if (event.chunk) {
+              const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
+
+              // Parse chunk using adapter
+              const parsed = adapter.parseChunk(chunk);
+
+              if (parsed.type === 'chunk' && parsed.content) {
+                yield { type: 'chunk', content: parsed.content };
+              } else if (parsed.type === 'done') {
+                break;
+              } else if (parsed.type === 'error') {
+                yield { type: 'error', error: parsed.error || 'Unknown error from adapter' };
+                break;
+              }
+            }
+          }
+          
+          // Se chegou aqui, sucesso completo!
           return;
-        }
-
-        // Stream bem-sucedido - processa os chunks
-        for await (const event of response.body) {
-          if (event.chunk) {
-            const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
-
-            // Processa chunk baseado no provedor
-            const chunkResults = processChunkForProvider(provider, chunk);
-            for (const result of chunkResults) {
-              yield result;
-            }
-
-            // Verifica se é o fim do stream (específico por provedor)
-            const isFinished =
-              (provider === ModelProvider.ANTHROPIC && chunk.type === 'message_stop') ||
-              (provider === ModelProvider.COHERE && chunk.is_finished) ||
-              (provider === ModelProvider.AMAZON && chunk.completionReason);
-
-            if (isFinished) {
-              break;
-            }
-          }
-        }
-        
-        // Se chegou aqui, sucesso! Sai do loop de retry
-        return;
-        
-      } catch (error: unknown) {
-        lastError = error;
-        
-        // Verifica se é erro de rate limiting
-        if (this.isRateLimitError(error)) {
-          const isLastAttempt = attempt === this.retryConfig.maxRetries;
           
-          if (isLastAttempt) {
-            // Última tentativa falhou - retorna erro amigável
-            console.error(`[BedrockProvider] Rate limit após ${attempt + 1} tentativas:`, error);
+        } catch (error: unknown) {
+          lastGlobalError = error;
+          
+          // Verifica se é erro de rate limiting
+          if (this.isRateLimitError(error)) {
+            const isLastAttempt = attempt === this.retryConfig.maxRetries;
             
+            if (isLastAttempt) {
+              console.error(`[BedrockProvider] Rate limit após ${attempt + 1} tentativas para ${testModelId}:`, error);
+              break; // Tenta próxima variação
+            }
+            
+            // Calcula delay e aguarda antes do próximo retry
+            const delayMs = this.calculateRetryDelay(attempt);
+            console.warn(
+              `[BedrockProvider] Rate limit detectado (tentativa ${attempt + 1}/${this.retryConfig.maxRetries + 1}). ` +
+              `Aguardando ${delayMs}ms antes de tentar novamente...`
+            );
+            
+            // Informa o usuário sobre o retry
             yield {
-              type: 'error',
-              error: `AWS Bedrock rate limit atingido. Por favor, aguarde alguns segundos e tente novamente. (Tentativas: ${attempt + 1}/${this.retryConfig.maxRetries + 1})`,
+              type: 'debug',
+              log: `⏳ Rate limit detectado. Aguardando ${Math.round(delayMs / 1000)}s antes de tentar novamente... (Tentativa ${attempt + 1}/${this.retryConfig.maxRetries + 1})`,
             };
-            return;
+            
+            await sleep(delayMs);
+            continue; // Tenta novamente com o mesmo modelId
           }
           
-          // Calcula delay e aguarda antes do próximo retry
-          const delayMs = this.calculateRetryDelay(attempt);
-          console.warn(
-            `[BedrockProvider] Rate limit detectado (tentativa ${attempt + 1}/${this.retryConfig.maxRetries + 1}). ` +
-            `Aguardando ${delayMs}ms antes de tentar novamente...`
-          );
-          
-          // Informa o usuário sobre o retry
-          yield {
-            type: 'debug',
-            log: `⏳ Rate limit detectado. Aguardando ${Math.round(delayMs / 1000)}s antes de tentar novamente... (Tentativa ${attempt + 1}/${this.retryConfig.maxRetries + 1})`,
-          };
-          
-          await sleep(delayMs);
-          continue; // Tenta novamente
+          // Erro não é de rate limiting - tenta próxima variação
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+          console.warn(`⚠️ [Bedrock Auto-Test] Failed with ${testModelId}: ${errorMessage}`);
+          break; // Tenta próxima variação
         }
-        
-        // Erro não é de rate limiting - falha imediatamente
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no AWS Bedrock';
-        console.error(`[BedrockProvider] Erro no stream:`, error);
-        yield {
-          type: 'error',
-          error: errorMessage,
-        };
-        return;
       }
     }
     
-    // Se chegou aqui, todas as tentativas falharam (não deveria acontecer devido ao return acima)
-    const errorMessage = lastError instanceof Error ? lastError.message : 'Erro desconhecido no AWS Bedrock';
+    // Se chegou aqui, todas as variações falharam
+    const errorMessage = lastGlobalError instanceof Error ? lastGlobalError.message : 'Erro desconhecido no AWS Bedrock';
+    console.error(`❌ [Bedrock Auto-Test] All ${modelIdVariations.length} variations failed for: ${originalModelId}`);
     yield {
       type: 'error',
-      error: `Falha após ${this.retryConfig.maxRetries + 1} tentativas: ${errorMessage}`,
+      error: `Falha ao invocar modelo ${originalModelId}. Tentativas: ${modelIdVariations.length} variações. Erro: ${errorMessage}`,
     };
   }
 
