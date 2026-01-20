@@ -44,6 +44,7 @@ export function useAWSConfig(): UseAWSConfigReturn {
     secretKey: '',
     region: 'us-east-1'
   });
+  const [originalRegion, setOriginalRegion] = useState('us-east-1');
   const [isDirty, setIsDirty] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -67,11 +68,13 @@ export function useAWSConfig(): UseAWSConfigReturn {
     try {
       const settings = await userSettingsService.getSettings();
       
+      const loadedRegion = settings.awsRegion || 'us-east-1';
       setFormState({
         accessKey: settings.awsAccessKey || '',
         secretKey: '', // nunca retorna do backend
-        region: settings.awsRegion || 'us-east-1'
+        region: loadedRegion
       });
+      setOriginalRegion(loadedRegion);
       setSelectedModels(settings.awsEnabledModels || []);
       setValidationStatus(settings.awsAccessKey ? 'valid' : 'idle');
       setIsDirty(false);
@@ -120,7 +123,12 @@ export function useAWSConfig(): UseAWSConfigReturn {
   const handleFieldChange = (field: keyof FormState, value: string) => {
     setFormState(prev => ({ ...prev, [field]: value }));
     setIsDirty(true);
-    setValidationStatus('idle');
+    
+    // Apenas resetar validationStatus se mudar credenciais, não região
+    if (field !== 'region') {
+      setValidationStatus('idle');
+    }
+    
     setError(null);
     setSuccess(null);
   };
@@ -182,10 +190,23 @@ export function useAWSConfig(): UseAWSConfigReturn {
 
   // Salva configurações AWS
   const handleSave = useCallback(async () => {
-    if (validationStatus !== 'valid') {
+    // Verifica se tem credenciais existentes (accessKey preenchida)
+    const hasExistingCredentials = formState.accessKey && formState.accessKey.length > 0;
+    const regionChanged = formState.region !== originalRegion;
+    const isOnlyRegionChange = hasExistingCredentials && regionChanged;
+    
+    // Se não tem credenciais existentes E não está validado, exigir validação
+    if (!hasExistingCredentials && validationStatus !== 'valid') {
       setError('Valide as credenciais antes de salvar');
       return;
     }
+    
+    // Se tem credenciais mas está editando (dirty) e não validou, exigir validação
+    if (hasExistingCredentials && isDirty && !isOnlyRegionChange && validationStatus !== 'valid') {
+      setError('Valide as credenciais antes de salvar');
+      return;
+    }
+    
     setIsSaving(true);
     setError(null);
     setSuccess(null);
@@ -196,8 +217,45 @@ export function useAWSConfig(): UseAWSConfigReturn {
         awsRegion: formState.region,
         awsEnabledModels: selectedModels
       });
+      
+      // Atualizar região original após salvar com sucesso
+      setOriginalRegion(formState.region);
       setSuccess('Configuração AWS salva com sucesso!');
       setIsDirty(false);
+      
+      // Se a região mudou, recarregar modelos disponíveis
+      if (regionChanged && hasExistingCredentials) {
+        console.log('🔄 Região alterada de', originalRegion, 'para', formState.region);
+        console.log('🔄 Recarregando modelos disponíveis...');
+        
+        try {
+          // Buscar modelos da nova região (mantém validationStatus = 'valid')
+          const modelsRes = await api.get('/providers/bedrock/available-models');
+          console.log('✅ Modelos recebidos:', modelsRes.data?.models?.length || 0);
+          
+          if (modelsRes.data?.models) {
+            setAvailableModels(modelsRes.data.models);
+            console.log('✅ Estado availableModels atualizado com', modelsRes.data.models.length, 'modelos');
+            
+            // Limpar seleção de modelos (modelos da região anterior não existem mais)
+            setSelectedModels([]);
+            console.log('✅ Seleção de modelos limpa');
+            
+            setSuccess(
+              `Região alterada para ${formState.region}! ` +
+              `${modelsRes.data.models.length} modelos disponíveis. ` +
+              `Selecione os modelos desejados e salve novamente.`
+            );
+          } else {
+            console.warn('⚠️ Resposta sem modelos:', modelsRes.data);
+          }
+        } catch (modelsErr: any) {
+          console.error('❌ Erro ao recarregar modelos:', modelsErr);
+          setError('Região salva, mas erro ao carregar novos modelos. Recarregue a página.');
+        }
+      } else {
+        console.log('ℹ️ Região não mudou ou sem credenciais:', { regionChanged, hasExistingCredentials });
+      }
       
       // Disparar evento customizado para atualizar lista de providers no ControlPanel
       window.dispatchEvent(new CustomEvent('aws-credentials-updated'));
@@ -206,7 +264,7 @@ export function useAWSConfig(): UseAWSConfigReturn {
     } finally {
       setIsSaving(false);
     }
-  }, [formState, selectedModels, validationStatus]);
+  }, [formState, selectedModels, validationStatus, originalRegion, isDirty]);
 
   // Alterna seleção de modelos
   const toggleModel = (modelId: string) => {
