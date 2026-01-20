@@ -15,65 +15,177 @@
 - Segurança (Zero-Trust, Fail-Secure)
 - JSend (API padronizada)
 
-### 2. [SECURITY-STANDARDS.md](SECURITY-STANDARDS.md) 🔒
-**Padrões de segurança obrigatórios**
-- Secrets e credenciais
-- Rate limiting (3 níveis)
-- Validação Zod
-- Headers de segurança (Helmet)
-- Checklist de deploy
+---
 
-### 3. [ARCHITECTURE.md](ARCHITECTURE.md) 🏗️
-**Visão geral da arquitetura**
-- Factory Pattern (AI providers)
-- Database-driven configuration
-- Modularidade enterprise-grade
+## 📂 Estrutura da Documentação
+
+```
+docs/
+├── README.md                          # Este arquivo (índice central)
+├── STANDARDS.md                       # ⭐ Regras imutáveis
+│
+├── architecture/                      # 🏗️ Arquitetura e Design
+│   ├── ARCHITECTURE.md
+│   ├── ARCHITECTURE-MODEL-ADAPTERS.md
+│   ├── IMPLEMENTATION-ANALYSIS-ADAPTERS.md
+│   └── ADR-004.md
+│
+├── performance/                       # ⚡ Otimizações de Performance
+│   ├── README.md                      # Índice de performance
+│   ├── PERFORMANCE-OPTIMIZATION-PLAN.md
+│   ├── PERFORMANCE-OPTIMIZATION-COMPLETE.md
+│   ├── PERFORMANCE-VALIDATION-REPORT.md
+│   ├── PERFORMANCE-PHASE2-LAYOUT-OPTIMIZATION.md
+│   ├── PERFORMANCE-ANALYSIS-SETTINGS.md
+│   ├── PERFORMANCE-FIXES-CODE-EXAMPLES.md
+│   ├── PERFORMANCE-OPTIMIZATIONS-IMPLEMENTED.md
+│   └── MEMORY-BEST-PRACTICES.md
+│
+├── components/                        # 🧩 Componentes Otimizados
+│   ├── OPTIMIZED-SWITCH-IMPLEMENTATION.md
+│   ├── OPTIMIZED-SWITCH-README.md
+│   ├── OPTIMIZED-TOOLTIP-README.md
+│   ├── SWITCH-MIGRATION-GUIDE.md
+│   ├── SWITCH-PERFORMANCE-REPORT.md
+│   ├── MODEL-CERTIFICATION-SYSTEM.md
+│   └── MODEL-CERTIFICATION-USAGE.md
+│
+├── security/                          # 🔒 Segurança
+│   ├── SECURITY-STANDARDS.md
+│   ├── SECURITY-ANALYSIS-AWS-CREDENTIALS.md
+│   └── SECURITY-FIX-CREDENTIALS-CORRUPTION.md
+│
+├── api/                               # 📡 APIs e Especificações
+│   ├── api-endpoints.md
+│   ├── ALL-MODELS-OFFICIAL-SPECS.md
+│   ├── ANTHROPIC-MODELS-OFFICIAL-SPECS.md
+│   └── HOW-TO-ADD-NEW-MODEL.md
+│
+├── aws/                               # ☁️ AWS Bedrock
+│   ├── AWS-BEDROCK-SETUP.md
+│   ├── AWS-BEDROCK-MODEL-FIX.md
+│   ├── AWS-BEDROCK-RATE-LIMITING.md
+│   ├── AWS-BEDROCK-API-FORMATS.md
+│   ├── AWS-BEDROCK-INFERENCE-PROFILES.md
+│   └── AWS-BEDROCK-MODEL-ISSUES.md
+│
+├── guides/                            # 📖 Guias e Tutoriais
+│   ├── setup-guide.md
+│   ├── VISUAL-IDENTITY-GUIDE.md
+│   └── MIGRATION-GUIDE-ADAPTERS.md
+│
+├── reports/                           # 📊 Relatórios e Compliance
+│   ├── STANDARDS-COMPLIANCE-REPORT.md
+│   ├── JSEND-FINAL-REPORT.md
+│   ├── PROVIDER-DATA-FLOW-ANALYSIS.md
+│   ├── PROVIDER-DATA-FLOW-ANALYSIS-ERRORS.md
+│   └── PROVIDER-DATA-FLOW-VERIFICATION.md
+│
+├── deprecated/                        # 🗄️ Arquivos Antigos
+│   ├── progress.md
+│   └── STANDARDS-IMPROVEMENTS.md
+│
+├── audit/                             # 🔍 Sistema de Auditoria
+│   ├── README.md
+│   └── audit-v1.4.md
+│
+├── fazer/                             # ✅ TODO e Roadmap
+│   └── fazer.md
+│
+├── tests/                             # 🧪 Planos de Teste
+│   ├── TEST-PLANS-SUMMARY.md
+│   ├── TEST-PLAN-AUTOMATED.md
+│   ├── TEST-PLAN-MANUAL.md
+│   └── testing.md
+│
+└── archive/                           # 📦 Relatórios Históricos
+    └── (relatórios antigos)
+```
 
 ---
 
-## 🔧 AWS Bedrock
+## 🗂️ Navegação por Categoria
 
-### [AWS-BEDROCK-SETUP.md](AWS-BEDROCK-SETUP.md)
-**Guia completo de configuração**
-- Criar IAM User e Access Key
-- Habilitar modelos Claude
-- Configurar credenciais
-- Testes e troubleshooting
+### 🏗️ [Arquitetura](architecture/)
+Documentação sobre design, padrões e decisões arquiteturais
+- **[ARCHITECTURE.md](architecture/ARCHITECTURE.md)** - Visão geral da arquitetura
+- **[ARCHITECTURE-MODEL-ADAPTERS.md](architecture/ARCHITECTURE-MODEL-ADAPTERS.md)** - Sistema de adapters
+- **[ADR-004.md](architecture/ADR-004.md)** - Architecture Decision Record
 
-### [AWS-BEDROCK-MODEL-FIX.md](AWS-BEDROCK-MODEL-FIX.md)
-**Correção de IDs de modelos**
-- Problema com IDs regionais antigos
-- Migração para Cross-Region Inference Profiles
-- Script de correção automática
+### ⚡ [Performance](performance/)
+Otimizações, análises e melhores práticas de performance
+- **[README.md](performance/README.md)** - Índice completo de performance
+- **[PERFORMANCE-OPTIMIZATION-COMPLETE.md](performance/PERFORMANCE-OPTIMIZATION-COMPLETE.md)** - Otimizações implementadas
+- **[MEMORY-BEST-PRACTICES.md](performance/MEMORY-BEST-PRACTICES.md)** - Boas práticas de memória
 
-### [AWS-BEDROCK-RATE-LIMITING.md](AWS-BEDROCK-RATE-LIMITING.md) 🆕
-**Solução para rate limiting**
-- Retry logic com backoff exponencial
-- Detecção automática de throttling
-- Mensagens amigáveis ao usuário
-- Melhores práticas para evitar limites
+### 🧩 [Componentes](components/)
+Componentes otimizados e sistema de certificação
+- **[OPTIMIZED-SWITCH-README.md](components/OPTIMIZED-SWITCH-README.md)** - Switch otimizado
+- **[OPTIMIZED-TOOLTIP-README.md](components/OPTIMIZED-TOOLTIP-README.md)** - Tooltip otimizado
+- **[MODEL-CERTIFICATION-SYSTEM.md](components/MODEL-CERTIFICATION-SYSTEM.md)** - Sistema de certificação
+
+### 🔒 [Segurança](security/)
+Padrões de segurança e análises
+- **[SECURITY-STANDARDS.md](security/SECURITY-STANDARDS.md)** - Padrões obrigatórios
+- **[SECURITY-ANALYSIS-AWS-CREDENTIALS.md](security/SECURITY-ANALYSIS-AWS-CREDENTIALS.md)** - Análise de credenciais
+
+### 📡 [API](api/)
+Documentação de APIs e especificações de modelos
+- **[api-endpoints.md](api/api-endpoints.md)** - Endpoints REST
+- **[ALL-MODELS-OFFICIAL-SPECS.md](api/ALL-MODELS-OFFICIAL-SPECS.md)** - Especificações de modelos
+- **[HOW-TO-ADD-NEW-MODEL.md](api/HOW-TO-ADD-NEW-MODEL.md)** - Como adicionar novos modelos
+
+### ☁️ [AWS Bedrock](aws/)
+Configuração e troubleshooting do AWS Bedrock
+- **[AWS-BEDROCK-SETUP.md](aws/AWS-BEDROCK-SETUP.md)** - Guia de configuração
+- **[AWS-BEDROCK-RATE-LIMITING.md](aws/AWS-BEDROCK-RATE-LIMITING.md)** - Solução para rate limiting
+- **[AWS-BEDROCK-MODEL-FIX.md](aws/AWS-BEDROCK-MODEL-FIX.md)** - Correção de IDs de modelos
+
+### 📖 [Guias](guides/)
+Tutoriais e guias práticos
+- **[setup-guide.md](guides/setup-guide.md)** - Como rodar o projeto
+- **[VISUAL-IDENTITY-GUIDE.md](guides/VISUAL-IDENTITY-GUIDE.md)** - Design system
+- **[MIGRATION-GUIDE-ADAPTERS.md](guides/MIGRATION-GUIDE-ADAPTERS.md)** - Migração de adapters
+
+### 📊 [Relatórios](reports/)
+Relatórios de compliance e análises
+- **[STANDARDS-COMPLIANCE-REPORT.md](reports/STANDARDS-COMPLIANCE-REPORT.md)** - Auditoria de conformidade
+- **[JSEND-FINAL-REPORT.md](reports/JSEND-FINAL-REPORT.md)** - JSend 100% implementado
+- **[PROVIDER-DATA-FLOW-ANALYSIS.md](reports/PROVIDER-DATA-FLOW-ANALYSIS.md)** - Análise de fluxo de dados
 
 ---
 
-## 📖 Guias Práticos
+## 🎯 Fluxo de Leitura Recomendado
 
-### Setup e Configuração
-- [setup-guide.md](setup-guide.md) - Como rodar o projeto (backend + frontend)
+### Para Novos Desenvolvedores
+1. **[STANDARDS.md](STANDARDS.md)** - Entenda as regras
+2. **[guides/setup-guide.md](guides/setup-guide.md)** - Configure o ambiente
+3. **[architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md)** - Compreenda a arquitetura
+4. **[api/api-endpoints.md](api/api-endpoints.md)** - Conheça a API
 
-### API
-- [api-endpoints.md](api-endpoints.md) - Documentação completa da API REST
+### Para Otimização de Performance
+1. **[performance/README.md](performance/README.md)** - Índice de performance
+2. **[performance/MEMORY-BEST-PRACTICES.md](performance/MEMORY-BEST-PRACTICES.md)** - Boas práticas
+3. **[components/OPTIMIZED-SWITCH-README.md](components/OPTIMIZED-SWITCH-README.md)** - Componentes otimizados
 
-### Design
-- [VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md) - Design system e identidade visual
+### Para Code Review
+1. **[STANDARDS.md](STANDARDS.md)** - Verifique conformidade
+2. **[security/SECURITY-STANDARDS.md](security/SECURITY-STANDARDS.md)** - Valide segurança
+3. **[guides/VISUAL-IDENTITY-GUIDE.md](guides/VISUAL-IDENTITY-GUIDE.md)** - Valide UI/UX
+
+### Para Deploy
+1. **[security/SECURITY-STANDARDS.md](security/SECURITY-STANDARDS.md)** - Checklist de deploy
+2. **[tests/](tests/)** - Execute todos os testes
+3. **[guides/setup-guide.md](guides/setup-guide.md)** - Configuração de produção
 
 ---
 
 ## 🧪 Testes
 
-- [tests/TEST-PLANS-SUMMARY.md](tests/TEST-PLANS-SUMMARY.md) - Resumo dos roteiros
-- [tests/TEST-PLAN-AUTOMATED.md](tests/TEST-PLAN-AUTOMATED.md) - Testes backend (17 testes)
-- [tests/TEST-PLAN-MANUAL.md](tests/TEST-PLAN-MANUAL.md) - Testes frontend (23 testes)
-- [tests/testing.md](tests/testing.md) - Guia geral de testes
+- **[tests/TEST-PLANS-SUMMARY.md](tests/TEST-PLANS-SUMMARY.md)** - Resumo dos roteiros
+- **[tests/TEST-PLAN-AUTOMATED.md](tests/TEST-PLAN-AUTOMATED.md)** - Testes backend (17 testes)
+- **[tests/TEST-PLAN-MANUAL.md](tests/TEST-PLAN-MANUAL.md)** - Testes frontend (23 testes)
+- **[tests/testing.md](tests/testing.md)** - Guia geral de testes
 
 **Executar testes:**
 ```bash
@@ -84,125 +196,30 @@ TOKEN=$(./get-test-token.sh | tail -n1)
 
 ---
 
-## 📊 Relatórios e Auditorias
-
-### Relatórios Finais (Raiz)
-- [JSEND-FINAL-REPORT.md](JSEND-FINAL-REPORT.md) - JSend 100% implementado
-- [progress.md](progress.md) - Progresso do projeto
-
-### Relatórios Históricos (Archive)
-- [archive/JSEND-REPORT.md](archive/JSEND-REPORT.md) - Análise inicial JSend
-- [archive/STANDARDS-COMPLIANCE-REPORT.md](archive/STANDARDS-COMPLIANCE-REPORT.md) - Auditoria de conformidade
-- [archive/STANDARDS-CORRECTIONS-DONE.md](archive/STANDARDS-CORRECTIONS-DONE.md) - Correções aplicadas
-- [Ver todos os relatórios →](archive/)
-
----
-
-## 🔍 Auditoria e Rastreabilidade
-
-### Sistema de Auditoria
-- [audit/README.md](audit/README.md) - Visão geral do sistema de auditoria
-- [audit/audit-v1.4.md](audit/audit-v1.4.md) - Schema de auditoria V1.4
-
----
-
-## 📝 Outros Documentos
-
-### Decisões de Arquitetura
-- [ADR-004.md](ADR-004.md) - Architecture Decision Record
-
-### Tarefas
-- [fazer/fazer.md](fazer/fazer.md) - TODO list e roadmap
-
----
-
-## 🗂️ Estrutura da Documentação
-
-```
-docs/
-├── README.md                    # Este arquivo (índice central)
-├── STANDARDS.md                 # ⭐ Regras imutáveis
-├── SECURITY-STANDARDS.md        # 🔒 Padrões de segurança
-├── ARCHITECTURE.md              # 🏗️ Arquitetura
-├── VISUAL-IDENTITY-GUIDE.md     # 🎨 Design system
-├── setup-guide.md               # 🚀 Como rodar
-├── api-endpoints.md             # 📡 API REST
-├── JSEND-FINAL-REPORT.md        # 📊 Relatório JSend
-├── progress.md                  # 📈 Progresso
-├── ADR-004.md                   # 📋 ADR
-│
-├── audit/                       # Sistema de auditoria
-│   ├── README.md
-│   └── audit-v1.4.md
-│
-├── fazer/                       # TODO e roadmap
-│   └── fazer.md
-│
-├── tests/                       # Planos de teste
-│   ├── TEST-PLANS-SUMMARY.md
-│   ├── TEST-PLAN-AUTOMATED.md
-│   ├── TEST-PLAN-MANUAL.md
-│   └── testing.md
-│
-└── archive/                     # Relatórios históricos
-    ├── JSEND-REPORT.md
-    ├── JSEND-MIGRATION-DONE.md
-    ├── JSEND-COMPLETE.md
-    ├── STANDARDS-ANALYSIS.md
-    ├── STANDARDS-COMPLIANCE-REPORT.md
-    ├── STANDARDS-CONFORMANCE-REPORT.md
-    ├── STANDARDS-CORRECTIONS-DONE.md
-    ├── REFACTOR-COMPLIANCE-REPORT.md
-    ├── GIT-STATUS-ANALYSIS.md
-    └── DOCUMENTATION-SUMMARY.md
-```
-
----
-
-## 🎯 Fluxo de Leitura Recomendado
-
-### Para Novos Desenvolvedores
-1. **STANDARDS.md** - Entenda as regras
-2. **setup-guide.md** - Configure o ambiente
-3. **ARCHITECTURE.md** - Compreenda a arquitetura
-4. **api-endpoints.md** - Conheça a API
-
-### Para Code Review
-1. **STANDARDS.md** - Verifique conformidade
-2. **SECURITY-STANDARDS.md** - Valide segurança
-3. **VISUAL-IDENTITY-GUIDE.md** - Valide UI/UX
-
-### Para Deploy
-1. **SECURITY-STANDARDS.md** - Checklist de deploy
-2. **tests/** - Execute todos os testes
-3. **setup-guide.md** - Configuração de produção
-
----
-
 ## 📊 Métricas da Documentação
 
 | Métrica | Valor |
 |---------|-------|
-| **Documentos essenciais** | 6 |
-| **Guias práticos** | 3 |
-| **Planos de teste** | 4 |
-| **Relatórios arquivados** | 10 |
-| **Total de páginas** | ~5.000 linhas |
+| **Categorias** | 10 |
+| **Documentos principais** | 45+ |
+| **Linhas de documentação** | ~6.000+ |
 | **Cobertura** | 100% |
+| **Última reorganização** | 2026-01-20 |
 
 ---
 
 ## 🔄 Manutenção
 
-**Última atualização:** 2025-01-13  
-**Responsável:** Amazon Q  
-**Status:** ✅ Organizado e atualizado
+**Última atualização:** 2026-01-20  
+**Versão:** 1.11.0  
+**Status:** ✅ Reorganizado e estruturado
 
-**Próximas ações:**
-- [ ] Atualizar progress.md com status atual
-- [ ] Revisar ADR-004.md
-- [ ] Adicionar diagramas ao ARCHITECTURE.md
+**Mudanças recentes:**
+- ✅ Reorganização completa em subpastas lógicas
+- ✅ Criação de índices por categoria
+- ✅ Atualização de todos os links internos
+- ✅ Adição de pasta deprecated para arquivos antigos
 
 ---
 
-**💡 Dica:** Use Ctrl+F para buscar rapidamente neste índice!
+**💡 Dica:** Use Ctrl+F para buscar rapidamente neste índice ou navegue pelas pastas para explorar cada categoria!
