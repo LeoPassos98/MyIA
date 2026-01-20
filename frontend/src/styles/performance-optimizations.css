@@ -1,0 +1,432 @@
+/* frontend/src/styles/performance-optimizations.css */
+/* Otimizações de Performance - Fase 2: Layout Optimization */
+/* CSS optimizations para animações GPU-accelerated e redução de layout thrashing */
+
+/**
+ * REGRA 1: Usar transform e opacity para animações
+ * Estas propriedades são GPU-accelerated e não causam reflow
+ */
+
+/* Classe helper para animações suaves */
+.gpu-accelerated {
+  will-change: transform, opacity;
+  transform: translateZ(0); /* Force GPU layer */
+  backface-visibility: hidden;
+}
+
+/* Remover will-change após animação para liberar recursos */
+.gpu-accelerated-done {
+  will-change: auto;
+}
+
+/**
+ * REGRA 2: Usar contain CSS para isolar subtrees
+ * Evita que mudanças em um componente afetem outros
+ */
+
+/* Containers isolados */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict; /* layout + paint + style */
+}
+
+.contain-content {
+  contain: content; /* layout + paint */
+}
+
+/**
+ * REGRA 3: Animações de fade otimizadas
+ * Usar apenas opacity (GPU-accelerated)
+ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-in forwards;
+}
+
+.fade-out {
+  animation: fadeOut 0.2s ease-out forwards;
+}
+
+/**
+ * REGRA 4: Animações de slide otimizadas
+ * Usar transform em vez de left/right/top/bottom
+ */
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.3s ease-out forwards;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+.slide-in-up {
+  animation: slideInUp 0.3s ease-out forwards;
+}
+
+.slide-in-down {
+  animation: slideInDown 0.3s ease-out forwards;
+}
+
+/**
+ * REGRA 5: Animações de scale otimizadas
+ * Transform scale é GPU-accelerated
+ */
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+.scale-out {
+  animation: scaleOut 0.2s ease-in forwards;
+}
+
+/**
+ * REGRA 6: Hover effects otimizados
+ * Usar transform em vez de margin/padding
+ */
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/**
+ * REGRA 7: Loading states otimizados
+ */
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/**
+ * REGRA 8: Skeleton loading otimizado
+ */
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/**
+ * REGRA 9: Scroll performance
+ * Usar scroll-behavior smooth com cuidado
+ */
+
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Desabilitar smooth scroll em dispositivos com reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .smooth-scroll {
+    scroll-behavior: auto;
+  }
+  
+  /* Desabilitar todas as animações */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/**
+ * REGRA 10: Otimizações para mobile
+ */
+
+@media (max-width: 768px) {
+  /* Reduzir complexidade de animações em mobile */
+  .gpu-accelerated {
+    animation-duration: 0.15s !important;
+  }
+  
+  /* Simplificar backdrop blur em mobile */
+  .backdrop-blur {
+    backdrop-filter: none;
+    background-color: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/**
+ * REGRA 11: Otimizações para dark mode
+ * Evitar mudanças bruscas de cor
+ */
+
+@media (prefers-color-scheme: dark) {
+  * {
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/**
+ * REGRA 12: Force hardware acceleration em elementos críticos
+ */
+
+.critical-performance {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/**
+ * REGRA 13: Otimizações para scroll containers
+ */
+
+.optimized-scroll {
+  /* Usar GPU para scroll */
+  transform: translateZ(0);
+  /* Melhorar performance de scroll em iOS */
+  -webkit-overflow-scrolling: touch;
+  /* Conter layout dentro do scroll */
+  contain: layout style paint;
+}
+
+/**
+ * REGRA 14: Transições suaves para theme switching
+ */
+
+.theme-transition {
+  transition: 
+    background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/**
+ * REGRA 15: Otimizações para inputs
+ */
+
+.optimized-input {
+  /* Evitar reflow durante digitação */
+  contain: layout style;
+  /* Melhorar performance de resize */
+  resize: none;
+}
+
+/**
+ * REGRA 16: Lazy loading de imagens
+ */
+
+.lazy-image {
+  /* Placeholder enquanto carrega */
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.lazy-image.loaded {
+  animation: none;
+  background: none;
+}
+
+/**
+ * REGRA 17: Otimizações para modais e overlays
+ */
+
+.modal-overlay {
+  /* GPU acceleration */
+  transform: translateZ(0);
+  /* Isolar do resto da página */
+  contain: strict;
+  /* Transição suave */
+  transition: opacity 0.3s ease;
+}
+
+.modal-content {
+  /* GPU acceleration */
+  transform: translateZ(0);
+  /* Transição suave */
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/**
+ * REGRA 18: Otimizações para tooltips
+ */
+
+.tooltip {
+  /* GPU acceleration */
+  transform: translateZ(0);
+  /* Transição rápida */
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  /* Evitar reflow */
+  contain: layout style;
+}
+
+/**
+ * REGRA 19: Otimizações para dropdowns
+ */
+
+.dropdown {
+  /* GPU acceleration */
+  transform: translateZ(0);
+  /* Transição suave */
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  /* Isolar layout */
+  contain: layout style paint;
+}
+
+/**
+ * REGRA 20: Utilities para debugging de performance
+ */
+
+/* Destacar elementos com layout thrashing */
+.debug-layout-thrashing {
+  outline: 2px solid red !important;
+}
+
+/* Destacar elementos com forced reflow */
+.debug-forced-reflow {
+  outline: 2px solid orange !important;
+}
+
+/* Destacar elementos sem GPU acceleration */
+.debug-no-gpu {
+  outline: 2px solid yellow !important;
+}
