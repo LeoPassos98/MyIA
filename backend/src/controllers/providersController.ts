@@ -9,6 +9,7 @@ import { BedrockProvider } from '../services/ai/providers/bedrock';
 import { bedrockConfigSchema } from '../schemas/bedrockSchema';
 import { jsend } from '../utils/jsend';
 import { AppError } from '../middleware/errorHandler';
+import { ModelRegistry } from '../services/ai/registry';
 import winston from 'winston';
 
 // Logger configurado (assumindo logger global)
@@ -206,6 +207,25 @@ export const providersController = {
       
       const awsModels = await bedrockProvider.getAvailableModels(apiKey);
 
+      // Debug: Log all models from AWS
+      console.log(`[ProvidersController] AWS returned ${awsModels.length} models`);
+      console.log('[ProvidersController] AWS models:', awsModels.map(m => m.modelId));
+      
+      // Debug: Log registry count
+      console.log(`[ProvidersController] Registry has ${ModelRegistry.count()} models`);
+      console.log('[ProvidersController] Registry models:', ModelRegistry.getAll().map(m => m.modelId));
+
+      // Filter only supported models using Model Registry
+      const supportedModels = awsModels.filter(model => {
+        const isSupported = ModelRegistry.isSupported(model.modelId);
+        if (!isSupported) {
+          console.log(`[ProvidersController] Model NOT in registry: ${model.modelId}`);
+        }
+        return isSupported;
+      });
+      
+      console.log(`[ProvidersController] Filtered to ${supportedModels.length} supported models`);
+
       // Buscar modelos cadastrados no banco para enriquecer com informações de custo
       const dbModels = await prisma.aIModel.findMany({
         where: {
@@ -227,22 +247,27 @@ export const providersController = {
       // Criar mapa de modelos do banco para lookup rápido
       const dbModelsMap = new Map(dbModels.map(m => [m.apiModelId, m]));
 
-      // Combinar informações da AWS com informações do banco
-      const enrichedModels = awsModels.map(awsModel => {
+      // Combinar informações da AWS com informações do banco e registry
+      const enrichedModels = supportedModels.map(awsModel => {
         const dbModel = dbModelsMap.get(awsModel.modelId);
+        const registryMetadata = ModelRegistry.getModel(awsModel.modelId);
         
         return {
           id: awsModel.modelId,
           apiModelId: awsModel.modelId,
-          name: dbModel?.name || awsModel.modelName,
+          name: dbModel?.name || registryMetadata?.displayName || awsModel.modelName,
           providerName: awsModel.providerName,
+          vendor: registryMetadata?.vendor,
+          description: registryMetadata?.description,
           costPer1kInput: dbModel?.costPer1kInput || 0,
           costPer1kOutput: dbModel?.costPer1kOutput || 0,
-          contextWindow: dbModel?.contextWindow || 0,
+          contextWindow: dbModel?.contextWindow || registryMetadata?.capabilities.maxContextWindow || 0,
           inputModalities: awsModel.inputModalities,
           outputModalities: awsModel.outputModalities,
           responseStreamingSupported: awsModel.responseStreamingSupported,
-          isInDatabase: !!dbModel
+          capabilities: registryMetadata?.capabilities,
+          isInDatabase: !!dbModel,
+          isInRegistry: !!registryMetadata
         };
       });
 

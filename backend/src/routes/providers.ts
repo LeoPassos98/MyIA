@@ -53,15 +53,23 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
   try {
     const userId = req.userId!;
 
+    console.log(`\n🔍 [/providers/configured] Usuário: ${userId}`);
+
     // Buscar configurações do usuário
     const settings = await prisma.userSettings.findUnique({
       where: { userId }
     });
 
+    console.log(`📊 [Settings] awsEnabledModels:`, settings?.awsEnabledModels);
+    console.log(`📊 [Settings] awsRegion:`, settings?.awsRegion);
+
     // Buscar validação AWS
     const awsValidation = await prisma.providerCredentialValidation.findUnique({
       where: { userId_provider: { userId, provider: 'bedrock' } }
     });
+
+    console.log(`🔐 [Validation] status:`, awsValidation?.status);
+    console.log(`🔐 [Validation] lastValidatedAt:`, awsValidation?.lastValidatedAt);
 
     // Buscar todos os providers ativos
     const allProviders = await prisma.aIProvider.findMany({
@@ -70,15 +78,22 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
       orderBy: { name: 'asc' }
     });
 
+    console.log(`📦 [Providers] Total ativos: ${allProviders.length}`);
+
     // Filtrar providers baseado em configuração
     const configuredProviders = allProviders.filter(provider => {
       // Providers padrão (sempre disponíveis)
       if (['openai', 'groq', 'together'].includes(provider.slug)) {
+        console.log(`✅ [${provider.slug}] Provider padrão incluído`);
         return true;
       }
 
       // AWS Bedrock: só mostrar se validado
       if (provider.slug === 'bedrock') {
+        console.log(`\n🔍 [Bedrock] Verificando condições...`);
+        console.log(`   - Validação válida: ${awsValidation?.status === 'valid'}`);
+        console.log(`   - Modelos habilitados: ${settings?.awsEnabledModels?.length || 0}`);
+        
         if (awsValidation?.status === 'valid' && settings?.awsEnabledModels?.length) {
           // Criar modelos dinâmicos para IDs que não existem no banco
           const existingModels = provider.models.filter(m =>
@@ -108,14 +123,19 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
           console.log('✅ [Bedrock] Modelos configurados:', provider.models.length);
           console.log('  - Do banco:', existingModels.length);
           console.log('  - Dinâmicos:', dynamicModels.length);
+          console.log('  - IDs:', provider.models.map(m => m.apiModelId));
           
           return provider.models.length > 0;
         }
+        console.log('❌ [Bedrock] Condições não atendidas, provider excluído');
         return false;
       }
 
       return true;
     });
+
+    console.log(`\n✅ [Final] Providers configurados: ${configuredProviders.length}`);
+    console.log(`   Slugs: ${configuredProviders.map(p => p.slug).join(', ')}\n`);
 
     res.json(jsend.success({ providers: configuredProviders }));
   } catch (error) {
