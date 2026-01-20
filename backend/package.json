@@ -15,7 +15,9 @@
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
-    "test:e2e": "jest tests/e2e"
+    "test:e2e": "jest tests/e2e",
+    "cleanup:db": "tsx scripts/cleanupDatabase.ts",
+    "cleanup:db:sql": "bash scripts/cleanup-database.sh"
   },
   "keywords": [
     "ia",

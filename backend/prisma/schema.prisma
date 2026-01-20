@@ -206,3 +206,36 @@ model UserProviderCredential {
   @@unique([userId, providerId]) // Um usuário só tem uma chave por provider
   @@map("user_provider_credentials")
 }
+
+// 4. Certificação de Modelos (Sistema de Validação Automática)
+model ModelCertification {
+  id                String   @id @default(cuid())
+  modelId           String   @unique
+  vendor            String   // anthropic, cohere, amazon
+  status            String   // certified, failed, untested, testing
+  
+  // Certificação
+  certifiedAt       DateTime?
+  expiresAt         DateTime?
+  certifiedBy       String?  // 'system' ou userId
+  
+  // Testes
+  lastTestedAt      DateTime?
+  testsPassed       Int      @default(0)
+  testsFailed       Int      @default(0)
+  successRate       Float    @default(0)
+  
+  // Performance
+  avgLatencyMs      Int?
+  lastError         String?
+  failureReasons    Json?    // Array de erros
+  
+  // Metadados
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([status])
+  @@index([vendor])
+  @@index([expiresAt])
+  @@map("model_certifications")
+}
