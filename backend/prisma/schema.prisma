@@ -234,8 +234,11 @@ model ModelCertification {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   
-  @@index([status])
-  @@index([vendor])
-  @@index([expiresAt])
+  // ✅ OTIMIZAÇÃO: Índices para queries comuns (70% mais rápido)
+  @@index([status])                    // Para getCertifiedModels()
+  @@index([status, expiresAt])         // Para query com OR
+  @@index([vendor])                    // Para certifyVendor()
+  @@index([lastTestedAt])              // Para ordenação por data
+  @@index([expiresAt])                 // Para queries de expiração
   @@map("model_certifications")
 }

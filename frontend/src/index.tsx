@@ -6,6 +6,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
+// Otimização Fase 2: Importar CSS de otimizações de performance
+import './styles/performance-optimizations.css';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

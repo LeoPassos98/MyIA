@@ -41,6 +41,7 @@ export function HeaderSlotsProvider({ children }: { children: React.ReactNode })
   return <HeaderSlotsContext.Provider value={value}>{children}</HeaderSlotsContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useHeaderSlots() {
   const ctx = useContext(HeaderSlotsContext);
   if (!ctx) {
