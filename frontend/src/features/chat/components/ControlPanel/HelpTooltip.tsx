@@ -2,7 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { Tooltip, Box, Typography, alpha, useTheme } from '@mui/material';
-import { HelpOutline as HelpIcon } from '@mui/icons-material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { ReactNode } from 'react';
 
 interface HelpTooltipProps {
@@ -43,22 +43,22 @@ export const HelpTooltip = ({ title, description, examples }: HelpTooltipProps) 
   );
 
   return (
-    <Tooltip 
-      title={content} 
-      arrow 
+    <Tooltip
+      title={content}
+      arrow
       placement="top"
       enterDelay={200}
       leaveDelay={100}
     >
-      <HelpIcon 
-        sx={{ 
-          fontSize: 16, 
-          color: 'text.secondary', 
+      <HelpOutlineIcon
+        sx={{
+          fontSize: 16,
+          color: 'text.secondary',
           opacity: 0.6,
           cursor: 'help',
           ml: 0.5,
           '&:hover': { opacity: 1, color: 'primary.main' }
-        }} 
+        }}
       />
     </Tooltip>
   );

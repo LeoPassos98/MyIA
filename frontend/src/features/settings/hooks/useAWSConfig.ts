@@ -79,30 +79,20 @@ export function useAWSConfig(): UseAWSConfigReturn {
       setValidationStatus(settings.awsAccessKey ? 'valid' : 'idle');
       setIsDirty(false);
 
-      // Se já tem credenciais configuradas, buscar modelos disponíveis dinamicamente
+      // ✅ OTIMIZAÇÃO: Simplificar lógica e remover fallback desnecessário
       if (settings.awsAccessKey) {
         try {
           const modelsRes = await api.get('/providers/bedrock/available-models');
-          if (modelsRes.data?.models) {
-            setAvailableModels(modelsRes.data.models);
-          }
+          setAvailableModels(modelsRes.data?.models || []);
         } catch (modelsErr: any) {
-          // Fallback: buscar modelos estáticos do banco
-          try {
-            const fallbackModels = await api.get('/providers/bedrock/models');
-            setAvailableModels(fallbackModels.data.models || []);
-          } catch (fallbackErr) {
-            console.error('Erro ao buscar modelos:', fallbackErr);
-          }
+          console.error('Erro ao buscar modelos disponíveis:', modelsErr);
+          // ✅ Falhar gracefully sem fallback (50% menos API calls)
+          setAvailableModels([]);
+          setError('Erro ao carregar modelos. Verifique suas credenciais AWS.');
         }
       } else {
-        // Sem credenciais, buscar modelos estáticos do banco
-        try {
-          const modelsRes = await api.get('/providers/bedrock/models');
-          setAvailableModels(modelsRes.data.models || []);
-        } catch (modelsErr) {
-          console.error('Erro ao buscar modelos:', modelsErr);
-        }
+        // ✅ Sem credenciais, não buscar modelos (lista vazia)
+        setAvailableModels([]);
       }
     } catch (err: any) {
       setError('Erro ao carregar configuração AWS');

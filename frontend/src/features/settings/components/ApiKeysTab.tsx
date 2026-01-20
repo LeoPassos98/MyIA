@@ -3,7 +3,10 @@
 
 import { useState } from 'react';
 import { Box, Tabs, Tab } from '@mui/material';
-import { Key, Cloud, Code, SmartToy } from '@mui/icons-material';
+import KeyIcon from '@mui/icons-material/Key';
+import CloudIcon from '@mui/icons-material/Cloud';
+import CodeIcon from '@mui/icons-material/Code';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { SettingsSection } from './SettingsSection';
 import StandardProviderPanel from './providers/StandardProviderPanel';
 import AWSProviderPanel from './providers/AWSProviderPanel';
@@ -20,10 +23,10 @@ export default function ApiKeysTab() {
     >
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
-          <Tab icon={<Key />} label="Padrão" iconPosition="start" />
-          <Tab icon={<Cloud />} label="AWS Bedrock" iconPosition="start" />
-          <Tab icon={<Code />} label="Azure OpenAI" iconPosition="start" />
-          <Tab icon={<SmartToy />} label="Gerenciar Modelos" iconPosition="start" />
+          <Tab icon={<KeyIcon />} label="Padrão" iconPosition="start" />
+          <Tab icon={<CloudIcon />} label="AWS Bedrock" iconPosition="start" />
+          <Tab icon={<CodeIcon />} label="Azure OpenAI" iconPosition="start" />
+          <Tab icon={<SmartToyIcon />} label="Gerenciar Modelos" iconPosition="start" />
         </Tabs>
       </Box>
 

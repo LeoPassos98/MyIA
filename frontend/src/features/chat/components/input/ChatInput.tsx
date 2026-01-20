@@ -1,11 +1,17 @@
 // frontend/src/features/chat/components/input/ChatInput.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+// Otimização Fase 2: Layout Optimization - Batch resize measurements
+// Fase 3: Memory Optimization - React.memo e useCallback
 
-import { useRef, useEffect } from 'react';
-import { Box, Typography, Fade, Switch, FormControlLabel, Alert, useTheme, alpha } from '@mui/material';
+import { useRef, useEffect, memo } from 'react';
+import { Box, Typography, Fade, FormControlLabel, Alert, useTheme, alpha } from '@mui/material';
+import { OptimizedSwitch } from '../../../../components/OptimizedSwitch';
 import { useChatInput } from '../../hooks/useChatInput';
 import { SendButton } from './SendButton';
 import { InputTextField } from './InputTextField';
+import { useThrottledCallback } from '../../../../hooks/useEventOptimization';
+import { useBatchedLayout } from '../../../../hooks/useLayoutOptimization';
+import { useMemoryLeakDetection } from '../../../../hooks/useMemoryOptimization';
 
 interface ChatInputProps {
   inputMessage: string;
@@ -20,7 +26,7 @@ interface ChatInputProps {
   onHeightChange?: (height: number) => void;
 }
 
-export default function ChatInput({
+function ChatInput({
   inputMessage,
   setInputMessage,
   onSend,
@@ -35,28 +41,54 @@ export default function ChatInput({
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Fase 3: Memory leak detection (apenas em dev)
+  const memoryTracker = useMemoryLeakDetection('ChatInput');
+
+  // Otimização Fase 2: Batch DOM operations para medições
+  const { scheduleRead } = useBatchedLayout();
 
   // ResizeObserver para detectar mudanças na altura do input
+  // Otimização Fase 2: Agrupa leituras DOM para evitar layout thrashing
+  const throttledHeightUpdate = useThrottledCallback(
+    (height: number) => {
+      if (onHeightChange) {
+        onHeightChange(height);
+      }
+    },
+    150, // Throttle de 150ms para resize handlers
+    [onHeightChange]
+  );
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !onHeightChange) return;
 
-    // Callback para atualizar altura
+    // Callback para atualizar altura com batch read
+    // Fase 2: Agrupa leitura de offsetHeight para evitar forced reflow
     const updateHeight = () => {
-      const height = container.offsetHeight;
-      onHeightChange(height);
+      scheduleRead(() => container.offsetHeight).then(height => {
+        throttledHeightUpdate(height);
+      });
     };
 
-    // Chama ao montar
-    updateHeight();
+    // Chama ao montar (leitura inicial agrupada)
+    scheduleRead(() => container.offsetHeight).then(height => {
+      onHeightChange(height);
+    });
 
-    // Observa mudanças de tamanho
+    // Observa mudanças de tamanho com throttle e batch operations
     const resizeObserver = new ResizeObserver(() => {
       updateHeight();
     });
+    
+    // Fase 3: Rastreia observer para garantir cleanup
+    memoryTracker.trackObserver(resizeObserver);
     resizeObserver.observe(container);
-    return () => resizeObserver.disconnect();
-  }, [onHeightChange]);
+    
+    return () => {
+      memoryTracker.disconnectObserver(resizeObserver);
+    };
+  }, [onHeightChange, throttledHeightUpdate, scheduleRead, memoryTracker]);
 
   const { handleSend, handleKeyDown } = useChatInput({
     inputMessage,
@@ -129,11 +161,12 @@ export default function ChatInput({
         >
           <FormControlLabel
             control={
-              <Switch
+              <OptimizedSwitch
                 size="small"
                 checked={isDevMode}
                 onChange={(e) => setIsDevMode(e.target.checked)}
                 disabled={isDrawerOpen}
+                aria-label="Modo desenvolvedor"
               />
             }
             label={
@@ -190,3 +223,19 @@ export default function ChatInput({
     </Box>
   );
 }
+
+// Fase 3: Memoiza componente para evitar re-renders desnecessários
+export default memo(ChatInput, (prevProps, nextProps) => {
+  return (
+    prevProps.inputMessage === nextProps.inputMessage &&
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.isDevMode === nextProps.isDevMode &&
+    prevProps.isManualMode === nextProps.isManualMode &&
+    prevProps.isDrawerOpen === nextProps.isDrawerOpen &&
+    prevProps.onSend === nextProps.onSend &&
+    prevProps.onStop === nextProps.onStop &&
+    prevProps.setInputMessage === nextProps.setInputMessage &&
+    prevProps.setIsDevMode === nextProps.setIsDevMode &&
+    prevProps.onHeightChange === nextProps.onHeightChange
+  );
+});

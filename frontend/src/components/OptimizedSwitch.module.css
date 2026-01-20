@@ -1,0 +1,188 @@
+/* OptimizedSwitch.module.css */
+/* GPU-accelerated Switch component - Performance optimized */
+
+.switchContainer {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.switchContainer.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Hidden native checkbox for accessibility */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Switch track */
+.track {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  background-color: rgba(0, 0, 0, 0.38);
+  border-radius: 11px;
+  transition: background-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: background-color;
+}
+
+.track.small {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+}
+
+/* Checked state */
+.input:checked + .track {
+  background-color: rgb(25, 118, 210);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .track {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+  
+  .input:checked + .track {
+    background-color: rgb(144, 202, 249);
+  }
+}
+
+/* Switch thumb (GPU-accelerated) */
+.thumb {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background-color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transform: translate(0, -50%);
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.thumb.small {
+  width: 14px;
+  height: 14px;
+}
+
+/* Checked thumb position (GPU-accelerated with transform) */
+.input:checked + .track .thumb {
+  transform: translate(16px, -50%);
+}
+
+.input:checked + .track .thumb.small {
+  transform: translate(14px, -50%);
+}
+
+/* Focus visible for keyboard navigation */
+.input:focus-visible + .track {
+  outline: 2px solid rgb(25, 118, 210);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .input:focus-visible + .track {
+    outline-color: rgb(144, 202, 249);
+  }
+}
+
+/* Hover effect */
+.switchContainer:not(.disabled):hover .track {
+  background-color: rgba(0, 0, 0, 0.48);
+}
+
+.switchContainer:not(.disabled):hover .input:checked + .track {
+  background-color: rgb(21, 101, 192);
+}
+
+@media (prefers-color-scheme: dark) {
+  .switchContainer:not(.disabled):hover .track {
+    background-color: rgba(255, 255, 255, 0.4);
+  }
+  
+  .switchContainer:not(.disabled):hover .input:checked + .track {
+    background-color: rgb(100, 181, 246);
+  }
+}
+
+/* Ripple effect on click (optional, lightweight) */
+.track::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  transition: opacity 200ms, transform 200ms;
+  pointer-events: none;
+}
+
+.switchContainer:active:not(.disabled) .track::before {
+  opacity: 0.12;
+  transform: translate(-50%, -50%) scale(1.5);
+}
+
+/* Label */
+.label {
+  margin-left: 8px;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+@media (prefers-color-scheme: dark) {
+  .label {
+    color: rgba(255, 255, 255, 0.87);
+  }
+}
+
+.label.disabled {
+  color: rgba(0, 0, 0, 0.38);
+}
+
+@media (prefers-color-scheme: dark) {
+  .label.disabled {
+    color: rgba(255, 255, 255, 0.38);
+  }
+}
+
+/* CSS Variables support for theming */
+.track {
+  background-color: var(--switch-track-bg, rgba(0, 0, 0, 0.38));
+}
+
+.input:checked + .track {
+  background-color: var(--switch-track-checked-bg, rgb(25, 118, 210));
+}
+
+.thumb {
+  background-color: var(--switch-thumb-bg, #fff);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .track,
+  .thumb,
+  .track::before {
+    transition: none;
+  }
+}

@@ -2,7 +2,8 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { IconButton, Tooltip, useTheme } from '@mui/material';
-import { Send as SendIcon, Stop as StopIcon } from '@mui/icons-material';
+import SendIcon from '@mui/icons-material/Send';
+import StopIcon from '@mui/icons-material/Stop';
 
 interface SendButtonProps {
   isLoading: boolean;

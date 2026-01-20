@@ -2,13 +2,11 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { Box, IconButton, Tooltip } from '@mui/material';
-import {
-  CopyAll as CopyIcon,
-  DataObject as DataObjectIcon,
-  Timeline as TimelineIcon,
-  PushPin as PushPinIcon,
-  PushPinOutlined as PushPinOutlinedIcon,
-} from '@mui/icons-material';
+import CopyAllIcon from '@mui/icons-material/CopyAll';
+import DataObjectIcon from '@mui/icons-material/DataObject';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import PushPinIcon from '@mui/icons-material/PushPin';
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import { Message } from '../../types';
 
 interface MessageActionsProps {
@@ -57,7 +55,7 @@ export function MessageActions({
           onClick={handleCopy}
           sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
         >
-          <CopyIcon fontSize="small" />
+          <CopyAllIcon fontSize="small" />
         </IconButton>
       </Tooltip>
 

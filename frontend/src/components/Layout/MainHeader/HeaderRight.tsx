@@ -2,7 +2,8 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { Box, Fade, Tooltip, IconButton } from '@mui/material';
-import { Tune as TuneIcon, Dashboard as DashboardIcon } from '@mui/icons-material';
+import TuneIcon from '@mui/icons-material/Tune';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import React from 'react';
 
 interface HeaderRightProps {

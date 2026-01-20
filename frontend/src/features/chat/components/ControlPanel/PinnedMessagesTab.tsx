@@ -5,10 +5,8 @@ import {
   Box, Typography, List, ListItem, ListItemText, 
   IconButton, alpha, useTheme, Chip
 } from '@mui/material';
-import { 
-  PushPin as PushPinIcon,
-  Delete as DeleteIcon 
-} from '@mui/icons-material';
+import PushPinIcon from '@mui/icons-material/PushPin';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useControlPanelLogic } from './useControlPanelLogic';

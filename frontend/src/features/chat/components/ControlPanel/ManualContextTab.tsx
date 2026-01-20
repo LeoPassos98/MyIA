@@ -1,12 +1,13 @@
 // frontend/src/features/chat/components/ControlPanel/ManualContextTab.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { 
-  Box, Typography, FormControlLabel, Switch, Divider, 
-  List, ListItemButton, ListItemIcon, Checkbox, ListItemText, 
+import {
+  Box, Typography, FormControlLabel, Switch, Divider,
+  List, ListItemButton, ListItemIcon, Checkbox, ListItemText,
   alpha, useTheme, Alert, Chip
 } from '@mui/material';
-import { Warning as WarningIcon, CheckCircle as CheckIcon } from '@mui/icons-material';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useControlPanelLogic } from './useControlPanelLogic';
@@ -74,9 +75,9 @@ export const ManualContextTab = () => {
             examples={['Selecione perguntas anteriores relevantes', 'Inclua respostas importantes da IA', 'Marque instruções que deu antes']}
           />
         </Box>
-        <Chip 
-          icon={selectedCount > 0 ? <CheckIcon /> : undefined}
-          label={`${selectedCount} selecionadas`} 
+        <Chip
+          icon={selectedCount > 0 ? <CheckCircleIcon /> : undefined}
+          label={`${selectedCount} selecionadas`}
           size="small"
           color={selectedCount > 0 ? 'warning' : 'default'}
           variant="outlined"

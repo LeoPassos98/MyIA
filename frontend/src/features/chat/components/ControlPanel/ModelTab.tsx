@@ -17,12 +17,10 @@ import {
   Divider,
   Button,
 } from '@mui/material';
-import {
-  SmartToy as BotIcon,
-  Thermostat as TempIcon,
-  Tune as TuneIcon,
-  CheckCircle,
-} from '@mui/icons-material';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import ThermostatIcon from '@mui/icons-material/Thermostat';
+import TuneIcon from '@mui/icons-material/Tune';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { aiProvidersService } from '../../../../services/aiProvidersService';
 import { certificationService } from '../../../../services/certificationService';
 import { AIProvider } from '../../../../types/ai';
@@ -159,7 +157,7 @@ export function ModelTab() {
       {/* === SEÇÃO: Seleção de IA === */}
       <Box>
         <Typography variant="subtitle2" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <BotIcon fontSize="small" color="secondary" /> Inteligência Artificial
+          <SmartToyIcon fontSize="small" color="secondary" /> Inteligência Artificial
           <HelpTooltip
             title="Provedor de IA"
             description="Escolha qual serviço de IA processará suas mensagens. Cada provedor tem modelos diferentes com capacidades e custos variados."
@@ -181,7 +179,7 @@ export function ModelTab() {
               size="small"
               variant={showOnlyCertified ? 'contained' : 'outlined'}
               onClick={() => setShowOnlyCertified(true)}
-              startIcon={<CheckCircle />}
+              startIcon={<CheckCircleIcon />}
             >
               Certificados
             </Button>
@@ -269,7 +267,7 @@ export function ModelTab() {
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Typography variant="body2" fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <TempIcon fontSize="small" /> Temperatura
+              <ThermostatIcon fontSize="small" /> Temperatura
               <HelpTooltip
                 title="Temperatura (Criatividade)"
                 description="Controla a aleatoriedade das respostas. Valores baixos geram respostas mais previsíveis e focadas. Valores altos geram respostas mais criativas e variadas."

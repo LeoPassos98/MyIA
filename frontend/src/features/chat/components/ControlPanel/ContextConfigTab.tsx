@@ -5,15 +5,13 @@ import {
   Box, Typography, Switch, FormControlLabel, Slider, TextField,
   Divider, Chip, alpha, useTheme, Tooltip, IconButton, Alert
 } from '@mui/material';
-import {
-  Psychology as BrainIcon,
-  PushPin as PinIcon,
-  History as HistoryIcon,
-  Search as SearchIcon,
-  Token as TokenIcon,
-  RestartAlt as ResetIcon,
-  Warning as WarningIcon
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import PushPinIcon from '@mui/icons-material/PushPin';
+import HistoryIcon from '@mui/icons-material/History';
+import SearchIcon from '@mui/icons-material/Search';
+import TokenIcon from '@mui/icons-material/Token';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import WarningIcon from '@mui/icons-material/Warning';
 import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useLayout } from '../../../../contexts/LayoutContext';
@@ -61,12 +59,12 @@ export const ContextConfigTab = () => {
       {/* Header com Reset */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <BrainIcon color="secondary" /> Pipeline de Contexto
+          <PsychologyIcon color="secondary" /> Pipeline de Contexto
         </Typography>
         <Tooltip title="Restaurar padrões">
           <span>
             <IconButton size="small" onClick={handleReset} disabled={isManualMode}>
-              <ResetIcon fontSize="small" />
+              <RestartAltIcon fontSize="small" />
             </IconButton>
           </span>
         </Tooltip>
@@ -83,7 +81,7 @@ export const ContextConfigTab = () => {
       <PanelSection active={contextConfig.useCustomSystemPrompt}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
           <Typography variant="subtitle2" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <BrainIcon fontSize="small" color="info" /> System Prompt
+            <PsychologyIcon fontSize="small" color="info" /> System Prompt
             <HelpTooltip 
               title="System Prompt (Instruções Iniciais)"
               description="Texto enviado no início de cada conversa que define a personalidade e comportamento da IA. É invisível para o usuário mas guia todas as respostas."
@@ -127,7 +125,7 @@ export const ContextConfigTab = () => {
       <PanelSection active={contextConfig.pinnedEnabled && !isManualMode} disabled={isManualMode}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: isManualMode ? 0.5 : 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PinIcon fontSize="small" color={isManualMode ? 'disabled' : 'warning'} />
+            <PushPinIcon fontSize="small" color={isManualMode ? 'disabled' : 'warning'} />
             <Typography variant="subtitle2" fontWeight="bold">Mensagens Fixadas</Typography>
             <HelpTooltip 
               title="Mensagens Fixadas (Pinned)"

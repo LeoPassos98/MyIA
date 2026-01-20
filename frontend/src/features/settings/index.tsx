@@ -3,7 +3,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Box, CircularProgress, IconButton } from '@mui/material';
-import { Person, Palette, Key, Menu as MenuIcon } from '@mui/icons-material';
+import PersonIcon from '@mui/icons-material/Person';
+import PaletteIcon from '@mui/icons-material/Palette';
+import KeyIcon from '@mui/icons-material/Key';
+import MenuIcon from '@mui/icons-material/Menu';
 import { useAuth } from '../../contexts/AuthContext';
 import { userSettingsService, UserSettings } from '../../services/userSettingsService';
 import { ObservabilityPageLayout, ObservabilitySection } from '../../components/PageLayout/ObservabilityPageLayout';
@@ -16,7 +19,7 @@ import ApiKeysTab from './components/ApiKeysTab';
 export default function SettingsPage() {
   const { isAuthenticated } = useAuth();
   const { setSlots, resetSlots } = useHeaderSlots();
-  const [_userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const [, setUserSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('profile');
@@ -64,9 +67,9 @@ export default function SettingsPage() {
   }
 
   const sections = [
-    { id: 'profile', label: 'Perfil', icon: <Person /> },
-    { id: 'appearance', label: 'Aparência', icon: <Palette /> },
-    { id: 'api-keys', label: 'Chaves de API', icon: <Key /> },
+    { id: 'profile', label: 'Perfil', icon: <PersonIcon /> },
+    { id: 'appearance', label: 'Aparência', icon: <PaletteIcon /> },
+    { id: 'api-keys', label: 'Chaves de API', icon: <KeyIcon /> },
   ];
 
   return (

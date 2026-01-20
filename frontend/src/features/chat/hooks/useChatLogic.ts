@@ -1,5 +1,6 @@
 // frontend/src/features/chat/hooks/useChatLogic.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+// Fase 3: Memory Optimization - Fixed memory leaks, cleanup de recursos
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom'; // Importante: hooks de navegação
@@ -7,6 +8,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useLayout } from '../../../contexts/LayoutContext';
 import { chatService, StreamChunk } from '../../../services/chatService';
 import { chatHistoryService, Message } from '../../../services/chatHistoryService';
+import { useStableCallback } from '../../../hooks/useMemoryOptimization';
 
 export function useChatLogic(chatId?: string) {
   const navigate = useNavigate();
@@ -24,6 +26,30 @@ export function useChatLogic(chatId?: string) {
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newChatIdRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Fase 3: Cleanup de recursos ao desmontar
+  useEffect(() => {
+    return () => {
+      // Limpa timeout pendente
+      if (flushTimeoutRef.current) {
+        clearTimeout(flushTimeoutRef.current);
+        flushTimeoutRef.current = null;
+      }
+      
+      // Aborta requisição em andamento
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      
+      // Limpa buffer de chunks
+      chunkBufferRef.current = '';
+      
+      // Reseta flags
+      isSendingRef.current = false;
+      newChatIdRef.current = null;
+    };
+  }, []);
 
   // 1. Redirecionar se não logado
   useEffect(() => {
@@ -57,17 +83,29 @@ export function useChatLogic(chatId?: string) {
     }
   };
 
-  const handleStop = () => {
+  // Fase 3: useStableCallback para evitar recriação
+  const handleStop = useStableCallback(() => {
+    // Limpa timeout pendente
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
+    
+    // Aborta requisição
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    
+    // Limpa buffer
+    chunkBufferRef.current = '';
+    
     setIsLoading(false);
     isSendingRef.current = false;
     setDebugLogs(prev => [...prev, "🛑 Interrompido pelo usuário."]);
-  };
+  });
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = useStableCallback(async () => {
     // Validações iniciais
     if (!inputMessage.trim() || isLoading || isSendingRef.current) return;
 
@@ -77,6 +115,16 @@ export function useChatLogic(chatId?: string) {
         alert('⚠️ Modo Manual Ativo: Selecione mensagens ou adicione contexto.');
         return;
       }
+    }
+
+    // Fase 3: Limpa recursos anteriores antes de novo envio
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
 
     // Preparação do envio
@@ -91,7 +139,6 @@ export function useChatLogic(chatId?: string) {
     abortControllerRef.current = controller;
 
     chunkBufferRef.current = '';
-    if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
 
     // IDs temporários para UI Otimista
     const userMsgId = `user-${Date.now()}`;
@@ -233,7 +280,7 @@ export function useChatLogic(chatId?: string) {
       setIsLoading(false);
       isSendingRef.current = false;
     }
-  };
+  });
 
   const handleTogglePin = useCallback(async (messageId: string) => {
     try {

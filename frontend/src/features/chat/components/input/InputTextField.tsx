@@ -1,9 +1,10 @@
 // frontend/src/features/chat/components/input/InputTextField.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { KeyboardEvent, useState } from 'react';
+import { KeyboardEvent, useState, useCallback } from 'react';
 import { TextField } from '@mui/material';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
+import { useThrottledCallback } from '../../../../hooks/useEventOptimization';
 
 interface InputTextFieldProps {
   value: string;
@@ -22,6 +23,23 @@ export function InputTextField({
 }: InputTextFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
 
+  // Otimização: Throttle no onChange para reduzir re-renders durante digitação rápida
+  // Mantém responsividade visual mas reduz processamento
+  const throttledOnChange = useThrottledCallback(
+    (newValue: string) => {
+      onChange(newValue);
+    },
+    150, // Throttle de 150ms - usuário não percebe o delay
+    [onChange]
+  );
+
+  // Handler local para atualização imediata do TextField (controlled component)
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    // Atualiza o valor localmente de forma throttled
+    throttledOnChange(newValue);
+  }, [throttledOnChange]);
+
   return (
     <TextField
       fullWidth
@@ -29,7 +47,7 @@ export function InputTextField({
       maxRows={9}
       placeholder={placeholder}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={handleChange}
       onKeyDown={onKeyDown}
       onFocus={() => setIsFocused(true)}
       onBlur={() => setIsFocused(false)}

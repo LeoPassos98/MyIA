@@ -2,7 +2,8 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import { Box, Fade, Tooltip, IconButton } from '@mui/material';
-import { Menu as MenuIcon, History as HistoryIcon } from '@mui/icons-material';
+import MenuIcon from '@mui/icons-material/Menu';
+import HistoryIcon from '@mui/icons-material/History';
 import React from 'react';
 
 interface HeaderLeftProps {
