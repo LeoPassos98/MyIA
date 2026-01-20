@@ -3,18 +3,19 @@
 
 import { useState } from 'react';
 import { Box, Tabs, Tab } from '@mui/material';
-import { Key, Cloud, Code } from '@mui/icons-material';
+import { Key, Cloud, Code, SmartToy } from '@mui/icons-material';
 import { SettingsSection } from './SettingsSection';
 import StandardProviderPanel from './providers/StandardProviderPanel';
 import AWSProviderPanel from './providers/AWSProviderPanel';
 import AzureProviderPanel from './providers/AzureProviderPanel';
+import ModelsManagementTab from './ModelsManagementTab';
 
 export default function ApiKeysTab() {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
-    <SettingsSection 
-      title="Chaves de API" 
+    <SettingsSection
+      title="Chaves de API"
       description="Configure suas credenciais para cada provedor de IA"
     >
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
@@ -22,12 +23,14 @@ export default function ApiKeysTab() {
           <Tab icon={<Key />} label="Padrão" iconPosition="start" />
           <Tab icon={<Cloud />} label="AWS Bedrock" iconPosition="start" />
           <Tab icon={<Code />} label="Azure OpenAI" iconPosition="start" />
+          <Tab icon={<SmartToy />} label="Gerenciar Modelos" iconPosition="start" />
         </Tabs>
       </Box>
 
       {activeTab === 0 && <StandardProviderPanel />}
       {activeTab === 1 && <AWSProviderPanel />}
       {activeTab === 2 && <AzureProviderPanel />}
+      {activeTab === 3 && <ModelsManagementTab />}
     </SettingsSection>
   );
 }

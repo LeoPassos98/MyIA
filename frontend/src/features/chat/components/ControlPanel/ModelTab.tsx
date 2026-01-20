@@ -1,7 +1,7 @@
 // frontend/src/features/chat/components/ControlPanel/ModelTab.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   FormControl,
@@ -15,13 +15,16 @@ import {
   Alert,
   Slider,
   Divider,
+  Button,
 } from '@mui/material';
 import {
   SmartToy as BotIcon,
   Thermostat as TempIcon,
-  Tune as TuneIcon
+  Tune as TuneIcon,
+  CheckCircle,
 } from '@mui/icons-material';
 import { aiProvidersService } from '../../../../services/aiProvidersService';
+import { certificationService } from '../../../../services/certificationService';
 import { AIProvider } from '../../../../types/ai';
 import { useLayout } from '../../../../contexts/LayoutContext';
 import { HelpTooltip } from './HelpTooltip';
@@ -41,6 +44,10 @@ export function ModelTab() {
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Estado para certificação
+  const [certifiedModels, setCertifiedModels] = useState<string[]>([]);
+  const [showOnlyCertified, setShowOnlyCertified] = useState(false);
 
   // O Estado da SELEÇÃO vem do Contexto Global
   const { chatConfig, updateChatConfig } = useLayout();
@@ -89,6 +96,19 @@ export function ModelTab() {
     };
   }, [chatConfig.provider, updateChatConfig]);
 
+  // Buscar modelos certificados
+  useEffect(() => {
+    async function loadCertifications() {
+      try {
+        const certified = await certificationService.getCertifiedModels();
+        setCertifiedModels(certified);
+      } catch (error) {
+        console.error('Erro ao carregar certificações:', error);
+      }
+    }
+    loadCertifications();
+  }, []);
+
   // 2. Handlers
   const handleProviderChange = (event: SelectChangeEvent) => {
     const newSlug = event.target.value;
@@ -111,6 +131,15 @@ export function ModelTab() {
 
   // Computados para UI
   const activeProvider = providers.find(p => p.slug === chatConfig.provider);
+
+  // Filtrar modelos por certificação
+  const filteredModels = useMemo(() => {
+    if (!activeProvider) return [];
+    if (!showOnlyCertified) return activeProvider.models;
+    return activeProvider.models.filter(m =>
+      certifiedModels.includes(m.apiModelId)
+    );
+  }, [activeProvider, certifiedModels, showOnlyCertified]);
 
   if (loading) {
     return (
@@ -137,6 +166,27 @@ export function ModelTab() {
             examples={['Groq: Rápido e gratuito (limite de tokens)', 'OpenAI: GPT-4, mais capaz, pago']}
           />
         </Typography>
+
+        {/* Filtros de Certificação */}
+        {activeProvider?.slug === 'aws' && (
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+            <Button
+              size="small"
+              variant={!showOnlyCertified ? 'contained' : 'outlined'}
+              onClick={() => setShowOnlyCertified(false)}
+            >
+              Todos
+            </Button>
+            <Button
+              size="small"
+              variant={showOnlyCertified ? 'contained' : 'outlined'}
+              onClick={() => setShowOnlyCertified(true)}
+              startIcon={<CheckCircle />}
+            >
+              Certificados
+            </Button>
+          </Box>
+        )}
 
         {/* Seletor de Provedor */}
         <FormControl fullWidth sx={{ mb: 2 }}>
@@ -172,16 +222,34 @@ export function ModelTab() {
             label="Modelo"
             onChange={handleModelChange}
           >
-            {activeProvider?.models.map((model) => (
+            {filteredModels.map((model) => (
               <MenuItem key={model.id} value={model.apiModelId}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                   <Typography>{model.name}</Typography>
-                  <Chip
-                    label={`${Math.round(model.contextWindow / 1024)}k tokens`}
-                    size="small"
-                    variant="outlined"
-                    sx={{ height: 20, fontSize: '0.65rem', ml: 1 }}
-                  />
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {certifiedModels.includes(model.apiModelId) && (
+                      <Chip
+                        label="Certificado"
+                        size="small"
+                        color="success"
+                        sx={{ height: 20, fontSize: '0.65rem' }}
+                      />
+                    )}
+                    {activeProvider?.slug === 'aws' && (
+                      <Chip
+                        label="AWS Bedrock"
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: '0.65rem' }}
+                      />
+                    )}
+                    <Chip
+                      label={`${Math.round(model.contextWindow / 1024)}k tokens`}
+                      size="small"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.65rem' }}
+                    />
+                  </Box>
                 </Box>
               </MenuItem>
             ))}
