@@ -86,6 +86,34 @@ router.get(
   certificationController.getCertifiedModels
 );
 
+// GET /api/certification/failed-models (mantido para compatibilidade)
+router.get(
+  '/failed-models',
+  queryLimiter,
+  certificationController.getFailedModels
+);
+
+// GET /api/certification/unavailable-models
+router.get(
+  '/unavailable-models',
+  queryLimiter,
+  certificationController.getUnavailableModels
+);
+
+// GET /api/certification/quality-warning-models
+router.get(
+  '/quality-warning-models',
+  queryLimiter,
+  certificationController.getQualityWarningModels
+);
+
+// GET /api/certification/details/:modelId
+router.get(
+  '/details/:modelId',
+  queryLimiter,
+  certificationController.getCertificationDetails
+);
+
 // GET /api/certification/is-certified/:modelId
 router.get(
   '/is-certified/:modelId',

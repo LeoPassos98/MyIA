@@ -1,6 +1,33 @@
 // backend/src/services/ai/registry/models/amazon.models.ts
 // Standards: docs/STANDARDS.md
 
+/**
+ * SUFIXOS DE CONTEXT WINDOW SUPORTADOS
+ *
+ * Os modelos Amazon Nova suportam diferentes context windows através de sufixos:
+ * - :8k    → 8,000 tokens
+ * - :20k   → 20,000 tokens
+ * - :24k   → 24,000 tokens
+ * - :128k  → 128,000 tokens
+ * - :256k  → 256,000 tokens
+ * - :300k  → 300,000 tokens
+ * - :1000k → 1,000,000 tokens (1M)
+ * - :mm    → Multimodal (varia por modelo)
+ *
+ * IMPORTANTE: AWS Bedrock não aceita sufixos no model ID.
+ * O sistema automaticamente remove o sufixo antes de invocar o modelo.
+ *
+ * Exemplo de normalização:
+ *   UI mostra:  amazon.nova-premier-v1:0:8k
+ *   AWS recebe: amazon.nova-premier-v1:0 (sem sufixo)
+ *
+ * A normalização é feita automaticamente pela função normalizeModelId()
+ * em backend/src/services/ai/providers/bedrock.ts
+ *
+ * TRANSPARÊNCIA: O usuário vê o sufixo na UI para escolher o context window
+ * desejado, mas a invocação real usa o ID base sem sufixo.
+ */
+
 import { ModelRegistry, ModelMetadata } from '../model-registry';
 
 /**
@@ -372,6 +399,15 @@ const amazonModels: ModelMetadata[] = [
       maxOutputTokens: 5000,
     },
     supportedPlatforms: ['bedrock'],
+    platformRules: [
+      {
+        platform: 'bedrock',
+        rule: 'requires_inference_profile',
+        config: {
+          profileFormat: '{region}.{modelId}',
+        },
+      },
+    ],
     adapterClass: 'AmazonAdapter',
   },
 
@@ -389,6 +425,15 @@ const amazonModels: ModelMetadata[] = [
       maxOutputTokens: 5000,
     },
     supportedPlatforms: ['bedrock'],
+    platformRules: [
+      {
+        platform: 'bedrock',
+        rule: 'requires_inference_profile',
+        config: {
+          profileFormat: '{region}.{modelId}',
+        },
+      },
+    ],
     adapterClass: 'AmazonAdapter',
   },
 
@@ -406,6 +451,15 @@ const amazonModels: ModelMetadata[] = [
       maxOutputTokens: 5000,
     },
     supportedPlatforms: ['bedrock'],
+    platformRules: [
+      {
+        platform: 'bedrock',
+        rule: 'requires_inference_profile',
+        config: {
+          profileFormat: '{region}.{modelId}',
+        },
+      },
+    ],
     adapterClass: 'AmazonAdapter',
   },
 
@@ -423,6 +477,15 @@ const amazonModels: ModelMetadata[] = [
       maxOutputTokens: 5000,
     },
     supportedPlatforms: ['bedrock'],
+    platformRules: [
+      {
+        platform: 'bedrock',
+        rule: 'requires_inference_profile',
+        config: {
+          profileFormat: '{region}.{modelId}',
+        },
+      },
+    ],
     adapterClass: 'AmazonAdapter',
   },
 
@@ -440,6 +503,15 @@ const amazonModels: ModelMetadata[] = [
       maxOutputTokens: 5000,
     },
     supportedPlatforms: ['bedrock'],
+    platformRules: [
+      {
+        platform: 'bedrock',
+        rule: 'requires_inference_profile',
+        config: {
+          profileFormat: '{region}.{modelId}',
+        },
+      },
+    ],
     adapterClass: 'AmazonAdapter',
   },
 ];

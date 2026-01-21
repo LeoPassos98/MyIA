@@ -1,6 +1,61 @@
 // frontend/src/types/ai.ts
 
 /**
+ * Categorias de erro para certificação de modelos
+ */
+export type ErrorCategory = 
+  | 'UNAVAILABLE'
+  | 'PERMISSION_ERROR'
+  | 'AUTHENTICATION_ERROR'
+  | 'RATE_LIMIT'
+  | 'TIMEOUT'
+  | 'CONFIGURATION_ERROR'
+  | 'QUALITY_ISSUE'
+  | 'NETWORK_ERROR'
+  | 'UNKNOWN_ERROR';
+
+/**
+ * Severidade do erro
+ */
+export type ErrorSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+/**
+ * Status de certificação do modelo
+ */
+export type CertificationStatus = 
+  | 'certified'
+  | 'failed'
+  | 'quality_warning'
+  | 'configuration_required'
+  | 'permission_required';
+
+/**
+ * Erro categorizado com ações sugeridas
+ */
+export interface CategorizedError {
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  message: string;
+  originalError: string;
+  suggestedActions: string[];
+  isTemporary: boolean;
+}
+
+/**
+ * Detalhes de certificação de um modelo
+ */
+export interface CertificationDetails {
+  modelId: string;
+  status?: CertificationStatus;
+  errorCategory?: ErrorCategory;
+  errorSeverity?: ErrorSeverity;
+  isAvailable?: boolean;
+  categorizedError?: CategorizedError;
+  lastChecked?: string;
+  error?: string;
+}
+
+/**
  * Modelo de IA básico (usado no ModelTab)
  */
 export interface AIModel {

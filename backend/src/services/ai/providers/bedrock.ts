@@ -14,24 +14,52 @@ import { ModelRegistry } from '../registry';
 import type { Message, UniversalOptions } from '../adapters';
 
 /**
+ * Normaliza model ID removendo sufixos de context window
+ *
+ * AWS Bedrock não aceita sufixos no model ID. Esta função remove
+ * sufixos conhecidos para garantir compatibilidade.
+ *
+ * Exemplos:
+ *   amazon.nova-premier-v1:0:8k   → amazon.nova-premier-v1:0
+ *   amazon.nova-premier-v1:0:20k  → amazon.nova-premier-v1:0
+ *   amazon.nova-premier-v1:0:mm   → amazon.nova-premier-v1:0
+ *   amazon.nova-lite-v1:0:300k    → amazon.nova-lite-v1:0
+ *
+ * @param modelId ID do modelo (pode conter sufixo)
+ * @returns ID do modelo normalizado (sem sufixo)
+ */
+function normalizeModelId(modelId: string): string {
+  // Remove sufixos conhecidos: :8k, :20k, :24k, :128k, :256k, :300k, :1000k, :mm
+  return modelId.replace(/:(8k|20k|24k|128k|256k|300k|1000k|mm)$/i, '');
+}
+
+/**
  * Converte modelId para Inference Profile ID se necessário
- * @param modelId ID do modelo
+ * @param modelId ID do modelo (pode conter sufixo)
  * @param region Região AWS (ex: 'us-east-1')
  * @returns Inference Profile ID ou modelId original
  */
 function getInferenceProfileId(modelId: string, region: string): string {
+  // Normalizar antes de processar
+  const baseModelId = normalizeModelId(modelId);
+  
+  // Se já tem prefixo de região, retornar como está
+  if (baseModelId.startsWith('us.') || baseModelId.startsWith('eu.')) {
+    return baseModelId;
+  }
+  
   // Check if model requires inference profile using registry
-  const platformRule = ModelRegistry.getPlatformRules(modelId, 'bedrock');
+  const platformRule = ModelRegistry.getPlatformRules(baseModelId, 'bedrock');
   
   if (platformRule?.rule === 'requires_inference_profile') {
     // Usar system-defined inference profile
     const regionPrefix = region.split('-')[0]; // 'us' de 'us-east-1'
-    const inferenceProfileId = `${regionPrefix}.${modelId}`;
+    const inferenceProfileId = `${regionPrefix}.${baseModelId}`;
     console.log(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${region})`);
     return inferenceProfileId;
   }
   
-  return modelId;
+  return baseModelId;
 }
 
 /**
@@ -155,21 +183,26 @@ export class BedrockProvider extends BaseAIProvider {
       universalOptions
     );
 
-    // 🧪 AUTO-TEST: Tentar múltiplas variações do modelId até encontrar a correta
+    // Normalizar model ID removendo sufixos de context window
     const originalModelId = options.modelId;
-    const modelIdWithProfile = getInferenceProfileId(options.modelId, this.region);
+    const normalizedModelId = normalizeModelId(originalModelId);
     
+    // Log se houve normalização
+    if (normalizedModelId !== originalModelId) {
+      console.log(`🔄 [Bedrock] Normalized model ID: ${originalModelId} → ${normalizedModelId}`);
+    }
+    
+    // Obter inference profile se necessário
+    const modelIdWithProfile = getInferenceProfileId(normalizedModelId, this.region);
+    
+    // 🧪 AUTO-TEST: Tentar múltiplas variações do modelId até encontrar a correta
     const modelIdVariations = [
-      // Variação 1: Sem "2" e sem sufixo (mais provável)
-      originalModelId.replace('nova-2-', 'nova-').replace(':256k', ''),
-      // Variação 2: Sem sufixo :256k
-      originalModelId.replace(':256k', ''),
-      // Variação 3: Sem "2" mas com sufixo
-      originalModelId.replace('nova-2-', 'nova-'),
-      // Variação 4: Original sem transformação
-      originalModelId,
-      // Variação 5: Com inference profile
+      // Variação 1: Normalizado (sem sufixo)
+      normalizedModelId,
+      // Variação 2: Com inference profile
       modelIdWithProfile,
+      // Variação 3: Sem "2" (para modelos nova-2-*)
+      normalizedModelId.replace('nova-2-', 'nova-'),
     ];
     
     console.log(`🧪 [Bedrock Auto-Test] Testing ${modelIdVariations.length} variations for: ${originalModelId}`);

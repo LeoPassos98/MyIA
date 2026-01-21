@@ -24,6 +24,7 @@ import { EnrichedAWSModel } from '../../../../types/ai';
 import { certificationService } from '../../../../services/certificationService';
 import { OptimizedTooltip } from '../../../../components/OptimizedTooltip';
 import { ModelInfoDrawer } from '../../../../components/ModelInfoDrawer';
+import { CertificationProgressDialog, ModelCertificationProgress } from '../../../../components/CertificationProgressDialog';
 
 // Regiões AWS atualizadas conforme padrão Amazon
 const REGION_GROUPS = [
@@ -79,6 +80,8 @@ const ModelCheckboxItem = memo(({
   onToggle,
   disabled,
   isCertified,
+  hasQualityWarning,
+  isUnavailable,
   onShowInfo
 }: {
   model: EnrichedAWSModel;
@@ -86,6 +89,8 @@ const ModelCheckboxItem = memo(({
   onToggle: (id: string) => void;
   disabled: boolean;
   isCertified: boolean;
+  hasQualityWarning: boolean;
+  isUnavailable: boolean;
   onShowInfo: (model: EnrichedAWSModel) => void;
 }) => {
   const hasDbInfo = model.isInDatabase !== false;
@@ -108,9 +113,25 @@ const ModelCheckboxItem = memo(({
               <Typography variant="body2">{model.name}</Typography>
               {isCertified && (
                 <Chip
-                  label="Certificado"
+                  label="✅ Certificado"
                   size="small"
                   color="success"
+                  sx={{ height: 18, fontSize: '0.65rem' }}
+                />
+              )}
+              {hasQualityWarning && (
+                <Chip
+                  label="⚠️ Qualidade"
+                  size="small"
+                  color="warning"
+                  sx={{ height: 18, fontSize: '0.65rem' }}
+                />
+              )}
+              {isUnavailable && (
+                <Chip
+                  label="❌ Indisponível"
+                  size="small"
+                  color="error"
                   sx={{ height: 18, fontSize: '0.65rem' }}
                 />
               )}
@@ -118,7 +139,7 @@ const ModelCheckboxItem = memo(({
                 <Chip
                   label="Novo"
                   size="small"
-                  color="warning"
+                  color="info"
                   sx={{ height: 18, fontSize: '0.65rem' }}
                 />
               )}
@@ -158,8 +179,14 @@ export default function AWSProviderPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [certifiedModels, setCertifiedModels] = useState<string[]>([]);
-  const [isCertifying, setIsCertifying] = useState(false);
-  const [certificationError, setCertificationError] = useState<string | null>(null);
+  const [unavailableModels, setUnavailableModels] = useState<string[]>([]);
+  const [qualityWarningModels, setQualityWarningModels] = useState<string[]>([]);
+  
+  // ✅ Estados para o diálogo de progresso de certificação
+  const [certificationProgress, setCertificationProgress] = useState<ModelCertificationProgress[]>([]);
+  const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
+  const [canCancelCertification, setCanCancelCertification] = useState(false);
+  const [certificationAborted, setCertificationAborted] = useState(false);
   
   // ✅ Estado para o drawer de informações do modelo
   const [selectedModelForInfo, setSelectedModelForInfo] = useState<EnrichedAWSModel | null>(null);
@@ -205,12 +232,22 @@ export default function AWSProviderPanel() {
     }
   }, [formState.accessKey]);
 
-  // Buscar modelos certificados
+  // Buscar modelos certificados, indisponíveis e com warning de qualidade
   useEffect(() => {
     async function loadCertifications() {
       try {
-        const certified = await certificationService.getCertifiedModels();
+        console.log('[AWSProviderPanel] 🔍 DEBUG: Carregando certificações...');
+        const [certified, unavailable, warnings] = await Promise.all([
+          certificationService.getCertifiedModels(),
+          certificationService.getUnavailableModels(),
+          certificationService.getQualityWarningModels()
+        ]);
+        console.log('[AWSProviderPanel] 🔍 DEBUG: Certificados:', certified);
+        console.log('[AWSProviderPanel] 🔍 DEBUG: Indisponíveis:', unavailable);
+        console.log('[AWSProviderPanel] 🔍 DEBUG: Warnings:', warnings);
         setCertifiedModels(certified);
+        setUnavailableModels(unavailable);
+        setQualityWarningModels(warnings);
       } catch (error) {
         console.error('Erro ao carregar certificações:', error);
       }
@@ -224,36 +261,106 @@ export default function AWSProviderPanel() {
     setIsDrawerOpen(true);
   }, []);
 
-  // Handler para certificar modelos selecionados
+  // Handler para certificar modelos selecionados com progresso detalhado
   const handleCertifySelected = async () => {
-    setIsCertifying(true);
-    setCertificationError(null);
+    // Inicializar progresso para cada modelo
+    const initialProgress: ModelCertificationProgress[] = selectedModels.map(modelId => {
+      const model = availableModels.find(m => m.apiModelId === modelId);
+      return {
+        modelId,
+        modelName: model?.name || modelId,
+        status: 'pending' as const
+      };
+    });
+    
+    setCertificationProgress(initialProgress);
+    setIsProgressDialogOpen(true);
+    setCanCancelCertification(true);
+    setCertificationAborted(false);
 
     try {
-      const results = await Promise.allSettled(
-        selectedModels.map(modelId =>
-          certificationService.certifyModel(modelId)
-        )
-      );
-
-      const newCertified = results
-        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-        .map(r => r.value.modelId);
-
-      setCertifiedModels(prev => [...new Set([...prev, ...newCertified])]);
-
-      const successCount = results.filter(r => r.status === 'fulfilled').length;
-      const failCount = results.filter(r => r.status === 'rejected').length;
-
-      if (failCount > 0) {
-        setCertificationError(`${successCount} certificados, ${failCount} falharam`);
+      // Certificar modelos um por vez para mostrar progresso
+      for (let i = 0; i < selectedModels.length; i++) {
+        // Verificar se foi cancelado
+        if (certificationAborted) {
+          // Marcar modelos restantes como cancelados
+          setCertificationProgress(prev =>
+            prev.map((p, idx) =>
+              idx >= i ? { ...p, status: 'error' as const, error: 'Cancelado pelo usuário' } : p
+            )
+          );
+          break;
+        }
+        
+        const modelId = selectedModels[i];
+        const startTime = Date.now();
+        
+        // Atualizar status para "running"
+        setCertificationProgress(prev =>
+          prev.map(p => p.modelId === modelId ? { ...p, status: 'running' as const, startTime } : p)
+        );
+        
+        try {
+          await certificationService.certifyModel(modelId);
+          const endTime = Date.now();
+          
+          // Buscar detalhes da certificação para obter o status
+          const certDetails = await certificationService.getCertificationDetails(modelId);
+          
+          // Sucesso
+          setCertificationProgress(prev =>
+            prev.map(p => p.modelId === modelId ? { 
+              ...p, 
+              status: 'success' as const, 
+              endTime,
+              result: certDetails || undefined
+            } : p)
+          );
+        } catch (error: any) {
+          const endTime = Date.now();
+          const errorMessage = error?.response?.data?.message || error?.message || 'Erro desconhecido';
+          
+          // Erro
+          setCertificationProgress(prev =>
+            prev.map(p => p.modelId === modelId ? {
+              ...p,
+              status: 'error' as const,
+              error: errorMessage,
+              endTime
+            } : p)
+          );
+        }
       }
+
+      // ✅ FIX: Após certificar, buscar listas atualizadas do backend com forceRefresh
+      // Isso garante que o estado local seja sincronizado com o backend
+      // e os badges permaneçam após reload da página
+      const [updatedCertifiedModels, updatedUnavailableModels, updatedWarningModels] = await Promise.all([
+        certificationService.getCertifiedModels(true),
+        certificationService.getUnavailableModels(true),
+        certificationService.getQualityWarningModels(true)
+      ]);
+      setCertifiedModels(updatedCertifiedModels);
+      setUnavailableModels(updatedUnavailableModels);
+      setQualityWarningModels(updatedWarningModels);
     } catch (error) {
       console.error('Erro ao certificar modelos:', error);
-      setCertificationError('Erro ao certificar modelos');
     } finally {
-      setIsCertifying(false);
+      setCanCancelCertification(false);
     }
+  };
+  
+  // Handler para cancelar certificação
+  const handleCancelCertification = () => {
+    setCertificationAborted(true);
+    setCanCancelCertification(false);
+  };
+  
+  // Handler para fechar diálogo de progresso
+  const handleCloseProgressDialog = () => {
+    setIsProgressDialogOpen(false);
+    setCertificationProgress([]);
+    setCertificationAborted(false);
   };
 
   // ✅ OTIMIZAÇÃO: Agrupar modelos por provedor e filtrar por busca (com debounce)
@@ -593,6 +700,8 @@ export default function AWSProviderPanel() {
                             onToggle={toggleModel}
                             disabled={!canSelectModels}
                             isCertified={certifiedModels.includes(model.apiModelId)}
+                            hasQualityWarning={qualityWarningModels.includes(model.apiModelId)}
+                            isUnavailable={unavailableModels.includes(model.apiModelId)}
                             onShowInfo={handleShowModelInfo}
                           />
                         ))}
@@ -613,11 +722,11 @@ export default function AWSProviderPanel() {
                             variant="outlined"
                             color="secondary"
                             onClick={handleCertifySelected}
-                            disabled={!canSelectModels || selectedModels.length === 0 || isCertifying}
-                            startIcon={isCertifying ? <CircularProgress size={20} /> : <VerifiedUserIcon />}
+                            disabled={!canSelectModels || selectedModels.length === 0 || isProgressDialogOpen}
+                            startIcon={isProgressDialogOpen ? <CircularProgress size={20} /> : <VerifiedUserIcon />}
                             sx={{ fontWeight: 'bold', px: 3 }}
                           >
-                            {isCertifying ? 'Certificando...' : `Certificar ${selectedModels.length} Modelos`}
+                            {isProgressDialogOpen ? 'Certificando...' : `Certificar ${selectedModels.length} Modelos`}
                           </Button>
                         </span>
                       </OptimizedTooltip>
@@ -644,12 +753,6 @@ export default function AWSProviderPanel() {
                   </Typography>
                 </>
               )}
-
-              {certificationError && (
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  {certificationError}
-                </Alert>
-              )}
             </>
           )}
         </Box>
@@ -661,6 +764,17 @@ export default function AWSProviderPanel() {
         model={selectedModelForInfo}
         onClose={() => setIsDrawerOpen(false)}
         isCertified={selectedModelForInfo ? certifiedModels.includes(selectedModelForInfo.apiModelId) : false}
+        hasQualityWarning={selectedModelForInfo ? qualityWarningModels.includes(selectedModelForInfo.apiModelId) : false}
+        isUnavailable={selectedModelForInfo ? unavailableModels.includes(selectedModelForInfo.apiModelId) : false}
+      />
+      
+      {/* ✅ Diálogo de progresso de certificação */}
+      <CertificationProgressDialog
+        open={isProgressDialogOpen}
+        models={certificationProgress}
+        onCancel={handleCancelCertification}
+        onClose={handleCloseProgressDialog}
+        canCancel={canCancelCertification}
       />
     </>
   );

@@ -212,7 +212,7 @@ model ModelCertification {
   id                String   @id @default(cuid())
   modelId           String   @unique
   vendor            String   // anthropic, cohere, amazon
-  status            String   // certified, failed, untested, testing
+  status            String   // certified, failed, untested, testing, quality_warning
   
   // Certificação
   certifiedAt       DateTime?
@@ -230,6 +230,10 @@ model ModelCertification {
   lastError         String?
   failureReasons    Json?    // Array de erros
   
+  // Categorização de Erros (Novo)
+  errorCategory     String?  // UNAVAILABLE, PERMISSION_ERROR, etc
+  errorSeverity     String?  // CRITICAL, HIGH, MEDIUM, LOW
+  
   // Metadados
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -240,5 +244,7 @@ model ModelCertification {
   @@index([vendor])                    // Para certifyVendor()
   @@index([lastTestedAt])              // Para ordenação por data
   @@index([expiresAt])                 // Para queries de expiração
+  @@index([errorCategory])             // Para filtrar por categoria de erro
+  @@index([errorSeverity])             // Para filtrar por severidade
   @@map("model_certifications")
 }

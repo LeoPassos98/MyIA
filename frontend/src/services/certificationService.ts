@@ -6,6 +6,7 @@
 
 import { api } from './api';
 import { logger } from '../utils/logger';
+import { CertificationDetails } from '../types/ai';
 
 export interface CertificationResult {
   modelId: string;
@@ -21,9 +22,13 @@ export interface CertificationResult {
 class CertificationService {
   private cache: {
     certifiedModels: string[] | null;
+    unavailableModels: string[] | null;
+    qualityWarningModels: string[] | null;
     timestamp: number;
   } = {
     certifiedModels: null,
+    unavailableModels: null,
+    qualityWarningModels: null,
     timestamp: 0
   };
   
@@ -99,7 +104,100 @@ class CertificationService {
     
     return modelIds;
   }
+  
+  /**
+   * Lista modelos que falharam na certificação (com cache)
+   * @param forceRefresh - Se true, ignora cache e busca do backend
+   */
+  async getFailedModels(_forceRefresh = false): Promise<string[]> {
+    // Usar o mesmo cache para simplificar, mas com chave diferente
+    // Por enquanto, sempre buscar do backend
+    logger.log('[CertificationService] 📋 Chamando API GET /certification/failed-models');
+    const response = await api.get('/certification/failed-models');
+    
+    const modelIds = response.data.modelIds || [];
+    logger.log('[CertificationService] ❌ Modelos que falharam:', modelIds.length, 'modelos');
+    
+    return modelIds;
+  }
 
+  /**
+   * Lista modelos indisponíveis (com cache)
+   * @param forceRefresh - Se true, ignora cache e busca do backend
+   */
+  async getUnavailableModels(forceRefresh = false): Promise<string[]> {
+    const now = Date.now();
+    
+    // ✅ OTIMIZAÇÃO: Retornar do cache se válido
+    if (!forceRefresh && this.cache.unavailableModels && (now - this.cache.timestamp) < this.CACHE_TTL) {
+      logger.log('[CertificationService] 📦 Retornando do cache (unavailable):', this.cache.unavailableModels.length, 'modelos');
+      return this.cache.unavailableModels;
+    }
+    
+    // ✅ Buscar do backend e atualizar cache
+    logger.log('[CertificationService] 📋 Chamando API GET /certification/unavailable-models');
+    const response = await api.get('/certification/unavailable-models');
+    
+    // 🐛 DEBUG: Verificar estrutura da resposta
+    console.log('[CertificationService] 🔍 DEBUG: Resposta completa do backend (unavailable):', response.data);
+    console.log('[CertificationService] 🔍 DEBUG: response.data.modelIds:', response.data.modelIds);
+    console.log('[CertificationService] 🔍 DEBUG: response.data.models:', response.data.models);
+    
+    const modelIds = response.data.modelIds || [];
+    this.cache.unavailableModels = modelIds;
+    this.cache.timestamp = now;
+    
+    logger.log('[CertificationService] ❌ Modelos indisponíveis:', modelIds.length, 'modelos');
+    
+    return modelIds;
+  }
+
+  /**
+   * Lista modelos com warning de qualidade (com cache)
+   * @param forceRefresh - Se true, ignora cache e busca do backend
+   */
+  async getQualityWarningModels(forceRefresh = false): Promise<string[]> {
+    const now = Date.now();
+    
+    // ✅ OTIMIZAÇÃO: Retornar do cache se válido
+    if (!forceRefresh && this.cache.qualityWarningModels && (now - this.cache.timestamp) < this.CACHE_TTL) {
+      logger.log('[CertificationService] 📦 Retornando do cache (quality warning):', this.cache.qualityWarningModels.length, 'modelos');
+      return this.cache.qualityWarningModels;
+    }
+    
+    // ✅ Buscar do backend e atualizar cache
+    logger.log('[CertificationService] 📋 Chamando API GET /certification/quality-warning-models');
+    const response = await api.get('/certification/quality-warning-models');
+    
+    // 🐛 DEBUG: Verificar estrutura da resposta
+    console.log('[CertificationService] 🔍 DEBUG: Resposta completa do backend:', response.data);
+    console.log('[CertificationService] 🔍 DEBUG: response.data.modelIds:', response.data.modelIds);
+    console.log('[CertificationService] 🔍 DEBUG: response.data.models:', response.data.models);
+    
+    const modelIds = response.data.modelIds || [];
+    this.cache.qualityWarningModels = modelIds;
+    this.cache.timestamp = now;
+    
+    logger.log('[CertificationService] ⚠️ Modelos com warning de qualidade:', modelIds.length, 'modelos');
+    
+    return modelIds;
+  }
+
+  /**
+   * Obtém detalhes completos da certificação de um modelo
+   */
+  async getCertificationDetails(modelId: string): Promise<CertificationDetails | null> {
+    try {
+      const response = await api.get(`/certification/details/${modelId}`);
+      return response.data.certification;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+  
   /**
    * Verifica se modelo está certificado
    */
@@ -115,6 +213,8 @@ class CertificationService {
   invalidateCache(): void {
     logger.log('[CertificationService] 🗑️ Cache invalidado');
     this.cache.certifiedModels = null;
+    this.cache.unavailableModels = null;
+    this.cache.qualityWarningModels = null;
     this.cache.timestamp = 0;
   }
 }
