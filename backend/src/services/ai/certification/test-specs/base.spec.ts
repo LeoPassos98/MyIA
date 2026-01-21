@@ -229,7 +229,7 @@ export const baseTestSpecs: TestSpec[] = [
           metadata: { errorHandled: hasError }
         };
         
-      } catch (error: any) {
+      } catch (_error: any) {
         // Erro capturado é OK, significa que foi tratado
         return {
           testId: 'error-handling',

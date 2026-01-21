@@ -15,6 +15,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useLayout } from '../../../../contexts/LayoutContext';
+import { useModelCapabilities } from '../../../../hooks/useModelCapabilities';
 
 const DEFAULT_CONFIG = {
   systemPrompt: 'Você é uma IA útil e direta.',
@@ -29,7 +30,13 @@ const DEFAULT_CONFIG = {
 
 export const ContextConfigTab = () => {
   const theme = useTheme();
-  const { contextConfig, updateContextConfig, chatHistorySnapshot, manualContext } = useLayout();
+  const { contextConfig, updateContextConfig, chatHistorySnapshot, manualContext, chatConfig } = useLayout();
+
+  // Hook de capabilities do modelo selecionado
+  const { capabilities } = useModelCapabilities(
+    chatConfig.provider,
+    chatConfig.model
+  );
 
   // Modo manual ativo desabilita as opções de pipeline automático
   const isManualMode = manualContext.hasAdditionalContext;
@@ -39,6 +46,10 @@ export const ContextConfigTab = () => {
   const totalMessages = chatHistorySnapshot.length;
 
   const handleReset = () => {
+    console.log('🔄 [ContextConfigTab] Reset to defaults:', {
+      from: contextConfig,
+      to: DEFAULT_CONFIG
+    });
     updateContextConfig(DEFAULT_CONFIG);
   };
 
@@ -92,7 +103,13 @@ export const ContextConfigTab = () => {
             control={
               <Switch
                 checked={contextConfig.useCustomSystemPrompt}
-                onChange={(e) => updateContextConfig({ useCustomSystemPrompt: e.target.checked })}
+                onChange={(e) => {
+                  console.log('🧠 [ContextConfigTab] System Prompt toggle:', {
+                    enabled: e.target.checked,
+                    promptLength: contextConfig.systemPrompt.length
+                  });
+                  updateContextConfig({ useCustomSystemPrompt: e.target.checked });
+                }}
                 size="small"
                 color="info"
               />
@@ -141,7 +158,14 @@ export const ContextConfigTab = () => {
           </Box>
           <Switch
             checked={contextConfig.pinnedEnabled}
-            onChange={(e) => updateContextConfig({ pinnedEnabled: e.target.checked })}
+            onChange={(e) => {
+              console.log('📌 [ContextConfigTab] Pinned messages toggle:', {
+                enabled: e.target.checked,
+                pinnedCount,
+                isManualMode
+              });
+              updateContextConfig({ pinnedEnabled: e.target.checked });
+            }}
             size="small"
             color="warning"
             disabled={isManualMode}
@@ -174,7 +198,15 @@ export const ContextConfigTab = () => {
           </Box>
           <Switch
             checked={contextConfig.recentEnabled}
-            onChange={(e) => updateContextConfig({ recentEnabled: e.target.checked })}
+            onChange={(e) => {
+              console.log('📜 [ContextConfigTab] Recent messages toggle:', {
+                enabled: e.target.checked,
+                recentCount: contextConfig.recentCount,
+                totalMessages,
+                isManualMode
+              });
+              updateContextConfig({ recentEnabled: e.target.checked });
+            }}
             size="small"
             color="success"
             disabled={isManualMode}
@@ -187,7 +219,14 @@ export const ContextConfigTab = () => {
           </Typography>
           <Slider
             value={contextConfig.recentCount}
-            onChange={(_, value) => updateContextConfig({ recentCount: value as number })}
+            onChange={(_, value) => {
+              console.log('📊 [ContextConfigTab] Recent count changed:', {
+                from: contextConfig.recentCount,
+                to: value,
+                totalMessages
+              });
+              updateContextConfig({ recentCount: value as number });
+            }}
             disabled={!contextConfig.recentEnabled || isManualMode}
             min={1}
             max={50}
@@ -220,7 +259,14 @@ export const ContextConfigTab = () => {
           </Box>
           <Switch
             checked={contextConfig.ragEnabled}
-            onChange={(e) => updateContextConfig({ ragEnabled: e.target.checked })}
+            onChange={(e) => {
+              console.log('🔍 [ContextConfigTab] RAG toggle:', {
+                enabled: e.target.checked,
+                ragTopK: contextConfig.ragTopK,
+                isManualMode
+              });
+              updateContextConfig({ ragEnabled: e.target.checked });
+            }}
             size="small"
             color="secondary"
             disabled={isManualMode}
@@ -233,7 +279,13 @@ export const ContextConfigTab = () => {
           </Typography>
           <Slider
             value={contextConfig.ragTopK}
-            onChange={(_, value) => updateContextConfig({ ragTopK: value as number })}
+            onChange={(_, value) => {
+              console.log('📊 [ContextConfigTab] RAG topK changed:', {
+                from: contextConfig.ragTopK,
+                to: value
+              });
+              updateContextConfig({ ragTopK: value as number });
+            }}
             disabled={!contextConfig.ragEnabled || isManualMode}
             min={1}
             max={20}
@@ -276,25 +328,37 @@ export const ContextConfigTab = () => {
           </Typography>
           <Slider
             value={contextConfig.maxContextTokens}
-            onChange={(_, value) => updateContextConfig({ maxContextTokens: value as number })}
+            onChange={(_, value) => {
+              const maxWindow = capabilities?.maxContextWindow ?? 8000;
+              console.log('🎯 [ContextConfigTab] Max context tokens changed:', {
+                from: contextConfig.maxContextTokens,
+                to: value,
+                percentage: ((value as number) / maxWindow * 100).toFixed(0) + '%',
+                modelMaxWindow: maxWindow
+              });
+              updateContextConfig({ maxContextTokens: value as number });
+            }}
             min={1000}
-            max={8000}
-            step={500}
+            max={capabilities?.maxContextWindow ?? 8000}
+            step={1000}
             marks={[
               { value: 1000, label: '1K' },
-              { value: 2000, label: '2K' },
-              { value: 4000, label: '4K' },
-              { value: 6000, label: '6K' },
-              { value: 8000, label: '8K' },
+              { value: capabilities?.maxContextWindow ?? 8000, label: `${((capabilities?.maxContextWindow ?? 8000) / 1000).toFixed(0)}K` }
             ]}
             valueLabelDisplay="auto"
             valueLabelFormat={(v) => `${(v / 1000).toFixed(1)}K`}
             color="error"
             size="small"
           />
-          <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
-            ⚠️ Groq (plano gratuito) tem limite de ~12K TPM. Mantenha ≤4K para evitar erros.
-          </Typography>
+          
+          {/* Aviso dinâmico baseado em capabilities */}
+          {capabilities && contextConfig.maxContextTokens > capabilities.maxContextWindow && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              ⚠️ O limite configurado ({contextConfig.maxContextTokens.toLocaleString()} tokens)
+              excede a capacidade do modelo ({capabilities.maxContextWindow.toLocaleString()} tokens).
+              O modelo usará no máximo {capabilities.maxContextWindow.toLocaleString()} tokens.
+            </Alert>
+          )}
         </Box>
       </PanelSection>
 

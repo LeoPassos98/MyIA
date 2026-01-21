@@ -18,11 +18,16 @@ const processingRequests = new Set<string>();
 
 export const chatController = {
   async sendMessage(req: AuthRequest, res: Response, next: NextFunction) {
+    logger.info(`[chatController.sendMessage] 🚀 Iniciando processamento para userId: ${req.userId}`);
+    
     try {
       if (!req.userId) {
+        logger.warn('[chatController.sendMessage] ❌ userId não encontrado');
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
+      
+      logger.info('[chatController.sendMessage] ✅ Autenticação OK, processando mensagem...');
 
       const {
         prompt, message: legacyMsg, provider, chatId,

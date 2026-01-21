@@ -55,7 +55,9 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     model: 'llama-3.1-8b-instant',
     strategy: 'efficient',
     temperature: 0.7,
-    topK: 5,
+    topK: 40,           // Valor padrão mais comum
+    topP: 0.9,          // ADICIONAR - Nucleus sampling padrão
+    maxTokens: 2048,    // ADICIONAR - Limite de saída padrão
     memoryWindow: 10,
   });
 

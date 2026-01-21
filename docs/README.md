@@ -26,6 +26,7 @@ docs/
 │
 ├── architecture/                      # 🏗️ Arquitetura e Design
 │   ├── ARCHITECTURE.md
+│   ├── ARCHITECTURE-DIAGRAMS.md
 │   ├── ARCHITECTURE-MODEL-ADAPTERS.md
 │   ├── IMPLEMENTATION-ANALYSIS-ADAPTERS.md
 │   └── ADR-004.md
@@ -48,12 +49,15 @@ docs/
 │   ├── SWITCH-MIGRATION-GUIDE.md
 │   ├── SWITCH-PERFORMANCE-REPORT.md
 │   ├── MODEL-CERTIFICATION-SYSTEM.md
-│   └── MODEL-CERTIFICATION-USAGE.md
+│   ├── MODEL-CERTIFICATION-USAGE.md
+│   └── MODEL-SELECTION-OPTIMIZATION.md
 │
 ├── security/                          # 🔒 Segurança
 │   ├── SECURITY-STANDARDS.md
 │   ├── SECURITY-ANALYSIS-AWS-CREDENTIALS.md
-│   └── SECURITY-FIX-CREDENTIALS-CORRUPTION.md
+│   ├── SECURITY-FIX-CREDENTIALS-CORRUPTION.md
+│   ├── SECURITY-SETUP.md
+│   └── SECURITY-TEST-REPORT.md
 │
 ├── api/                               # 📡 APIs e Especificações
 │   ├── api-endpoints.md
@@ -72,18 +76,29 @@ docs/
 ├── guides/                            # 📖 Guias e Tutoriais
 │   ├── setup-guide.md
 │   ├── VISUAL-IDENTITY-GUIDE.md
-│   └── MIGRATION-GUIDE-ADAPTERS.md
+│   ├── MIGRATION-GUIDE-ADAPTERS.md
+│   ├── CERTIFICATION-SYSTEM-GUIDE.md
+│   ├── CODEBASE-INDEX.md
+│   ├── GITHUB_OAUTH_FIX.md
+│   ├── ONBOARDING-SYSTEM-SPEC.md
+│   ├── QUALITY-GATES-SETUP.md
+│   ├── QUICK-REFERENCE.md
+│   ├── START-SH-DOCS.md
+│   ├── useModelCapabilities-GUIDE.md
+│   └── VALIDATION-CHECKLIST.md
 │
 ├── reports/                           # 📊 Relatórios e Compliance
 │   ├── STANDARDS-COMPLIANCE-REPORT.md
 │   ├── JSEND-FINAL-REPORT.md
 │   ├── PROVIDER-DATA-FLOW-ANALYSIS.md
 │   ├── PROVIDER-DATA-FLOW-ANALYSIS-ERRORS.md
-│   └── PROVIDER-DATA-FLOW-VERIFICATION.md
-│
-├── deprecated/                        # 🗄️ Arquivos Antigos
-│   ├── progress.md
-│   └── STANDARDS-IMPROVEMENTS.md
+│   ├── PROVIDER-DATA-FLOW-VERIFICATION.md
+│   ├── CAPABILITIES-FIX-REPORT.md
+│   ├── CAPABILITIES-HOOK-FIX.md
+│   ├── CAPABILITIES-VENDOR-EXTRACTION-FIX.md
+│   ├── CERTIFICATION-DEBUG-REPORT.md
+│   ├── IMPLEMENTATION-REPORT-COMPLETE.md
+│   └── PHASE1-AUDIT-REPORT.md
 │
 ├── audit/                             # 🔍 Sistema de Auditoria
 │   ├── README.md
@@ -98,8 +113,17 @@ docs/
 │   ├── TEST-PLAN-MANUAL.md
 │   └── testing.md
 │
-└── archive/                           # 📦 Relatórios Históricos
-    └── (relatórios antigos)
+├── archive/                           # 📦 Relatórios Históricos
+│   ├── JSEND-COMPLETE.md
+│   ├── JSEND-MIGRATION-DONE.md
+│   ├── SECURITY-PHASE1-DONE.md
+│   ├── SECURITY-PHASE2-DONE.md
+│   └── (outros relatórios de migrações concluídas)
+│
+└── obsolete/                          # 🗑️ Documentação Obsoleta
+    ├── progress.md
+    ├── STANDARDS-IMPROVEMENTS.md
+    └── STANDARDS-COMPLIANCE-REPORT-OLD.md
 ```
 
 ---
@@ -109,6 +133,7 @@ docs/
 ### 🏗️ [Arquitetura](architecture/)
 Documentação sobre design, padrões e decisões arquiteturais
 - **[ARCHITECTURE.md](architecture/ARCHITECTURE.md)** - Visão geral da arquitetura
+- **[ARCHITECTURE-DIAGRAMS.md](architecture/ARCHITECTURE-DIAGRAMS.md)** - Diagramas visuais do sistema
 - **[ARCHITECTURE-MODEL-ADAPTERS.md](architecture/ARCHITECTURE-MODEL-ADAPTERS.md)** - Sistema de adapters
 - **[ADR-004.md](architecture/ADR-004.md)** - Architecture Decision Record
 
@@ -146,12 +171,25 @@ Tutoriais e guias práticos
 - **[setup-guide.md](guides/setup-guide.md)** - Como rodar o projeto
 - **[VISUAL-IDENTITY-GUIDE.md](guides/VISUAL-IDENTITY-GUIDE.md)** - Design system
 - **[MIGRATION-GUIDE-ADAPTERS.md](guides/MIGRATION-GUIDE-ADAPTERS.md)** - Migração de adapters
+- **[CERTIFICATION-SYSTEM-GUIDE.md](guides/CERTIFICATION-SYSTEM-GUIDE.md)** - Sistema de certificação
+- **[CODEBASE-INDEX.md](guides/CODEBASE-INDEX.md)** - Indexação completa da codebase
+- **[QUICK-REFERENCE.md](guides/QUICK-REFERENCE.md)** - Referência rápida
+- **[START-SH-DOCS.md](guides/START-SH-DOCS.md)** - Documentação do script start.sh
+- **[QUALITY-GATES-SETUP.md](guides/QUALITY-GATES-SETUP.md)** - Setup de quality gates
+- **[useModelCapabilities-GUIDE.md](guides/useModelCapabilities-GUIDE.md)** - Hook de capabilities
+- **[GITHUB_OAUTH_FIX.md](guides/GITHUB_OAUTH_FIX.md)** - Fix de OAuth do GitHub
+- **[ONBOARDING-SYSTEM-SPEC.md](guides/ONBOARDING-SYSTEM-SPEC.md)** - Sistema de onboarding
+- **[VALIDATION-CHECKLIST.md](guides/VALIDATION-CHECKLIST.md)** - Checklist de validação
 
 ### 📊 [Relatórios](reports/)
 Relatórios de compliance e análises
 - **[STANDARDS-COMPLIANCE-REPORT.md](reports/STANDARDS-COMPLIANCE-REPORT.md)** - Auditoria de conformidade
 - **[JSEND-FINAL-REPORT.md](reports/JSEND-FINAL-REPORT.md)** - JSend 100% implementado
 - **[PROVIDER-DATA-FLOW-ANALYSIS.md](reports/PROVIDER-DATA-FLOW-ANALYSIS.md)** - Análise de fluxo de dados
+- **[CAPABILITIES-FIX-REPORT.md](reports/CAPABILITIES-FIX-REPORT.md)** - Fix de capabilities
+- **[CERTIFICATION-DEBUG-REPORT.md](reports/CERTIFICATION-DEBUG-REPORT.md)** - Debug de certificação
+- **[IMPLEMENTATION-REPORT-COMPLETE.md](reports/IMPLEMENTATION-REPORT-COMPLETE.md)** - Relatório de implementação
+- **[PHASE1-AUDIT-REPORT.md](reports/PHASE1-AUDIT-REPORT.md)** - Auditoria fase 1
 
 ---
 
@@ -210,15 +248,16 @@ TOKEN=$(./get-test-token.sh | tail -n1)
 
 ## 🔄 Manutenção
 
-**Última atualização:** 2026-01-20  
-**Versão:** 1.11.0  
-**Status:** ✅ Reorganizado e estruturado
+**Última atualização:** 2026-01-21  
+**Versão:** 1.12.0  
+**Status:** ✅ Reorganizado e centralizado
 
 **Mudanças recentes:**
-- ✅ Reorganização completa em subpastas lógicas
-- ✅ Criação de índices por categoria
-- ✅ Atualização de todos os links internos
-- ✅ Adição de pasta deprecated para arquivos antigos
+- ✅ Consolidação de documentação espalhada pelo projeto
+- ✅ Movimentação de arquivos da raiz para docs/
+- ✅ Criação de pasta obsolete/ (substituindo deprecated/)
+- ✅ Atualização completa do índice com novos arquivos
+- ✅ Organização de relatórios e guias em categorias apropriadas
 
 ---
 

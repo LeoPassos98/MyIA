@@ -1,8 +1,12 @@
 // backend/src/services/ai/registry/model-registry.ts
 // Standards: docs/STANDARDS.md
 
+import { ModelCapabilities as DetailedCapabilities } from '../../../types/capabilities';
+import { logger } from '../../../utils/logger';
+
 /**
  * Model capabilities (features supported by the model)
+ * @deprecated Use DetailedCapabilities from types/capabilities.ts instead
  */
 export interface ModelCapabilities {
   streaming: boolean;
@@ -171,4 +175,166 @@ export class ModelRegistry {
     const platformRule = this.getPlatformRules(modelId, platform);
     return platformRule?.rule === rule;
   }
+
+  /**
+   * Normalize model ID from frontend format to registry format
+   *
+   * Frontend sends: "anthropic:claude-3-5-sonnet-20241022"
+   * Registry expects: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+   *
+   * This method tries to find the best match in the registry.
+   *
+   * @param modelId - Model ID in any format
+   * @returns Normalized model ID or undefined if not found
+   */
+  static normalizeModelId(modelId: string): string | undefined {
+    // Se já está no formato correto e existe, retorna
+    if (this.models.has(modelId)) {
+      return modelId;
+    }
+
+    // Converte formato frontend (provider:model) para backend (provider.model)
+    const frontendFormat = modelId.replace(':', '.');
+
+    // Tenta encontrar correspondência exata
+    if (this.models.has(frontendFormat)) {
+      return frontendFormat;
+    }
+
+    // Tenta encontrar por correspondência parcial (busca por prefixo)
+    // Ex: "anthropic.claude-3-5-sonnet-20241022" encontra "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    const allModels = Array.from(this.models.keys());
+    
+    // Busca exata por prefixo
+    const exactMatch = allModels.find(m => m === frontendFormat);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // Busca por prefixo (modelo sem versão)
+    const prefixMatch = allModels.find(m => m.startsWith(frontendFormat));
+    if (prefixMatch) {
+      logger.debug(`Model ID normalized: ${modelId} -> ${prefixMatch}`);
+      return prefixMatch;
+    }
+
+    // Busca por nome similar (remove versões e sufixos)
+    const baseModelId = frontendFormat.split(':')[0]; // Remove sufixos como :8k
+    const similarMatch = allModels.find(m => {
+      const baseRegistryId = m.split(':')[0];
+      return baseRegistryId.startsWith(baseModelId) || baseModelId.startsWith(baseRegistryId);
+    });
+
+    if (similarMatch) {
+      logger.debug(`Model ID normalized (similar): ${modelId} -> ${similarMatch}`);
+      return similarMatch;
+    }
+
+    logger.warn(`Could not normalize model ID: ${modelId}`);
+    return undefined;
+  }
+}
+
+/**
+ * Build detailed capabilities object from model metadata
+ *
+ * Aplica regras específicas por vendor para determinar quais parâmetros
+ * são suportados e seus valores padrão.
+ *
+ * @param metadata - Model metadata from registry
+ * @returns Detailed capabilities object
+ */
+export function buildCapabilities(metadata: ModelMetadata): DetailedCapabilities {
+  const vendor = metadata.vendor.toLowerCase();
+  
+  logger.debug(`[buildCapabilities] Building for model: ${metadata.modelId} (vendor: ${vendor})`);
+  logger.debug(`[buildCapabilities] Metadata:`, {
+    modelId: metadata.modelId,
+    vendor: metadata.vendor,
+    displayName: metadata.displayName,
+    maxContextWindow: metadata.capabilities.maxContextWindow,
+    maxOutputTokens: metadata.capabilities.maxOutputTokens,
+  });
+
+  // Regras base comuns a todos os modelos
+  const baseCapabilities: DetailedCapabilities = {
+    // Temperature: suportado por todos os vendors
+    temperature: {
+      enabled: true,
+      min: 0,
+      max: 1,
+      default: vendor === 'anthropic' ? 1 : vendor === 'cohere' ? 0.3 : 0.7,
+    },
+
+    // Top-K: NÃO suportado por Anthropic
+    topK: {
+      enabled: vendor !== 'anthropic',
+      min: vendor === 'cohere' ? 0 : 1,
+      max: 500,
+      default: vendor === 'cohere' ? 0 : 250,
+    },
+
+    // Top-P: suportado por todos os vendors
+    topP: {
+      enabled: true,
+      min: 0,
+      max: 1,
+      default: vendor === 'anthropic' ? 0.999 : vendor === 'cohere' ? 0.75 : 0.9,
+    },
+
+    // Max Tokens: suportado por todos
+    maxTokens: {
+      enabled: true,
+      min: 1,
+      max: metadata.capabilities.maxOutputTokens,
+      default: Math.min(2048, metadata.capabilities.maxOutputTokens),
+    },
+
+    // Stop Sequences: suportado por todos
+    stopSequences: {
+      enabled: true,
+      max: vendor === 'anthropic' ? 4 : 10,
+    },
+
+    // Streaming: baseado no metadata
+    streaming: {
+      enabled: metadata.capabilities.streaming,
+    },
+
+    // Vision: baseado no metadata
+    vision: {
+      enabled: metadata.capabilities.vision,
+    },
+
+    // Function Calling: baseado no metadata
+    functionCalling: {
+      enabled: metadata.capabilities.functionCalling,
+    },
+
+    // System Prompt: suportado por todos
+    systemPrompt: {
+      enabled: true,
+    },
+
+    // Context Window: do metadata
+    maxContextWindow: metadata.capabilities.maxContextWindow,
+
+    // Max Output Tokens: do metadata
+    maxOutputTokens: metadata.capabilities.maxOutputTokens,
+
+    // Inference Profile: verifica se tem regra de inference profile
+    requiresInferenceProfile: metadata.platformRules?.some(
+      rule => rule.rule === 'requires_inference_profile'
+    ) ?? false,
+  };
+
+  logger.debug(`[buildCapabilities] Result for ${metadata.modelId}:`, {
+    temperature: baseCapabilities.temperature,
+    topK: baseCapabilities.topK,
+    topP: baseCapabilities.topP,
+    maxTokens: baseCapabilities.maxTokens,
+    requiresInferenceProfile: baseCapabilities.requiresInferenceProfile,
+  });
+
+  return baseCapabilities;
 }

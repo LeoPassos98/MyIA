@@ -19,11 +19,12 @@ export interface Message {
 
 export interface ChatConfig {
   provider: string;
-  model: string; // <--- ADICIONADO (Resolve o erro)
+  model: string;
   temperature: number;
-  topK: number;
+  topK?: number;        // Tornar opcional (alguns modelos não suportam)
+  topP?: number;        // ADICIONAR - Nucleus sampling
+  maxTokens?: number;   // Já existe, manter
   memoryWindow: number;
-  maxTokens?: number;
   // Tipagem estrita para evitar erros de digitação
   strategy: 'fast' | 'efficient' | 'thorough' | 'creative';
 }

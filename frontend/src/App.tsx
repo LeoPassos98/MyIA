@@ -6,6 +6,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline, Box, CircularProgress } from '@mui/material';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
+// React Query
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 // Contexts
 import { AuthProvider } from './contexts/AuthContext';
 import { CustomThemeProvider } from './contexts/ThemeContext';
@@ -19,6 +22,9 @@ import { AuditFeature } from './features/audit';
 // ✅ FASE 5: Performance Monitoring
 import { perfMonitor } from './services/performanceMonitor';
 import { useWebVitals } from './hooks/usePerformanceTracking';
+
+// ✅ FASE 3: Model Capabilities - Prefetch Hook
+import { usePrefetchCapabilities } from './hooks/usePrefetchCapabilities';
 
 // ✅ OTIMIZAÇÃO FASE 4: Code Splitting com React.lazy()
 // Componentes pesados carregados sob demanda (50-60% redução no bundle inicial)
@@ -55,6 +61,20 @@ const LoadingFallback = () => (
     <CircularProgress />
   </Box>
 );
+
+// ✅ FASE 3: Configurar QueryClient para React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Configurações globais para queries
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 1000 * 60 * 5, // 5 minutos (default)
+      gcTime: 1000 * 60 * 60, // 1 hora (default)
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function AppRoutes() {
   return (
@@ -121,9 +141,22 @@ function AppRoutes() {
   );
 }
 
-function App() {
+function AppContent() {
   // ✅ FASE 5: Inicializar monitoramento de Web Vitals
   const webVitals = useWebVitals();
+
+  // ✅ FASE 3: Prefetch de capabilities de todos os modelos
+  usePrefetchCapabilities({
+    enabled: true,
+    onSuccess: (count) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`✅ [Capabilities] Prefetched ${count} models`);
+      }
+    },
+    onError: (error) => {
+      console.error('❌ [Capabilities] Prefetch failed:', error);
+    },
+  });
 
   // ✅ FASE 5: Log de métricas em desenvolvimento
   useEffect(() => {
@@ -164,6 +197,14 @@ function App() {
         </AuthProvider>
       </LayoutProvider>
     </HeaderSlotsProvider>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
   );
 }
 

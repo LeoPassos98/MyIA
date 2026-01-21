@@ -20,6 +20,7 @@ import auditRoutes from './routes/auditRoutes';
 import promptTraceRoutes from './routes/promptTraceRoutes';
 import providersRoutes from './routes/providers';
 import certificationRoutes from './routes/certificationRoutes';
+import modelsRoutes from './routes/modelsRoutes';
 import passport from './config/passport';
 
 
@@ -107,6 +108,7 @@ app.use('/api/audit', apiLimiter, auditRoutes);
 app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
 app.use('/api/providers', apiLimiter, providersRoutes);
 app.use('/api/certification', certificationRoutes);
+app.use('/api/models', apiLimiter, modelsRoutes);
 
 // Rota 404
 app.use((req, res) => {

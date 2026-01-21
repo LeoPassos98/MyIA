@@ -155,7 +155,7 @@ export class BedrockProvider extends BaseAIProvider {
     try {
       adapter = AdapterFactory.getAdapterForModel(options.modelId);
       console.log(`🔍 [Bedrock] Using adapter: ${adapter.displayName} for model: ${options.modelId}`);
-    } catch (error) {
+    } catch (_error) {
       yield {
         type: 'error',
         error: `Model ${options.modelId} is not supported. Please check the model ID.`,

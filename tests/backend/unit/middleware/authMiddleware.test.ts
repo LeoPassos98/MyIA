@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
-import { authMiddleware, AuthRequest } from '../../../src/middleware/authMiddleware';
-import { generateToken } from '../../../src/utils/jwt';
-import { AppError } from '../../../src/middleware/errorHandler';
+import { authMiddleware, AuthRequest } from '../../../../backend/src/middleware/authMiddleware';
+import { generateToken } from '../../../../backend/src/utils/jwt';
+import { AppError } from '../../../../backend/src/middleware/errorHandler';
 
 describe('Middleware de Autenticação', () => {
   let mockRequest: Partial<AuthRequest>;

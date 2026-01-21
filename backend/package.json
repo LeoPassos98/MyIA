@@ -13,9 +13,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:unit": "jest tests/unit",
-    "test:integration": "jest tests/integration",
-    "test:e2e": "jest tests/e2e",
+    "test:unit": "jest ../tests/backend/unit",
+    "test:integration": "jest ../tests/backend/integration",
+    "test:e2e": "jest ../tests/backend/e2e",
     "cleanup:db": "tsx scripts/cleanupDatabase.ts",
     "cleanup:db:sql": "bash scripts/cleanup-database.sh"
   },

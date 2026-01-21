@@ -5,7 +5,7 @@ module.exports = {
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
   ],
-  ignorePatterns: ['dist', 'node_modules', '.eslintrc.cjs', 'backend/jest.config.js', 'backend/prisma/**', 'backend/scripts/**', 'backend/tests/**'],
+  ignorePatterns: ['dist', 'node_modules', '.eslintrc.cjs', 'backend/jest.config.js', 'backend/prisma/**', 'backend/scripts/**', 'backend/tests/**', 'tests/**'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     project: ['./backend/tsconfig.json', './frontend/tsconfig.json'],

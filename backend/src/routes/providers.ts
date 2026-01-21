@@ -4,7 +4,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { jsend } from '../utils/jsend';
-import { protect } from '../middleware/auth';
+import { protect } from '../middleware/authMiddleware';
 import { providersController } from '../controllers/providersController';
 import { validateRequest } from '../middleware/validateRequest';
 import { apiLimiter } from '../middleware/rateLimiter'; // Corrigido: usar apiLimiter

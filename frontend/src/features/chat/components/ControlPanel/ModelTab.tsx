@@ -25,7 +25,11 @@ import { aiProvidersService } from '../../../../services/aiProvidersService';
 import { certificationService } from '../../../../services/certificationService';
 import { AIProvider } from '../../../../types/ai';
 import { useLayout } from '../../../../contexts/LayoutContext';
+import { useModelCapabilities } from '../../../../hooks/useModelCapabilities';
+import { useCertificationDetails } from '../../../../hooks/useCertificationDetails';
 import { HelpTooltip } from './HelpTooltip';
+import { CapabilityBadge } from './CapabilityBadge';
+import { CertificationBadge } from './CertificationBadge';
 import GroqLogo from '../../../../assets/providers/groq.svg';
 import OpenAILogo from '../../../../assets/providers/openai.svg';
 import DefaultLogo from '../../../../assets/providers/default.svg';
@@ -49,6 +53,18 @@ export function ModelTab() {
 
   // O Estado da SELEÇÃO vem do Contexto Global
   const { chatConfig, updateChatConfig } = useLayout();
+
+  // Hook de capabilities do modelo selecionado
+  const { capabilities, isLoading: capabilitiesLoading, error: capabilitiesError } = useModelCapabilities(
+    chatConfig.provider,
+    chatConfig.model
+  );
+
+  // Hook de detalhes de certificação do modelo selecionado
+  const fullModelId = chatConfig.provider && chatConfig.model
+    ? `${chatConfig.provider}:${chatConfig.model}`
+    : null;
+  const { certificationDetails } = useCertificationDetails(fullModelId);
 
   // 1. Buscar dados ao carregar
   useEffect(() => {
@@ -113,6 +129,13 @@ export function ModelTab() {
     const providerData = providers.find(p => p.slug === newSlug);
     const defaultModel = providerData?.models[0]?.apiModelId || '';
 
+    console.log('🔄 [ModelTab] Provider changed:', {
+      from: chatConfig.provider,
+      to: newSlug,
+      defaultModel,
+      availableModels: providerData?.models.length || 0
+    });
+
     updateChatConfig({
       provider: newSlug,
       model: defaultModel
@@ -120,10 +143,28 @@ export function ModelTab() {
   };
 
   const handleModelChange = (event: SelectChangeEvent) => {
+    const selectedModel = activeProvider?.models.find(m => m.apiModelId === event.target.value);
+    
+    console.log('🤖 [ModelTab] Model changed:', {
+      from: chatConfig.model,
+      to: event.target.value,
+      modelName: selectedModel?.name,
+      contextWindow: selectedModel?.contextWindow,
+      isCertified: certifiedModels.includes(event.target.value)
+    });
+
     updateChatConfig({ model: event.target.value });
   };
 
   const handleParamChange = (key: keyof typeof chatConfig, value: number | string) => {
+    console.log('⚙️ [ModelTab] Parameter changed:', {
+      parameter: key,
+      from: chatConfig[key],
+      to: value,
+      provider: chatConfig.provider,
+      model: chatConfig.model
+    });
+
     updateChatConfig({ [key]: value });
   };
 
@@ -153,6 +194,19 @@ export function ModelTab() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, px: 2 }}>
+      {/* Loading state para capabilities */}
+      {capabilitiesLoading && (
+        <Alert severity="info" icon={<CircularProgress size={20} />} sx={{ mb: 2 }}>
+          Carregando configurações do modelo...
+        </Alert>
+      )}
+
+      {/* Error state para capabilities */}
+      {capabilitiesError && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Não foi possível carregar as capabilities do modelo. Usando valores padrão.
+        </Alert>
+      )}
 
       {/* === SEÇÃO: Seleção de IA === */}
       <Box>
@@ -253,6 +307,51 @@ export function ModelTab() {
             ))}
           </Select>
         </FormControl>
+
+        {/* Seção de Capabilities do Modelo */}
+        {capabilities && (
+          <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block', mb: 1 }}>
+              Capabilities do Modelo:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+              <CapabilityBadge label="Streaming" enabled={capabilities.streaming.enabled} />
+              <CapabilityBadge
+                label="Vision"
+                enabled={capabilities.vision.enabled}
+                icon="vision"
+                tooltip={capabilities.vision.enabled ? 'Modelo suporta análise de imagens' : 'Modelo não suporta imagens'}
+              />
+              <CapabilityBadge
+                label="Function Calling"
+                enabled={capabilities.functionCalling.enabled}
+                icon="function"
+                tooltip={capabilities.functionCalling.enabled ? 'Modelo suporta chamadas de função' : 'Modelo não suporta function calling'}
+              />
+              <CapabilityBadge
+                label={`Context: ${(capabilities.maxContextWindow / 1000).toFixed(0)}K`}
+                enabled={true}
+                tooltip={`Janela de contexto: ${capabilities.maxContextWindow.toLocaleString()} tokens`}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {/* Badge de Certificação do Modelo */}
+        {certificationDetails && (
+          <Box sx={{ mt: 2 }}>
+            <CertificationBadge
+              status={certificationDetails.status || 'not_tested'}
+              lastChecked={certificationDetails.lastChecked}
+              successRate={certificationDetails.successRate}
+              errorCategory={certificationDetails.errorCategory}
+              onClick={() => {
+                // TODO: Abrir modal de detalhes de certificação
+                console.log('Abrir modal de certificação para:', fullModelId);
+              }}
+            />
+          </Box>
+        )}
       </Box>
 
       <Divider />
@@ -284,8 +383,8 @@ export function ModelTab() {
           </Box>
           <Slider
             value={chatConfig.temperature}
-            min={0}
-            max={2}
+            min={capabilities?.temperature.min ?? 0}
+            max={capabilities?.temperature.max ?? 2}
             step={0.1}
             onChange={(_, val) => handleParamChange('temperature', val as number)}
             valueLabelDisplay="auto"
@@ -316,14 +415,94 @@ export function ModelTab() {
             />
           </Box>
           <Slider
-            value={chatConfig.topK}
-            min={1}
-            max={100}
+            disabled={!capabilities?.topK.enabled || capabilitiesLoading}
+            value={chatConfig.topK ?? capabilities?.topK.default ?? 40}
+            min={capabilities?.topK.min ?? 1}
+            max={capabilities?.topK.max ?? 100}
             step={1}
             onChange={(_, val) => handleParamChange('topK', val as number)}
           />
           <Typography variant="caption" color="text.secondary">
             Limita o vocabulário às K palavras mais prováveis. Reduz alucinações.
+          </Typography>
+        </Box>
+
+        {/* Alert inline para Top-K desabilitado */}
+        {capabilities && !capabilities.topK.enabled && capabilities.topP.enabled && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Este modelo não suporta Top-K. Use <strong>Top-P</strong> abaixo para controlar diversidade.
+          </Alert>
+        )}
+
+        {/* Top-P (Nucleus Sampling) */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" fontWeight={600} sx={{ display: 'flex', alignItems: 'center' }}>
+              Top-P (Nucleus Sampling)
+              <HelpTooltip
+                title="Top-P (Nucleus Sampling)"
+                description="Controla diversidade considerando probabilidade cumulativa. Alternativa ao Top-K. Valores baixos tornam a resposta mais focada, valores altos permitem mais criatividade."
+                examples={['0.1: Muito focado', '0.9: Equilíbrio (recomendado)', '1.0: Máxima diversidade']}
+              />
+            </Typography>
+            <Chip
+              label={chatConfig.topP ?? capabilities?.topP.default ?? 0.9}
+              size="small"
+              color="secondary"
+              variant="outlined"
+              sx={{ minWidth: 40, fontWeight: 'bold' }}
+            />
+          </Box>
+          <Slider
+            disabled={!capabilities?.topP.enabled || capabilitiesLoading}
+            value={chatConfig.topP ?? capabilities?.topP.default ?? 0.9}
+            min={capabilities?.topP.min ?? 0}
+            max={capabilities?.topP.max ?? 1}
+            step={0.01}
+            onChange={(_, val) => handleParamChange('topP', val as number)}
+            marks={[
+              { value: 0, label: '0' },
+              { value: 0.5, label: '0.5' },
+              { value: 1, label: '1' }
+            ]}
+            valueLabelDisplay="auto"
+          />
+          <Typography variant="caption" color="text.secondary">
+            Considera tokens cuja probabilidade cumulativa atinge P. Alternativa ao Top-K.
+          </Typography>
+        </Box>
+
+        {/* Max Tokens (Limite de Saída) */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" fontWeight={600} sx={{ display: 'flex', alignItems: 'center' }}>
+              Max Tokens (Limite de Saída)
+              <HelpTooltip
+                title="Max Tokens (Limite de Saída)"
+                description="Limite máximo de tokens na resposta. Valores maiores permitem respostas mais longas mas custam mais. 1 token ≈ 4 caracteres."
+                examples={['512: Respostas curtas', '2048: Equilíbrio (recomendado)', '4096: Respostas longas']}
+              />
+            </Typography>
+            <Chip
+              label={chatConfig.maxTokens ?? capabilities?.maxTokens.default ?? 2048}
+              size="small"
+              color="secondary"
+              variant="outlined"
+              sx={{ minWidth: 40, fontWeight: 'bold' }}
+            />
+          </Box>
+          <Slider
+            disabled={!capabilities?.maxTokens.enabled || capabilitiesLoading}
+            value={chatConfig.maxTokens ?? capabilities?.maxTokens.default ?? 2048}
+            min={capabilities?.maxTokens.min ?? 100}
+            max={capabilities?.maxTokens.max ?? 4096}
+            step={100}
+            onChange={(_, val) => handleParamChange('maxTokens', val as number)}
+            valueLabelDisplay="auto"
+            valueLabelFormat={(v) => `${v}`}
+          />
+          <Typography variant="caption" color="text.secondary">
+            Limite máximo de tokens que o modelo pode gerar na resposta.
           </Typography>
         </Box>
       </Box>
