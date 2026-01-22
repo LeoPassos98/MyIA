@@ -16,7 +16,8 @@ import {
   TestSpec,
   ErrorCategory,
   ErrorSeverity,
-  CategorizedError
+  CategorizedError,
+  ProgressCallback
 } from './types';
 import { categorizeError } from './error-categorizer';
 import { logger } from '../../../utils/logger';
@@ -29,42 +30,124 @@ interface AWSCredentials {
 
 export class ModelCertificationService {
   /**
+   * Busca certificação apenas do cache (sem executar testes)
+   * Usado pelo endpoint GET /check/:modelId que não tem rate limiting
+   *
+   * Este método é chamado ANTES do rate limiting para evitar consumo
+   * desnecessário de quota quando o resultado já está em cache.
+   *
+   * @param modelId - ID do modelo a verificar
+   * @returns Resultado da certificação em cache ou null se não encontrado/expirado
+   */
+  async getCachedCertification(modelId: string): Promise<CertificationResult | null> {
+    logger.info(`[CertificationService] Verificando cache para ${modelId}`);
+    
+    const cached = await prisma.modelCertification.findUnique({
+      where: { modelId }
+    });
+    
+    if (!cached) {
+      logger.info(`[CertificationService] Cache miss: nenhuma certificação encontrada para ${modelId}`);
+      return null;
+    }
+    
+    // Verificar se certificação está expirada
+    if (cached.expiresAt) {
+      const now = new Date();
+      if (cached.expiresAt <= now) {
+        logger.info(`[CertificationService] Cache expirado para ${modelId}`);
+        return null;
+      }
+    }
+    
+    // Reconstruir categorizedError se houver
+    let categorizedError: CategorizedError | undefined;
+    if (cached.errorCategory && cached.lastError) {
+      categorizedError = categorizeError(cached.lastError);
+    }
+    
+    logger.info(`[CertificationService] Cache hit para ${modelId}: status=${cached.status}`);
+    
+    // Retornar resultado do cache
+    return {
+      modelId: cached.modelId,
+      status: cached.status as ModelCertificationStatus,
+      testsPassed: cached.testsPassed,
+      testsFailed: cached.testsFailed,
+      successRate: cached.successRate,
+      avgLatencyMs: cached.avgLatencyMs || 0,
+      isCertified: cached.status === 'certified',
+      isAvailable: cached.status === 'certified' || cached.status === 'quality_warning',
+      results: [], // Não retornamos resultados detalhados do cache
+      categorizedError,
+      overallSeverity: cached.errorSeverity as ErrorSeverity | undefined
+    };
+  }
+
+  /**
    * Certifica um modelo específico executando testes apropriados
-   * 
+   *
    * @param modelId - ID do modelo a ser certificado
    * @param credentials - Credenciais AWS para acesso ao Bedrock
+   * @param force - Se true, ignora cache e força re-certificação
+   * @param onProgress - Callback opcional para feedback de progresso via SSE
    * @returns Resultado da certificação
    */
   async certifyModel(
     modelId: string,
-    credentials: AWSCredentials
+    credentials: AWSCredentials,
+    force: boolean = false,
+    onProgress?: ProgressCallback
   ): Promise<CertificationResult> {
-    console.log(`[CertificationService] 🚀 Iniciando certificação para: ${modelId}`);
+    console.log(`[CertificationService] 🚀 Iniciando certificação para: ${modelId} (force=${force})`);
     
-    // 0. Verificar se já existe certificação válida
-    const existingCert = await prisma.modelCertification.findUnique({
-      where: { modelId }
-    });
+    // ========================================================================
+    // CORREÇÃO #1: Verificar cache ANTES de aplicar rate limiting
+    // ========================================================================
+    //
+    // Problema anterior: Rate limiter era aplicado na rota ANTES da verificação
+    // de cache, consumindo quota desnecessariamente mesmo quando o resultado
+    // já estava disponível em cache.
+    //
+    // Solução:
+    // 1. Endpoint GET /check/:modelId verifica cache SEM rate limiting
+    // 2. Este método certifyModel() é chamado apenas quando cache miss
+    // 3. Rate limiting de rota (10 req/min) já foi aplicado antes de chegar aqui
+    //
+    // Fluxo:
+    // - Frontend chama GET /check/:modelId (sem rate limit)
+    // - Se cache hit: retorna imediatamente
+    // - Se cache miss: Frontend chama POST /certify-model (com rate limit)
+    //
+    // PARÂMETRO FORCE:
+    // - Se force=true, pula verificação de cache e força re-certificação
+    // - Útil para invalidar cache antigo (ex: timeout 10s -> 30s)
+    // ========================================================================
     
-    if (existingCert && existingCert.status === 'certified' && existingCert.expiresAt) {
-      const now = new Date();
-      if (existingCert.expiresAt > now) {
-        const daysRemaining = Math.ceil((existingCert.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        console.log(`[CertificationService] ✅ Certificação válida encontrada para ${modelId}. Expira em ${daysRemaining} dias.`);
+    // 1. Verificar cache PRIMEIRO (a menos que force=true)
+    if (!force) {
+      const cached = await this.getCachedCertification(modelId);
+      if (cached) {
+        logger.info(`[CertificationService] ✅ Cache hit para ${modelId}, retornando sem executar testes`);
         
-        // Retornar certificação existente sem executar testes novamente
-        return {
-          modelId: existingCert.modelId,
-          status: existingCert.status as ModelCertificationStatus,
-          testsPassed: existingCert.testsPassed,
-          testsFailed: existingCert.testsFailed,
-          successRate: existingCert.successRate,
-          avgLatencyMs: existingCert.avgLatencyMs || 0,
-          isCertified: true,
-          results: []
-        };
+        // Emitir evento de conclusão se callback fornecido
+        if (onProgress) {
+          onProgress({
+            type: 'complete',
+            message: 'Resultado obtido do cache',
+            certification: cached
+          });
+        }
+        
+        return cached;
       }
+    } else {
+      logger.info(`[CertificationService] 🔄 Force=true, ignorando cache para ${modelId}`);
     }
+    
+    // 2. Cache miss - executar testes
+    // (rate limiting de rota já foi aplicado, mas adicionar log)
+    logger.info(`[CertificationService] ⚠️ Cache miss para ${modelId}, executando testes (rate limit já aplicado)`);
     
     // 1. Obter metadata do modelo
     console.log(`[CertificationService] 📖 Buscando metadata do modelo no registry...`);
@@ -86,12 +169,45 @@ export class ModelCertificationService {
     const tests = this.getTestsForVendor(metadata.vendor);
     console.log(`[CertificationService] 📝 Testes selecionados para vendor ${metadata.vendor}:`, tests.length);
     
-    // 4. Executar testes via TestRunner
+    // Emitir progresso: iniciando testes
+    if (onProgress) {
+      onProgress({
+        type: 'progress',
+        current: 0,
+        total: tests.length,
+        message: `Iniciando ${tests.length} testes de certificação`
+      });
+    }
+    
+    // 4. Executar testes via TestRunner com callback de progresso
     // Formato esperado pelo BedrockProvider: ACCESS_KEY:SECRET_KEY
     const apiKey = `${credentials.accessKey}:${credentials.secretKey}`;
     console.log(`[CertificationService] 🧪 Executando testes...`);
     const runner = new TestRunner(provider, apiKey);
-    const testResults = await runner.runTests(modelId, tests);
+    
+    // Contador de testes completados para progresso
+    let completedTests = 0;
+    
+    const testResults = await runner.runTests(
+      modelId,
+      tests,
+      onProgress ? (testName, status) => {
+        // Incrementar contador quando teste completa (passed ou failed)
+        if (status === 'passed' || status === 'failed') {
+          completedTests++;
+        }
+        
+        // Emitir evento de progresso
+        onProgress({
+          type: 'progress',
+          current: completedTests,
+          total: tests.length,
+          testName,
+          status
+        });
+      } : undefined
+    );
+    
     console.log(`[CertificationService] 📊 Testes executados:`, {
       total: testResults.length,
       passed: testResults.filter(r => r.passed).length,
@@ -116,6 +232,11 @@ export class ModelCertificationService {
     let isAvailable = true;
     let status: ModelCertificationStatus;
     let isCertified = false;
+    
+    // Coletar testes que falharam para o campo qualityIssues
+    const qualityIssues = testResults
+      .filter(r => !r.passed)
+      .map(r => r.testName);
     
     // Coletar e categorizar erros
     const failureReasons = testResults
@@ -147,64 +268,83 @@ export class ModelCertificationService {
         severity: categorizedError.severity,
         isTemporary: categorizedError.isTemporary
       });
-      
-      // Determinar status baseado na categoria do erro
-      if (categorizedError.category === ErrorCategory.QUALITY_ISSUE) {
-        // Modelo funciona mas tem problemas de qualidade
+    }
+    
+    // ========================================================================
+    // NOVA LÓGICA DE DETERMINAÇÃO DE STATUS (Correção #6)
+    // ========================================================================
+    //
+    // Thresholds de Certificação:
+    // - >= 80%: CERTIFIED (modelo confiável, mesmo com alguns testes falhando)
+    // - 60-79%: QUALITY_WARNING (funcional mas com problemas de qualidade)
+    // - < 60%: FAILED (não confiável para uso em produção)
+    //
+    // Justificativa dos Thresholds:
+    // - 80%: Permite que modelos sejam certificados mesmo com 1-2 testes falhando
+    //        em suítes de 5-10 testes. Isso é realista considerando edge cases.
+    // - 60%: Threshold mínimo para considerar o modelo "funcional". Abaixo disso,
+    //        há muitos problemas para recomendar o uso.
+    //
+    // Exceções:
+    // - Erros críticos (UNAVAILABLE, PERMISSION_ERROR, etc) sempre resultam em FAILED,
+    //   independente do successRate, pois o modelo não pode ser usado.
+    // ========================================================================
+    
+    // Primeiro, verificar se há erros críticos que impedem o uso do modelo
+    if (categorizedError) {
+      if (
+        categorizedError.category === ErrorCategory.UNAVAILABLE ||
+        categorizedError.category === ErrorCategory.PERMISSION_ERROR ||
+        categorizedError.category === ErrorCategory.AUTHENTICATION_ERROR ||
+        categorizedError.category === ErrorCategory.CONFIGURATION_ERROR
+      ) {
+        // Erros críticos: modelo não pode ser usado independente do successRate
+        status = ModelCertificationStatus.FAILED;
+        isAvailable = false;
+        isCertified = false;
+        console.log(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED devido a erro crítico: ${categorizedError.category}`);
+      } else {
+        // Erros não-críticos: determinar status baseado no successRate
+        if (successRate >= 80) {
+          // >= 80%: CERTIFIED (modelo confiável mesmo com alguns problemas)
+          status = ModelCertificationStatus.CERTIFIED;
+          isAvailable = true;
+          isCertified = true;
+          console.log(`[CertificationService] ✅ Modelo ${modelId} CERTIFIED com ${successRate.toFixed(1)}% (erros não-críticos ignorados)`);
+        } else if (successRate >= 60) {
+          // 60-79%: QUALITY_WARNING (funcional mas com problemas)
+          status = ModelCertificationStatus.QUALITY_WARNING;
+          isAvailable = true;
+          isCertified = false;
+          console.log(`[CertificationService] ⚠️ Modelo ${modelId} marcado como QUALITY_WARNING (${successRate.toFixed(1)}%)`);
+        } else {
+          // < 60%: FAILED (não confiável)
+          status = ModelCertificationStatus.FAILED;
+          isAvailable = false;
+          isCertified = false;
+          console.log(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED (${successRate.toFixed(1)}% < 60%)`);
+        }
+      }
+    } else {
+      // Sem erros categorizados: determinar apenas por successRate
+      if (successRate >= 80) {
+        // >= 80%: CERTIFIED
+        status = ModelCertificationStatus.CERTIFIED;
+        isAvailable = true;
+        isCertified = true;
+        console.log(`[CertificationService] ✅ Modelo ${modelId} CERTIFIED com ${successRate.toFixed(1)}%`);
+      } else if (successRate >= 60) {
+        // 60-79%: QUALITY_WARNING
         status = ModelCertificationStatus.QUALITY_WARNING;
         isAvailable = true;
         isCertified = false;
-        console.log(`[CertificationService] ⚠️ DEBUG: Definindo status como QUALITY_WARNING para ${modelId}`);
-      } else if (
-        categorizedError.category === ErrorCategory.UNAVAILABLE ||
-        categorizedError.category === ErrorCategory.PERMISSION_ERROR ||
-        categorizedError.category === ErrorCategory.AUTHENTICATION_ERROR
-      ) {
-        // Modelo não pode ser usado
-        status = ModelCertificationStatus.FAILED;
-        isAvailable = false;
-        isCertified = false;
-      } else if (categorizedError.category === ErrorCategory.CONFIGURATION_ERROR) {
-        // Requer configuração
-        status = ModelCertificationStatus.FAILED;
-        isAvailable = false;
-        isCertified = false;
+        console.log(`[CertificationService] ⚠️ Modelo ${modelId} marcado como QUALITY_WARNING (${successRate.toFixed(1)}%)`);
       } else {
-        // Outros erros (temporários, rede, etc)
+        // < 60%: FAILED
         status = ModelCertificationStatus.FAILED;
         isAvailable = false;
         isCertified = false;
-      }
-    } else {
-      // Sem erros, determinar por success rate
-      isCertified = successRate >= 80;
-      status = isCertified
-        ? ModelCertificationStatus.CERTIFIED
-        : ModelCertificationStatus.FAILED;
-      isAvailable = isCertified;
-    }
-    
-    // Se passou em 80%+ dos testes, considerar certificado mesmo com alguns erros
-    // MAS: se já foi identificado como QUALITY_WARNING, manter esse status
-    if (successRate >= 80) {
-      console.log(`[CertificationService] 🔍 DEBUG: successRate >= 80 para ${modelId}`);
-      console.log(`[CertificationService] 🔍 DEBUG: status atual: ${status}`);
-      console.log(`[CertificationService] 🔍 DEBUG: categorizedError?.category: ${categorizedError?.category}`);
-      
-      // Se já foi marcado como QUALITY_WARNING, NÃO sobrescrever
-      if (status !== ModelCertificationStatus.QUALITY_WARNING) {
-        isCertified = true;
-        status = ModelCertificationStatus.CERTIFIED;
-        isAvailable = true;
-        categorizedError = undefined;
-        overallSeverity = undefined;
-        console.log(`[CertificationService] ✅ DEBUG: Mudando para CERTIFIED`);
-      } else {
-        // Mantém QUALITY_WARNING mas marca como disponível
-        isAvailable = true;
-        isCertified = false;  // Não é totalmente certificado
-        logger.info(`[CertificationService] Modelo ${modelId} passou em ${successRate}% mas mantém status QUALITY_WARNING devido a erros de qualidade`);
-        console.log(`[CertificationService] ⚠️ DEBUG: Mantendo QUALITY_WARNING com categorizedError preservado`);
+        console.log(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED (${successRate.toFixed(1)}% < 60%)`);
       }
     }
     
@@ -271,6 +411,7 @@ export class ModelCertificationService {
       avgLatencyMs,
       isCertified,
       isAvailable,
+      qualityIssues: qualityIssues.length > 0 ? qualityIssues : undefined,
       results: testResults,
       categorizedError,
       overallSeverity
@@ -295,7 +436,7 @@ export class ModelCertificationService {
     
     for (const model of models) {
       try {
-        const result = await this.certifyModel(model.modelId, credentials);
+        const result = await this.certifyModel(model.modelId, credentials, false);
         results.push(result);
       } catch (error: any) {
         console.error(`[Certification] Failed to certify ${model.modelId}:`, error.message);
@@ -332,7 +473,7 @@ export class ModelCertificationService {
     
     for (const model of models) {
       try {
-        const result = await this.certifyModel(model.modelId, credentials);
+        const result = await this.certifyModel(model.modelId, credentials, false);
         results.push(result);
       } catch (error: any) {
         console.error(`[Certification] Failed to certify ${model.modelId}:`, error.message);
@@ -408,6 +549,7 @@ export class ModelCertificationService {
 
   /**
    * Obtém lista de modelos realmente indisponíveis (não podem ser usados)
+   * Retorna modelos com status 'failed' E categorias de erro críticas
    *
    * @returns Array de modelIds indisponíveis
    */
@@ -427,6 +569,29 @@ export class ModelCertificationService {
     
     const modelIds = certs.map(c => c.modelId);
     console.log('[CertificationService] 🚫 Modelos indisponíveis encontrados:', modelIds);
+    
+    return modelIds;
+  }
+
+  /**
+   * Obtém lista de TODOS os modelos com status 'failed'
+   * Usado para exibir badge vermelho "❌ Indisponível" no frontend
+   *
+   * @returns Array de modelIds que falharam na certificação
+   */
+  async getAllFailedModels(): Promise<string[]> {
+    console.log('[CertificationService] 🔍 Buscando TODOS os modelos com status failed...');
+    
+    const certs = await prisma.modelCertification.findMany({
+      where: {
+        status: 'failed'
+      },
+      select: { modelId: true },
+      distinct: ['modelId']
+    });
+    
+    const modelIds = certs.map(c => c.modelId);
+    console.log('[CertificationService] ❌ Modelos failed encontrados:', modelIds);
     
     return modelIds;
   }

@@ -72,8 +72,11 @@ interface RetryConfig {
   backoffMultiplier: number;
 }
 
+// Retry reduzido para 2 tentativas por variação de formato
+// Total de tentativas: 6 (3 variações × 2 retries)
+// Isso reduz latência mantendo resiliência adequada
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 3,
+  maxRetries: 2,
   initialDelayMs: 1000,
   maxDelayMs: 10000,
   backoffMultiplier: 2,

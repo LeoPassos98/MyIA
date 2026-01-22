@@ -122,8 +122,39 @@ class CertificationService {
   }
 
   /**
-   * Lista modelos indisponíveis (com cache)
+   * Lista TODOS os modelos com status 'failed' (para exibir badge vermelho)
    * @param forceRefresh - Se true, ignora cache e busca do backend
+   */
+  async getAllFailedModels(forceRefresh = false): Promise<string[]> {
+    const now = Date.now();
+    
+    // ✅ OTIMIZAÇÃO: Retornar do cache se válido
+    if (!forceRefresh && this.cache.unavailableModels && (now - this.cache.timestamp) < this.CACHE_TTL) {
+      logger.log('[CertificationService] 📦 Retornando do cache (all failed):', this.cache.unavailableModels.length, 'modelos');
+      return this.cache.unavailableModels;
+    }
+    
+    // ✅ Buscar do backend e atualizar cache
+    logger.log('[CertificationService] 📋 Chamando API GET /certification/all-failed-models');
+    const response = await api.get('/certification/all-failed-models');
+    
+    // 🐛 DEBUG: Verificar estrutura da resposta
+    console.log('[CertificationService] 🔍 DEBUG: Resposta completa do backend (all failed):', response.data);
+    console.log('[CertificationService] 🔍 DEBUG: response.data.modelIds:', response.data.modelIds);
+    
+    const modelIds = response.data.modelIds || [];
+    this.cache.unavailableModels = modelIds;
+    this.cache.timestamp = now;
+    
+    logger.log('[CertificationService] ❌ Todos os modelos failed:', modelIds.length, 'modelos');
+    
+    return modelIds;
+  }
+
+  /**
+   * Lista modelos indisponíveis com erros críticos (com cache)
+   * @param forceRefresh - Se true, ignora cache e busca do backend
+   * @deprecated Use getAllFailedModels() para exibir badges no frontend
    */
   async getUnavailableModels(forceRefresh = false): Promise<string[]> {
     const now = Date.now();

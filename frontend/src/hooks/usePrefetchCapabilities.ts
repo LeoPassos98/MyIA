@@ -11,7 +11,7 @@
  * @module hooks/usePrefetchCapabilities
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchAllCapabilities } from '../services/api/modelsApi';
 import type { ModelCapabilities } from '../types/capabilities';
@@ -81,7 +81,7 @@ export function usePrefetchCapabilities(options?: {
   const enabled = options?.enabled ?? true;
 
   // Estado local para tracking
-  const [state, setState] = React.useState<{
+  const [state, setState] = useState<{
     isPrefetching: boolean;
     error: Error | null;
     prefetchedCount: number;
@@ -91,9 +91,32 @@ export function usePrefetchCapabilities(options?: {
     prefetchedCount: 0,
   });
 
+  // ✅ FIX: Usar useRef para callbacks (não causa re-render)
+  const onSuccessRef = useRef(options?.onSuccess);
+  const onErrorRef = useRef(options?.onError);
+  
+  // Atualizar refs quando callbacks mudarem (sem causar re-render)
+  useEffect(() => {
+    onSuccessRef.current = options?.onSuccess;
+    onErrorRef.current = options?.onError;
+  }, [options?.onSuccess, options?.onError]);
+
+  // ✅ FIX: Flag para prevenir múltiplas execuções simultâneas
+  const isPrefetchingRef = useRef(false);
+  
+  // ✅ FIX: Contador de tentativas para backoff exponencial
+  const retryCountRef = useRef(0);
+  const MAX_RETRIES = 3;
+
   useEffect(() => {
     // Só executa se enabled
     if (!enabled) return;
+
+    // ✅ FIX: Prevenir execuções simultâneas
+    if (isPrefetchingRef.current) {
+      console.log('[usePrefetchCapabilities] Already prefetching, skipping...');
+      return;
+    }
 
     // Flag para evitar race conditions
     let isMounted = true;
@@ -103,9 +126,12 @@ export function usePrefetchCapabilities(options?: {
       const existingCache = queryClient.getQueryData(['allCapabilities']);
       if (existingCache) {
         // Já foi feito prefetch, não fazer novamente
+        console.log('[usePrefetchCapabilities] Cache already exists, skipping prefetch');
         return;
       }
 
+      // ✅ FIX: Marcar como em execução
+      isPrefetchingRef.current = true;
       setState((prev) => ({ ...prev, isPrefetching: true, error: null }));
 
       try {
@@ -137,8 +163,11 @@ export function usePrefetchCapabilities(options?: {
           prefetchedCount: count,
         });
 
-        // Chamar callback de sucesso
-        options?.onSuccess?.(count);
+        // ✅ FIX: Resetar contador de tentativas em caso de sucesso
+        retryCountRef.current = 0;
+
+        // Chamar callback de sucesso (via ref)
+        onSuccessRef.current?.(count);
 
         console.log(`[usePrefetchCapabilities] Successfully prefetched ${count} models`);
       } catch (error) {
@@ -152,11 +181,45 @@ export function usePrefetchCapabilities(options?: {
           prefetchedCount: 0,
         });
 
-        // Chamar callback de erro
-        options?.onError?.(err);
+        // ✅ FIX: Tratamento específico para erro 429 (Too Many Requests)
+        const is429Error = (err as any).status === 429 || err.message.includes('429');
+        
+        if (is429Error) {
+          console.error('[usePrefetchCapabilities] Rate limit exceeded (429). Stopping retries.');
+          retryCountRef.current = MAX_RETRIES; // Prevenir retry
+        } else {
+          // ✅ FIX: Incrementar contador de tentativas
+          retryCountRef.current++;
+          
+          // ✅ FIX: Backoff exponencial se ainda houver tentativas
+          if (retryCountRef.current < MAX_RETRIES) {
+            const backoffDelay = Math.min(1000 * Math.pow(2, retryCountRef.current), 10000);
+            console.warn(
+              `[usePrefetchCapabilities] Retry ${retryCountRef.current}/${MAX_RETRIES} in ${backoffDelay}ms`,
+              err
+            );
+            
+            setTimeout(() => {
+              if (isMounted) {
+                isPrefetchingRef.current = false; // Permitir nova tentativa
+                prefetchCapabilities();
+              }
+            }, backoffDelay);
+            
+            return; // Não chamar onError ainda, aguardar retry
+          }
+        }
+
+        // Chamar callback de erro (via ref) apenas após esgotar tentativas
+        onErrorRef.current?.(err);
 
         // Log do erro mas não quebra o app
         console.error('[usePrefetchCapabilities] Failed to prefetch capabilities:', err);
+      } finally {
+        // ✅ FIX: Liberar flag apenas se não houver retry pendente
+        if (retryCountRef.current >= MAX_RETRIES || isMounted === false) {
+          isPrefetchingRef.current = false;
+        }
       }
     };
 
@@ -167,7 +230,7 @@ export function usePrefetchCapabilities(options?: {
     return () => {
       isMounted = false;
     };
-  }, [enabled, queryClient, options?.onSuccess, options?.onError]);
+  }, [enabled, queryClient]); // ✅ FIX: Remover callbacks das dependências
 
   return state;
 }
@@ -202,6 +265,3 @@ export function useInvalidateCapabilities(): () => Promise<void> {
     });
   };
 }
-
-// Import React para useState
-import React from 'react';

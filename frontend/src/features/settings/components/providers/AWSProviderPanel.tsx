@@ -101,9 +101,15 @@ const ModelCheckboxItem = memo(({
       disabled={disabled}
       control={
         <Checkbox
+          // ✅ CORREÇÃO: O estado visual do checkbox deve refletir apenas isSelected
+          // A lógica de desabilitar modelos failed é feita via disabled={isUnavailable}
+          // Isso garante que:
+          // - Modelos certified/quality_warning: checkbox marca/desmarca normalmente
+          // - Modelos failed: checkbox sempre desmarcado (isSelected será false) e desabilitado
           checked={isSelected}
           onChange={() => onToggle(model.apiModelId)}
           tabIndex={0}
+          disabled={disabled || isUnavailable}
         />
       }
       label={
@@ -232,21 +238,23 @@ export default function AWSProviderPanel() {
     }
   }, [formState.accessKey]);
 
-  // Buscar modelos certificados, indisponíveis e com warning de qualidade
+  // Buscar modelos certificados, indisponíveis (failed) e com warning de qualidade
   useEffect(() => {
     async function loadCertifications() {
       try {
         console.log('[AWSProviderPanel] 🔍 DEBUG: Carregando certificações...');
-        const [certified, unavailable, warnings] = await Promise.all([
+        // ✅ CORREÇÃO: Usar getAllFailedModels() para pegar TODOS os modelos com status 'failed'
+        // Isso garante que o badge vermelho "❌ Indisponível" apareça para todos os modelos falhados
+        const [certified, allFailed, warnings] = await Promise.all([
           certificationService.getCertifiedModels(),
-          certificationService.getUnavailableModels(),
+          certificationService.getAllFailedModels(),
           certificationService.getQualityWarningModels()
         ]);
         console.log('[AWSProviderPanel] 🔍 DEBUG: Certificados:', certified);
-        console.log('[AWSProviderPanel] 🔍 DEBUG: Indisponíveis:', unavailable);
+        console.log('[AWSProviderPanel] 🔍 DEBUG: Todos os Failed:', allFailed);
         console.log('[AWSProviderPanel] 🔍 DEBUG: Warnings:', warnings);
         setCertifiedModels(certified);
-        setUnavailableModels(unavailable);
+        setUnavailableModels(allFailed); // Usar lista completa de modelos failed
         setQualityWarningModels(warnings);
       } catch (error) {
         console.error('Erro ao carregar certificações:', error);
@@ -335,13 +343,14 @@ export default function AWSProviderPanel() {
       // ✅ FIX: Após certificar, buscar listas atualizadas do backend com forceRefresh
       // Isso garante que o estado local seja sincronizado com o backend
       // e os badges permaneçam após reload da página
-      const [updatedCertifiedModels, updatedUnavailableModels, updatedWarningModels] = await Promise.all([
+      // ✅ CORREÇÃO: Usar getAllFailedModels() para pegar TODOS os modelos com status 'failed'
+      const [updatedCertifiedModels, updatedAllFailedModels, updatedWarningModels] = await Promise.all([
         certificationService.getCertifiedModels(true),
-        certificationService.getUnavailableModels(true),
+        certificationService.getAllFailedModels(true),
         certificationService.getQualityWarningModels(true)
       ]);
       setCertifiedModels(updatedCertifiedModels);
-      setUnavailableModels(updatedUnavailableModels);
+      setUnavailableModels(updatedAllFailedModels); // Usar lista completa de modelos failed
       setQualityWarningModels(updatedWarningModels);
     } catch (error) {
       console.error('Erro ao certificar modelos:', error);

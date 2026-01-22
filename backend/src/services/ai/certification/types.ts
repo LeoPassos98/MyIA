@@ -2,6 +2,26 @@
 // Standards: docs/STANDARDS.md
 
 /**
+ * Evento de progresso para SSE (Server-Sent Events)
+ * Usado para enviar feedback em tempo real durante a certificação
+ */
+export interface ProgressEvent {
+  type: 'progress' | 'complete' | 'error';
+  current?: number;
+  total?: number;
+  testName?: string;
+  status?: 'running' | 'passed' | 'failed';
+  message?: string;
+  certification?: CertificationResult;
+}
+
+/**
+ * Callback de progresso para certificação
+ * Função chamada durante a execução dos testes para enviar atualizações via SSE
+ */
+export type ProgressCallback = (event: ProgressEvent) => void;
+
+/**
  * Categorias de erro na certificação
  */
 export enum ErrorCategory {
@@ -78,6 +98,7 @@ export interface CertificationResult {
   avgLatencyMs: number;
   isCertified: boolean;
   isAvailable?: boolean;              // Novo: TRUE se modelo pode ser usado
+  qualityIssues?: string[];           // Novo: lista de testes que falharam
   results: TestResult[];
   categorizedError?: CategorizedError; // Novo: erro categorizado se houver
   overallSeverity?: ErrorSeverity;    // Nova: severidade geral

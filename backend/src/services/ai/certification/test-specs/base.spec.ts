@@ -200,7 +200,9 @@ export const baseTestSpecs: TestSpec[] = [
     id: 'error-handling',
     name: 'Error Handling Test',
     description: 'Valida tratamento de erros',
-    timeout: 10000,
+    // Timeout aumentado para 30s: modelos AWS Bedrock podem ter cold start
+    // que causa latência inicial elevada, resultando em falsos negativos com timeout de 10s
+    timeout: 30000,
     
     async run(modelId: string, provider: any, apiKey: string): Promise<TestResult> {
       const startTime = Date.now();

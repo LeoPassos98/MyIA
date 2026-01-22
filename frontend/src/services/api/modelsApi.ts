@@ -170,6 +170,16 @@ export async function fetchAllCapabilities(): Promise<Record<string, ModelCapabi
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<AllCapabilitiesResponse>;
       
+      // ✅ FIX: Erro 429 - Too Many Requests (Rate Limit)
+      if (axiosError.response?.status === 429) {
+        const capError: CapabilitiesError = {
+          message: 'Too many requests. Please wait before trying again.',
+          status: 429,
+          code: 'RATE_LIMIT_EXCEEDED',
+        };
+        throw capError;
+      }
+      
       // Erro 500 - Erro interno do servidor
       if (axiosError.response?.status === 500) {
         const capError: CapabilitiesError = {

@@ -105,15 +105,23 @@ export const CertificationProgressDialog = memo(({
   };
   
   const getStatusLabel = (model: ModelCertificationProgress) => {
+    // ========================================================================
+    // CORREÇÃO: Melhorar labels para diferenciar status
+    // ========================================================================
+    // - quality_warning: "⚠️ Disponível" (amarelo)
+    // - certified: "✅ Certificado" (verde)
+    // - failed/unavailable: "❌ Indisponível" (vermelho)
+    // ========================================================================
+    
     if (model.status === 'success' && model.result?.status === 'quality_warning') {
-      return 'Com Limitações';
+      return '⚠️ Disponível';
     }
     
     switch (model.status) {
       case 'success':
-        return 'Certificado';
+        return '✅ Certificado';
       case 'error':
-        return 'Falhou';
+        return '❌ Indisponível';
       case 'running':
         return 'Certificando...';
       default:
@@ -196,17 +204,17 @@ export const CertificationProgressDialog = memo(({
         
         {isComplete && errorModels > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            <strong>Alguns modelos falharam na certificação</strong>
+            <strong>Alguns modelos não puderam ser certificados</strong>
             <br />
-            Verifique os detalhes abaixo. Modelos que falharam podem ter IDs inválidos ou não estar disponíveis na sua região AWS.
+            Modelos indisponíveis podem ter IDs inválidos ou não estar disponíveis na sua região AWS.
           </Alert>
         )}
         
         {isComplete && errorModels === 0 && (
           <Alert severity="success" sx={{ mb: 2 }}>
-            <strong>Todos os modelos foram certificados com sucesso!</strong>
+            <strong>Certificação concluída!</strong>
             <br />
-            Os badges de certificação agora aparecerão nos modelos.
+            Modelos certificados (✅) e disponíveis com limitações (⚠️) podem ser usados. Os badges aparecerão na lista de modelos.
           </Alert>
         )}
         
@@ -249,7 +257,12 @@ export const CertificationProgressDialog = memo(({
                         ❌ {model.error}
                       </Typography>
                     )}
-                    {model.status === 'success' && model.startTime && model.endTime && (
+                    {model.status === 'success' && model.result?.status === 'quality_warning' && model.startTime && model.endTime && (
+                      <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+                        ⚠️ Disponível com limitações em {Math.round((model.endTime - model.startTime) / 1000)}s
+                      </Typography>
+                    )}
+                    {model.status === 'success' && model.result?.status === 'certified' && model.startTime && model.endTime && (
                       <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>
                         ✅ Certificado em {Math.round((model.endTime - model.startTime) / 1000)}s
                       </Typography>

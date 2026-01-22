@@ -10,10 +10,31 @@ import * as certificationController from '../controllers/certificationController
 
 const router = Router();
 
-// Rate limiters específicos para certificação
+// ========================================================================
+// CORREÇÃO #1: Rate Limiting Otimizado
+// ========================================================================
+//
+// Problema anterior: Rate limiter de 5 req/min era muito restritivo e aplicado
+// ANTES da verificação de cache, consumindo quota desnecessariamente.
+//
+// Solução:
+// 1. Novo endpoint GET /check/:modelId SEM rate limiting (verifica apenas cache)
+// 2. Endpoint POST /certify-model COM rate limiting aumentado (5 → 10 req/min)
+// 3. Cache verificado ANTES de executar testes (dentro do service)
+//
+// Fluxo recomendado:
+// - Frontend chama GET /check/:modelId (ilimitado, apenas leitura de cache)
+// - Se cached=false: Frontend chama POST /certify-model (10 req/min, executa testes)
+//
+// Benefícios:
+// - Usuários não são bloqueados por rate limit quando resultado está em cache
+// - Rate limit aplicado apenas quando testes realmente serão executados
+// - Limite aumentado (10 req/min) permite mais flexibilidade
+// ========================================================================
+
 const certifyModelLimiter = rateLimit({
   windowMs: 60000, // 1 minuto
-  max: 5, // 5 req/min
+  max: 10, // Aumentado de 5 para 10 req/min
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -58,11 +79,57 @@ const queryLimiter = rateLimit({
 // Todas as rotas requerem autenticação
 router.use(authMiddleware);
 
-// POST /api/certification/certify-model
+// ========================================================================
+// NOVO ENDPOINT: GET /check/:modelId (SEM rate limiting)
+// ========================================================================
+// Verifica se existe certificação em cache sem consumir rate limit.
+// Este endpoint deve ser chamado ANTES do POST /certify-model.
+//
+// Fluxo recomendado:
+// 1. Frontend chama GET /check/:modelId
+// 2. Se response.data.cached === true: usar response.data.certification
+// 3. Se response.data.cached === false: chamar POST /certify-model
+// ========================================================================
+router.get(
+  '/check/:modelId',
+  certificationController.checkCertificationCache
+);
+
+// POST /api/certification/certify-model (COM rate limiting de 10 req/min)
 router.post(
   '/certify-model',
   certifyModelLimiter,
   certificationController.certifyModel
+);
+
+// ========================================================================
+// CORREÇÃO #4: Endpoint SSE para Feedback de Progresso
+// ========================================================================
+// GET /api/certification/certify-model/:modelId/stream
+//
+// Novo endpoint que fornece feedback em tempo real via Server-Sent Events (SSE)
+// durante o processo de certificação (30-60 segundos).
+//
+// Benefícios:
+// - Usuário recebe atualizações de progresso em tempo real
+// - Melhor experiência durante operações longas
+// - Visibilidade de qual teste está sendo executado
+// - Feedback imediato de sucesso/falha de cada teste
+//
+// Rate limiting: 10 req/min (mesmo limite do POST /certify-model)
+//
+// Formato dos eventos SSE:
+// - type: 'progress' - Atualização de progresso
+//   { type: 'progress', current: 2, total: 6, testName: 'streaming-test', status: 'running' }
+// - type: 'complete' - Certificação concluída
+//   { type: 'complete', certification: {...} }
+// - type: 'error' - Erro durante certificação
+//   { type: 'error', message: 'Erro ao executar testes' }
+// ========================================================================
+router.get(
+  '/certify-model/:modelId/stream',
+  certifyModelLimiter, // Usar o mesmo rate limiter (10 req/min)
+  certificationController.certifyModelStream
 );
 
 // POST /api/certification/certify-vendor
@@ -93,7 +160,14 @@ router.get(
   certificationController.getFailedModels
 );
 
-// GET /api/certification/unavailable-models
+// GET /api/certification/all-failed-models (retorna TODOS os modelos com status 'failed')
+router.get(
+  '/all-failed-models',
+  queryLimiter,
+  certificationController.getAllFailedModels
+);
+
+// GET /api/certification/unavailable-models (retorna apenas modelos com erros críticos)
 router.get(
   '/unavailable-models',
   queryLimiter,
@@ -119,6 +193,23 @@ router.get(
   '/is-certified/:modelId',
   queryLimiter,
   certificationController.checkCertification
+);
+
+// ========================================================================
+// DELETE /api/certification/:modelId
+// ========================================================================
+// Deleta certificação de um modelo específico.
+// Útil para invalidar cache de certificações antigas e forçar re-certificação.
+//
+// Após deletar, o modelo precisará ser re-certificado usando:
+//   POST /api/certification/certify-model { modelId, force: true }
+//
+// Rate limiting: 30 req/min (mesmo limite de queries)
+// ========================================================================
+router.delete(
+  '/:modelId',
+  queryLimiter,
+  certificationController.deleteCertification
 );
 
 export default router;
