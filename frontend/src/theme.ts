@@ -18,6 +18,21 @@ declare module '@mui/material/styles' {
       glass: string;
       shimmer: string;
     };
+    backgrounds: {
+      warningSubtle: string;
+      warningHover: string;
+      infoSubtle: string;
+      secondarySubtle: string;
+      secondaryHover: string;
+      disabledSubtle: string;
+      paperTransparent: string;
+      defaultTransparent: string;
+    };
+    borders: {
+      warningSubtle: string;
+      infoSubtle: string;
+      whiteSubtle: string;
+    };
   }
   interface PaletteOptions {
     custom?: {
@@ -29,6 +44,21 @@ declare module '@mui/material/styles' {
       secondary?: string;
       glass?: string;
       shimmer?: string;
+    };
+    backgrounds?: {
+      warningSubtle?: string;
+      warningHover?: string;
+      infoSubtle?: string;
+      secondarySubtle?: string;
+      secondaryHover?: string;
+      disabledSubtle?: string;
+      paperTransparent?: string;
+      defaultTransparent?: string;
+    };
+    borders?: {
+      warningSubtle?: string;
+      infoSubtle?: string;
+      whiteSubtle?: string;
     };
   }
 
@@ -98,6 +128,22 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
         hackerBg: '#0d1117',
       },
       gradients,
+      backgrounds: {
+        // Backgrounds sutis para alertas e seções
+        warningSubtle: mode === 'dark' ? 'rgba(255, 152, 0, 0.15)' : 'rgba(255, 152, 0, 0.1)',
+        warningHover: mode === 'dark' ? 'rgba(255, 152, 0, 0.25)' : 'rgba(255, 152, 0, 0.2)',
+        infoSubtle: mode === 'dark' ? 'rgba(33, 150, 243, 0.15)' : 'rgba(33, 150, 243, 0.1)',
+        secondarySubtle: mode === 'dark' ? 'rgba(255, 142, 83, 0.05)' : 'rgba(255, 142, 83, 0.08)',
+        secondaryHover: mode === 'dark' ? 'rgba(255, 142, 83, 0.1)' : 'rgba(255, 142, 83, 0.12)',
+        disabledSubtle: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+        paperTransparent: mode === 'dark' ? 'rgba(30, 30, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+        defaultTransparent: mode === 'dark' ? 'rgba(18, 18, 18, 0.5)' : 'rgba(245, 245, 245, 0.5)',
+      },
+      borders: {
+        warningSubtle: mode === 'dark' ? 'rgba(255, 152, 0, 0.3)' : 'rgba(255, 152, 0, 0.4)',
+        infoSubtle: mode === 'dark' ? 'rgba(33, 150, 243, 0.3)' : 'rgba(33, 150, 243, 0.4)',
+        whiteSubtle: mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+      },
     },
     
     // --- TIPOGRAFIA REFINADA (RECOMENDAÇÃO PRO) ---
