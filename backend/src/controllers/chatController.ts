@@ -31,7 +31,7 @@ export const chatController = {
 
       const {
         prompt, message: legacyMsg, provider, chatId,
-        model, context, selectedMessageIds, strategy, temperature, memoryWindow, topK,
+        model, context, selectedMessageIds, strategy, temperature, memoryWindow, topK, topP, maxTokens,
         contextConfig // Nova configuração do pipeline de contexto
       } = req.body;
 
@@ -183,6 +183,9 @@ export const chatController = {
 
       // 6.6. Preparar objeto de auditoria LEAN (Standards §7 - Anti-Duplicação)
       // Salva apenas IDs e metadados, não conteúdo duplicado
+      // 🎯 MODO AUTO/MANUAL: Detectar se parâmetros foram enviados
+      const isAutoMode = temperature === undefined && topP === undefined && topK === undefined && maxTokens === undefined;
+      
       const auditObject = {
         config_V47: {
           mode: isManualMode ? 'manual' : 'auto',
@@ -190,7 +193,14 @@ export const chatController = {
           provider: lockedProvider,
           timestamp: new Date().toISOString(),
           strategy: strategy || 'efficient',
-          params: { temperature, topK, memoryWindow }
+          params: {
+            mode: isAutoMode ? 'auto' : 'manual', // ✅ Indicar modo usado
+            temperature: temperature ?? 'auto',
+            topP: topP ?? 'auto',
+            topK: topK ?? 'auto',
+            maxTokens: maxTokens ?? 'auto',
+            memoryWindow
+          }
         },
         // LEAN: Salva systemPrompt (único!) e IDs em vez de conteúdo
         systemPrompt: systemPrompt,
@@ -206,8 +216,13 @@ export const chatController = {
         providerSlug: lockedProvider,
         modelId: targetModel,
         userId: req.userId,
-        temperature: temperature ?? 0.7,
-        topK: topK
+        // 🎯 MODO AUTO/MANUAL: Só envia parâmetros se modo manual
+        ...(isAutoMode ? {} : {
+          temperature: temperature,
+          topP: topP,
+          topK: topK,
+          maxTokens: maxTokens
+        })
       });
 
       // Watchdog: Derruba a conexão se a IA travar por 60s [PODE SER MENOR QUE 60s]
