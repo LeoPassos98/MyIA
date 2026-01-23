@@ -49,6 +49,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Titan Text Lite (Official: 4k context)
@@ -66,6 +72,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Titan Text Premier (Official: 32k context)
@@ -83,6 +95,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova 2 Lite
@@ -109,6 +127,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova 2 Lite (256k context)
@@ -135,6 +159,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova 2 Micro
@@ -161,6 +191,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova 2 Pro
@@ -187,6 +223,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova 2 Sonic
@@ -213,6 +255,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Pro v1 (24k context)
@@ -230,6 +278,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Pro v1 (300k context)
@@ -247,6 +301,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Pro v1 (default)
@@ -264,6 +324,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Lite v1 (24k context)
@@ -281,6 +347,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Lite v1 (300k context)
@@ -298,6 +370,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Lite v1 (default)
@@ -315,6 +393,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Micro v1 (24k context)
@@ -332,6 +416,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Micro v1 (128k context)
@@ -349,6 +439,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Micro v1 (default)
@@ -366,6 +462,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Sonic v1
@@ -383,6 +485,12 @@ const amazonModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Premier v1 (8k context)
@@ -409,6 +517,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Premier v1 (20k context)
@@ -435,6 +549,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Premier v1 (1000k context)
@@ -461,6 +581,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Premier v1 (multimodal)
@@ -487,6 +613,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 
   // Nova Premier v1 (default)
@@ -513,6 +645,12 @@ const amazonModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
   },
 ];
 

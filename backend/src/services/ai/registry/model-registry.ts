@@ -26,6 +26,16 @@ export interface PlatformRule {
 }
 
 /**
+ * Recommended parameters for auto mode
+ */
+export interface RecommendedParams {
+  temperature: number;
+  topP?: number;
+  topK?: number;
+  maxTokens: number;
+}
+
+/**
  * Complete metadata for a model
  */
 export interface ModelMetadata {
@@ -39,6 +49,7 @@ export interface ModelMetadata {
   adapterClass: string; // e.g., 'CohereAdapter'
   deprecated?: boolean;
   replacedBy?: string;
+  recommendedParams?: RecommendedParams; // ✅ NOVO: Valores recomendados para modo auto
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
+import { ModelRegistry } from '../registry/model-registry';
 
 /**
  * Adapter for Anthropic Claude models
@@ -38,29 +39,30 @@ export class AnthropicAdapter extends BaseModelAdapter {
       .filter(m => m.role !== 'system')
       .map(m => ({ role: m.role, content: m.content }));
 
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
+    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
+    const recommendedParams = modelDef?.recommendedParams;
+
+    // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
+    const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.7;
+    const topP = options.topP ?? recommendedParams?.topP ?? 0.9;
+    const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
+
     const body: any = {
       anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: options.maxTokens || 2048,
+      max_tokens: maxTokens,
       messages: conversationMessages,
+      temperature: temperature,
     };
 
-    // IMPORTANT: Some Claude models don't accept both temperature and top_p
-    // Use only temperature by default (more intuitive for users)
-    if (options.temperature !== undefined) {
-      body.temperature = options.temperature;
-    } else {
-      body.temperature = 0.7; // Default
-    }
-
-    // Only add top_k if specified (not all models support it)
+    // Only add top_k if specified (Anthropic doesn't support it officially)
     if (options.topK !== undefined) {
       body.top_k = options.topK;
     }
 
-    // Do NOT add top_p if temperature is set (causes conflicts)
-    // Only use top_p if explicitly provided AND temperature is not set
-    if (options.topP !== undefined && options.temperature === undefined) {
-      body.top_p = options.topP;
+    // Add top_p (Anthropic supports it)
+    if (topP !== undefined) {
+      body.top_p = topP;
     }
 
     if (systemMessage) {

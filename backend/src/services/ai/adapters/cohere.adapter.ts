@@ -8,6 +8,7 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
+import { ModelRegistry } from '../registry/model-registry';
 
 /**
  * Adapter for Cohere Command models
@@ -50,10 +51,19 @@ export class CohereAdapter extends BaseModelAdapter {
     
     const lastMessage = conversationMessages[conversationMessages.length - 1];
     
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
+    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
+    const recommendedParams = modelDef?.recommendedParams;
+
+    // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
+    const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.3;
+    const topP = options.topP ?? recommendedParams?.topP ?? 0.75;
+    const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
+    
     const body: any = {
       message: lastMessage?.content || '',
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens || 2048,
+      temperature: temperature,
+      max_tokens: maxTokens,
     };
 
     // Add chat_history if there are previous messages
@@ -66,9 +76,9 @@ export class CohereAdapter extends BaseModelAdapter {
       body.preamble = systemMessage.content;
     }
 
-    // Cohere supports p (top_p) but not top_k in the same way
-    if (options.topP !== undefined) {
-      body.p = options.topP;
+    // Cohere supports p (top_p)
+    if (topP !== undefined) {
+      body.p = topP;
     }
 
     // NOTE: Streaming is controlled by InvokeModelWithResponseStreamCommand,

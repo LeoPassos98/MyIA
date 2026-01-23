@@ -31,6 +31,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 3.5 Haiku (requires inference profile)
@@ -57,6 +62,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 4.5 Haiku (requires inference profile)
@@ -83,6 +93,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 4.5 Sonnet (requires inference profile)
@@ -109,6 +124,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 4 Opus (requires inference profile)
@@ -135,6 +155,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 4 Sonnet (requires inference profile)
@@ -161,6 +186,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 4.5 Opus (requires inference profile)
@@ -187,6 +217,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 4.1 Opus (requires inference profile)
@@ -213,6 +248,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 3.7 Sonnet (requires inference profile)
@@ -239,6 +279,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 3.5 Sonnet v1 (legacy, requires inference profile)
@@ -265,6 +310,11 @@ const anthropicModels: ModelMetadata[] = [
       },
     ],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 3 Opus (legacy, direct invocation)
@@ -282,6 +332,11 @@ const anthropicModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 3 Sonnet (legacy, direct invocation)
@@ -299,6 +354,11 @@ const anthropicModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 
   // Claude 3 Haiku (legacy, direct invocation)
@@ -316,6 +376,11 @@ const anthropicModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock'],
     adapterClass: 'AnthropicAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    },
   },
 ];
 

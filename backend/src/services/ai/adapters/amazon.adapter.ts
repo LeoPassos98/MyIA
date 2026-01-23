@@ -8,6 +8,7 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
+import { ModelRegistry } from '../registry/model-registry';
 
 /**
  * Adapter for Amazon Titan and Nova models
@@ -84,12 +85,21 @@ export class AmazonAdapter extends BaseModelAdapter {
       content: [{ text: m.content }],
     }));
 
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
+    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
+    const recommendedParams = modelDef?.recommendedParams;
+
+    // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
+    const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.7;
+    const topP = options.topP ?? recommendedParams?.topP ?? 0.9;
+    const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
+
     const body: any = {
       messages: formattedMessages,
       inferenceConfig: {
-        maxTokens: options.maxTokens || 2048,
-        temperature: options.temperature ?? 0.7,
-        topP: options.topP || 0.9,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
       },
     };
 
@@ -135,12 +145,21 @@ export class AmazonAdapter extends BaseModelAdapter {
       inputText = `System: ${systemMessage.content}\n\n${inputText}`;
     }
 
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
+    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
+    const recommendedParams = modelDef?.recommendedParams;
+
+    // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
+    const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.7;
+    const topP = options.topP ?? recommendedParams?.topP ?? 0.9;
+    const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
+
     const body: any = {
       inputText,
       textGenerationConfig: {
-        maxTokenCount: options.maxTokens || 2048,
-        temperature: options.temperature ?? 0.7,
-        topP: options.topP || 0.9,
+        maxTokenCount: maxTokens,
+        temperature: temperature,
+        topP: topP,
       },
     };
 

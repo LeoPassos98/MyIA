@@ -22,6 +22,12 @@ const cohereModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock', 'direct'],
     adapterClass: 'CohereAdapter',
+    recommendedParams: {
+      temperature: 0.3,
+      topP: 0.75,
+      topK: 0,
+      maxTokens: 2048,
+    },
   },
 
   // Command R+ (Official: 128k context)
@@ -39,6 +45,12 @@ const cohereModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock', 'direct'],
     adapterClass: 'CohereAdapter',
+    recommendedParams: {
+      temperature: 0.3,
+      topP: 0.75,
+      topK: 0,
+      maxTokens: 2048,
+    },
   },
 
   // Command Light
@@ -56,6 +68,12 @@ const cohereModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock', 'direct'],
     adapterClass: 'CohereAdapter',
+    recommendedParams: {
+      temperature: 0.3,
+      topP: 0.75,
+      topK: 0,
+      maxTokens: 2048,
+    },
   },
 
   // Command Text
@@ -73,6 +91,12 @@ const cohereModels: ModelMetadata[] = [
     },
     supportedPlatforms: ['bedrock', 'direct'],
     adapterClass: 'CohereAdapter',
+    recommendedParams: {
+      temperature: 0.3,
+      topP: 0.75,
+      topK: 0,
+      maxTokens: 2048,
+    },
   },
 ];
 
