@@ -189,9 +189,16 @@ export function useChatLogic(chatId?: string) {
         if (manualContext.selectedMessageIds.length > 0) payload.selectedMessageIds = manualContext.selectedMessageIds;
       } else {
         payload.strategy = chatConfig.strategy;
-        payload.temperature = chatConfig.temperature;
-        payload.topK = chatConfig.topK;
         payload.memoryWindow = chatConfig.memoryWindow;
+        
+        // 🎯 MODO AUTO/MANUAL: Só envia parâmetros se modo manual
+        if (!chatConfig.isAutoMode) {
+          payload.temperature = chatConfig.temperature;
+          payload.topP = chatConfig.topP;
+          payload.topK = chatConfig.topK;
+          payload.maxTokens = chatConfig.maxTokens;
+        }
+        // Se isAutoMode === true, não envia parâmetros (backend usa recommendedParams)
         
         // Configuração do Pipeline de Contexto
         payload.contextConfig = {
