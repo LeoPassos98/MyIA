@@ -143,6 +143,20 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
   }
 });
 
+// GET /api/providers/by-vendor
+router.get(
+  '/by-vendor',
+  protect,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await providersController.getByVendor(req as any, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 router.post(
   '/bedrock/validate',
   protect,
