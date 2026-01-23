@@ -90,3 +90,64 @@ export interface AIProvider {
   logoUrl?: string;
   models: AIModel[];
 }
+
+/**
+ * Resposta do endpoint /api/providers/by-vendor
+ */
+export interface ModelsByVendor {
+  vendors: VendorGroup[];
+}
+
+/**
+ * Grupo de modelos por vendor (empresa/criador)
+ */
+export interface VendorGroup {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string;
+  models: ModelWithProviders[];
+}
+
+/**
+ * Modelo com informações de disponibilidade em múltiplos providers
+ */
+export interface ModelWithProviders {
+  id: string;
+  name: string;
+  apiModelId: string;
+  contextWindow: number;
+  maxOutputTokens?: number;
+  version?: string;
+  availableOn: ProviderAvailability[];
+  capabilities?: {
+    supportsVision?: boolean;
+    supportsPromptCache?: boolean;
+    supportsFunctionCalling?: boolean;
+  };
+  pricing?: {
+    inputPer1M?: number;
+    outputPer1M?: number;
+    cacheReadPer1M?: number;
+    cacheWritePer1M?: number;
+  };
+}
+
+/**
+ * Disponibilidade de um modelo em um provider específico
+ */
+export interface ProviderAvailability {
+  providerSlug: string;
+  providerName: string;
+  isConfigured: boolean;
+  certification: CertificationInfo | null;
+}
+
+/**
+ * Informações de certificação de um modelo
+ */
+export interface CertificationInfo {
+  status: string;
+  successRate?: number;
+  lastChecked?: string;
+}

@@ -20,6 +20,7 @@ export interface Message {
 export interface ChatConfig {
   provider: string;
   model: string;
+  vendorSlug?: string;  // NOVO - Rastrear vendor do modelo (opcional para compatibilidade)
   temperature: number;
   topK?: number;        // Tornar opcional (alguns modelos não suportam)
   topP?: number;        // ADICIONAR - Nucleus sampling
@@ -27,6 +28,7 @@ export interface ChatConfig {
   memoryWindow: number;
   // Tipagem estrita para evitar erros de digitação
   strategy: 'fast' | 'efficient' | 'thorough' | 'creative';
+  isAutoMode?: boolean; // ✅ NOVO - Modo Auto/Manual de parâmetros
 }
 
 export interface ManualContextState {
