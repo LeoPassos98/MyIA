@@ -16,15 +16,17 @@ interface CapabilityBadgeProps {
 
 export function CapabilityBadge({ label, enabled, tooltip, icon = 'check' }: CapabilityBadgeProps) {
   const getIcon = () => {
-    if (!enabled) return <CancelIcon />;
+    if (!enabled) {
+      return <CancelIcon aria-label="Recurso não disponível" />;
+    }
     
     switch (icon) {
       case 'vision':
-        return <VisibilityIcon />;
+        return <VisibilityIcon aria-label="Suporte a visão computacional" />;
       case 'function':
-        return <FunctionsIcon />;
+        return <FunctionsIcon aria-label="Suporte a chamadas de função" />;
       default:
-        return <CheckCircleIcon />;
+        return <CheckCircleIcon aria-label="Recurso disponível" />;
     }
   };
 
@@ -35,6 +37,7 @@ export function CapabilityBadge({ label, enabled, tooltip, icon = 'check' }: Cap
       color={enabled ? 'success' : 'default'}
       icon={getIcon()}
       sx={{ mr: 1, mb: 1 }}
+      aria-label={`${label}: ${enabled ? 'disponível' : 'não disponível'}`}
     />
   );
 

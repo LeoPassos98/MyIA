@@ -1,52 +1,54 @@
+// frontend/src/utils/logger.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+
 /**
- * frontend/src/utils/logger.ts
- * Conditional logger for development/production
- * Standards: docs/STANDARDS.md
+ * Logger condicional para desenvolvimento
+ * 
+ * Em produção, apenas warn e error são exibidos.
+ * Em desenvolvimento, todos os níveis são exibidos.
  */
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = import.meta.env.DEV;
 
 export const logger = {
   /**
-   * Log informativo (apenas em desenvolvimento)
+   * Debug logs - apenas em desenvolvimento
    */
-  log: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (isDev) {
       console.log(...args);
     }
   },
-  
+
   /**
-   * Log de erro (sempre ativo)
+   * Log logs - apenas em desenvolvimento (alias para info)
    */
-  error: (...args: any[]) => {
-    console.error(...args);
-  },
-  
-  /**
-   * Log de warning (apenas em desenvolvimento)
-   */
-  warn: (...args: any[]) => {
+  log: (...args: unknown[]) => {
     if (isDev) {
-      console.warn(...args);
+      console.log(...args);
     }
   },
-  
+
   /**
-   * Log de debug (apenas em desenvolvimento)
+   * Info logs - apenas em desenvolvimento
    */
-  debug: (...args: any[]) => {
-    if (isDev) {
-      console.debug(...args);
-    }
-  },
-  
-  /**
-   * Log de info (apenas em desenvolvimento)
-   */
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     if (isDev) {
       console.info(...args);
     }
-  }
+  },
+
+  /**
+   * Warning logs - sempre exibidos
+   */
+  warn: (...args: unknown[]) => {
+    console.warn(...args);
+  },
+
+  /**
+   * Error logs - sempre exibidos
+   */
+  error: (...args: unknown[]) => {
+    console.error(...args);
+  },
 };

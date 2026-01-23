@@ -39,11 +39,11 @@ class CertificationService {
    * Credenciais são buscadas automaticamente do banco
    */
   async certifyModel(modelId: string): Promise<CertificationResult> {
-    logger.log('[CertificationService] 🚀 Chamando API POST /certification/certify-model:', { modelId });
+    logger.debug('[CertificationService] 🚀 Chamando API POST /certification/certify-model:', { modelId });
     const response = await api.post('/certification/certify-model', {
       modelId
     });
-    logger.log('[CertificationService] ✅ Resposta recebida:', response.data);
+    logger.debug('[CertificationService] ✅ Resposta recebida:', response.data);
     
     // ✅ OTIMIZAÇÃO: Invalidar cache após certificação
     this.invalidateCache();
@@ -88,19 +88,19 @@ class CertificationService {
     
     // ✅ OTIMIZAÇÃO: Retornar do cache se válido
     if (!forceRefresh && this.cache.certifiedModels && (now - this.cache.timestamp) < this.CACHE_TTL) {
-      logger.log('[CertificationService] 📦 Retornando do cache:', this.cache.certifiedModels.length, 'modelos');
+      logger.debug('[CertificationService] 📦 Retornando do cache:', this.cache.certifiedModels.length, 'modelos');
       return this.cache.certifiedModels;
     }
     
     // ✅ Buscar do backend e atualizar cache
-    logger.log('[CertificationService] 📋 Chamando API GET /certification/certified-models');
+    logger.debug('[CertificationService] 📋 Chamando API GET /certification/certified-models');
     const response = await api.get('/certification/certified-models');
     
     const modelIds = response.data.modelIds || [];
     this.cache.certifiedModels = modelIds;
     this.cache.timestamp = now;
     
-    logger.log('[CertificationService] ✅ Cache atualizado:', modelIds.length, 'modelos');
+    logger.debug('[CertificationService] ✅ Cache atualizado:', modelIds.length, 'modelos');
     
     return modelIds;
   }
@@ -112,11 +112,11 @@ class CertificationService {
   async getFailedModels(_forceRefresh = false): Promise<string[]> {
     // Usar o mesmo cache para simplificar, mas com chave diferente
     // Por enquanto, sempre buscar do backend
-    logger.log('[CertificationService] 📋 Chamando API GET /certification/failed-models');
+    logger.debug('[CertificationService] 📋 Chamando API GET /certification/failed-models');
     const response = await api.get('/certification/failed-models');
     
     const modelIds = response.data.modelIds || [];
-    logger.log('[CertificationService] ❌ Modelos que falharam:', modelIds.length, 'modelos');
+    logger.debug('[CertificationService] ❌ Modelos que falharam:', modelIds.length, 'modelos');
     
     return modelIds;
   }
@@ -130,12 +130,12 @@ class CertificationService {
     
     // ✅ OTIMIZAÇÃO: Retornar do cache se válido
     if (!forceRefresh && this.cache.unavailableModels && (now - this.cache.timestamp) < this.CACHE_TTL) {
-      logger.log('[CertificationService] 📦 Retornando do cache (all failed):', this.cache.unavailableModels.length, 'modelos');
+      logger.debug('[CertificationService] 📦 Retornando do cache (all failed):', this.cache.unavailableModels.length, 'modelos');
       return this.cache.unavailableModels;
     }
     
     // ✅ Buscar do backend e atualizar cache
-    logger.log('[CertificationService] 📋 Chamando API GET /certification/all-failed-models');
+    logger.debug('[CertificationService] 📋 Chamando API GET /certification/all-failed-models');
     const response = await api.get('/certification/all-failed-models');
     
     // 🐛 DEBUG: Verificar estrutura da resposta
@@ -146,7 +146,7 @@ class CertificationService {
     this.cache.unavailableModels = modelIds;
     this.cache.timestamp = now;
     
-    logger.log('[CertificationService] ❌ Todos os modelos failed:', modelIds.length, 'modelos');
+    logger.debug('[CertificationService] ❌ Todos os modelos failed:', modelIds.length, 'modelos');
     
     return modelIds;
   }
@@ -161,12 +161,12 @@ class CertificationService {
     
     // ✅ OTIMIZAÇÃO: Retornar do cache se válido
     if (!forceRefresh && this.cache.unavailableModels && (now - this.cache.timestamp) < this.CACHE_TTL) {
-      logger.log('[CertificationService] 📦 Retornando do cache (unavailable):', this.cache.unavailableModels.length, 'modelos');
+      logger.debug('[CertificationService] 📦 Retornando do cache (unavailable):', this.cache.unavailableModels.length, 'modelos');
       return this.cache.unavailableModels;
     }
     
     // ✅ Buscar do backend e atualizar cache
-    logger.log('[CertificationService] 📋 Chamando API GET /certification/unavailable-models');
+    logger.debug('[CertificationService] 📋 Chamando API GET /certification/unavailable-models');
     const response = await api.get('/certification/unavailable-models');
     
     // 🐛 DEBUG: Verificar estrutura da resposta
@@ -178,7 +178,7 @@ class CertificationService {
     this.cache.unavailableModels = modelIds;
     this.cache.timestamp = now;
     
-    logger.log('[CertificationService] ❌ Modelos indisponíveis:', modelIds.length, 'modelos');
+    logger.debug('[CertificationService] ❌ Modelos indisponíveis:', modelIds.length, 'modelos');
     
     return modelIds;
   }
@@ -192,12 +192,12 @@ class CertificationService {
     
     // ✅ OTIMIZAÇÃO: Retornar do cache se válido
     if (!forceRefresh && this.cache.qualityWarningModels && (now - this.cache.timestamp) < this.CACHE_TTL) {
-      logger.log('[CertificationService] 📦 Retornando do cache (quality warning):', this.cache.qualityWarningModels.length, 'modelos');
+      logger.debug('[CertificationService] 📦 Retornando do cache (quality warning):', this.cache.qualityWarningModels.length, 'modelos');
       return this.cache.qualityWarningModels;
     }
     
     // ✅ Buscar do backend e atualizar cache
-    logger.log('[CertificationService] 📋 Chamando API GET /certification/quality-warning-models');
+    logger.debug('[CertificationService] 📋 Chamando API GET /certification/quality-warning-models');
     const response = await api.get('/certification/quality-warning-models');
     
     // 🐛 DEBUG: Verificar estrutura da resposta
@@ -209,7 +209,7 @@ class CertificationService {
     this.cache.qualityWarningModels = modelIds;
     this.cache.timestamp = now;
     
-    logger.log('[CertificationService] ⚠️ Modelos com warning de qualidade:', modelIds.length, 'modelos');
+    logger.debug('[CertificationService] ⚠️ Modelos com warning de qualidade:', modelIds.length, 'modelos');
     
     return modelIds;
   }
@@ -242,7 +242,7 @@ class CertificationService {
    * Deve ser chamado após qualquer operação de certificação
    */
   invalidateCache(): void {
-    logger.log('[CertificationService] 🗑️ Cache invalidado');
+    logger.debug('[CertificationService] 🗑️ Cache invalidado');
     this.cache.certifiedModels = null;
     this.cache.unavailableModels = null;
     this.cache.qualityWarningModels = null;

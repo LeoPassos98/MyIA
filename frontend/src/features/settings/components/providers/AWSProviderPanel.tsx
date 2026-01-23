@@ -228,15 +228,21 @@ export default function AWSProviderPanel() {
   } = useAWSConfig();
 
   // Detectar credenciais existentes ao carregar
+  // ✅ CORREÇÃO: Só marcar como "credenciais existentes" se validationStatus for 'valid'
+  // Isso evita que o sistema bloqueie os campos quando o usuário está digitando
+  // novas credenciais pela primeira vez
   useEffect(() => {
-    if (formState.accessKey && formState.accessKey.length > 0) {
+    // Só considerar credenciais existentes se:
+    // 1. Tem accessKey preenchido
+    // 2. E o status de validação é 'valid' (credenciais já foram validadas anteriormente)
+    if (formState.accessKey && formState.accessKey.length > 0 && validationStatus === 'valid') {
       setHasExistingCredentials(true);
       setIsEditingCredentials(false);
     } else {
       setHasExistingCredentials(false);
       setIsEditingCredentials(false);
     }
-  }, [formState.accessKey]);
+  }, [formState.accessKey, validationStatus]);
 
   // Buscar modelos certificados, indisponíveis (failed) e com warning de qualidade
   useEffect(() => {

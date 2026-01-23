@@ -59,6 +59,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     topP: 0.9,          // ADICIONAR - Nucleus sampling padrão
     maxTokens: 2048,    // ADICIONAR - Limite de saída padrão
     memoryWindow: 10,
+    isAutoMode: true,   // ✅ NOVO - Modo Auto ativado por padrão
   });
 
   // Context Pipeline configuration (valores conservadores para Groq free tier: 12K TPM limit)

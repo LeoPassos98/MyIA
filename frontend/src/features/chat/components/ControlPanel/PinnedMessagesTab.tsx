@@ -1,9 +1,9 @@
 // frontend/src/features/chat/components/ControlPanel/PinnedMessagesTab.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { 
-  Box, Typography, List, ListItem, ListItemText, 
-  IconButton, alpha, useTheme, Chip
+import {
+  Box, Typography, List, ListItem, ListItemText,
+  IconButton, Chip, Button
 } from '@mui/material';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -13,7 +13,6 @@ import { useControlPanelLogic } from './useControlPanelLogic';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 export const PinnedMessagesTab = () => {
-  const theme = useTheme();
   const { chatHistorySnapshot, onUnpinMessage } = useControlPanelLogic();
   
   // Filtra apenas mensagens pinadas
@@ -42,21 +41,43 @@ export const PinnedMessagesTab = () => {
       </Box>
 
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-        Mensagens fixadas são enviadas obrigatoriamente no contexto de todas as próximas mensagens, 
+        Mensagens fixadas são enviadas obrigatoriamente no contexto de todas as próximas mensagens,
         tendo prioridade sobre o RAG e memória recente.
       </Typography>
+
+      {/* Toolbar de Ações em Lote */}
+      {pinnedMessages.length > 0 && (
+        <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'flex-end' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => {
+              if (confirm(`Deseja realmente desafixar todas as ${pinnedMessages.length} mensagens?`)) {
+                pinnedMessages.forEach(msg => onUnpinMessage?.(msg.id));
+              }
+            }}
+          >
+            Desafixar Todas ({pinnedMessages.length})
+          </Button>
+        </Box>
+      )}
 
       {/* Lista de Mensagens Pinadas */}
       <PanelSection sx={{ maxHeight: 400, overflow: 'auto', p: 0, ...scrollbarStyles }}>
         <List dense>
           {pinnedMessages.length === 0 ? (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-              <PushPinIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <PushPinIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2, opacity: 0.5 }} />
+              <Typography variant="body2" color="text.secondary" gutterBottom>
                 Nenhuma mensagem fixada.
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Use o ícone 📌 nas mensagens do chat para fixá-las.
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                Use o ícone 📌 nas mensagens do chat para fixá-las aqui.
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, fontStyle: 'italic' }}>
+                Mensagens fixadas têm prioridade máxima no contexto da IA.
               </Typography>
             </Box>
           ) : (
@@ -66,18 +87,22 @@ export const PinnedMessagesTab = () => {
                 sx={{
                   borderBottom: '1px solid',
                   borderColor: 'divider',
-                  bgcolor: alpha(theme.palette.secondary.main, 0.05),
-                  '&:hover': { 
-                    bgcolor: alpha(theme.palette.secondary.main, 0.1) 
+                  bgcolor: 'backgrounds.secondarySubtle',
+                  '&:hover': {
+                    bgcolor: 'backgrounds.secondaryHover'
                   }
                 }}
                 secondaryAction={
-                  <IconButton 
-                    edge="end" 
+                  <IconButton
+                    edge="end"
                     size="small"
                     title="Desafixar mensagem"
-                    onClick={() => onUnpinMessage?.(msg.id)}
-                    sx={{ 
+                    onClick={() => {
+                      if (confirm('Deseja realmente desafixar esta mensagem?')) {
+                        onUnpinMessage?.(msg.id);
+                      }
+                    }}
+                    sx={{
                       color: 'text.secondary',
                       '&:hover': { color: 'error.main' }
                     }}
@@ -125,13 +150,14 @@ export const PinnedMessagesTab = () => {
 
       {/* Aviso de Prioridade */}
       {pinnedMessages.length > 0 && (
-        <Box 
-          sx={{ 
-            mt: 2, 
-            p: 2, 
+        <Box
+          sx={{
+            mt: 2,
+            p: 2,
             borderRadius: 1,
-            bgcolor: alpha(theme.palette.info.main, 0.1),
-              border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+            bgcolor: 'backgrounds.infoSubtle',
+            borderColor: 'borders.infoSubtle',
+            border: '1px solid',
           }}
         >
           <Typography variant="caption" color="info.main" fontWeight="bold">

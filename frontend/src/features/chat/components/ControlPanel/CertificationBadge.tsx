@@ -11,13 +11,14 @@
  */
 
 import { Chip, Tooltip, type ChipProps } from '@mui/material';
-import { 
-  CheckCircle, 
-  Warning, 
+import {
+  CheckCircle,
+  Warning,
   Error as ErrorIcon,
-  HelpOutline 
+  HelpOutline
 } from '@mui/icons-material';
 import type { CertificationStatus, ErrorCategory } from '../../../../types/ai';
+import { formatRelativeDate } from '../../../../utils/formatters';
 
 /**
  * Props do componente CertificationBadge
@@ -94,8 +95,8 @@ export function CertificationBadge({
           color: 'success',
           icon: <CheckCircle sx={{ fontSize: 16 }} />,
           label: successRate !== undefined ? `Certificado (${successRate}%)` : 'Certificado',
-          tooltip: lastChecked 
-            ? `Testado em ${formatDate(lastChecked)}. Taxa de sucesso: ${successRate || 100}%`
+          tooltip: lastChecked
+            ? `Testado em ${formatRelativeDate(lastChecked)}. Taxa de sucesso: ${successRate || 100}%`
             : 'Modelo certificado e funcionando corretamente'
         };
       
@@ -162,34 +163,6 @@ export function CertificationBadge({
 }
 
 /**
- * Formata a data para exibição amigável
- */
-function formatDate(isoDate: string): string {
-  try {
-    const date = new Date(isoDate);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) {
-      return 'hoje';
-    } else if (diffDays === 1) {
-      return 'ontem';
-    } else if (diffDays < 7) {
-      return `há ${diffDays} dias`;
-    } else {
-      return date.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-    }
-  } catch {
-    return 'data desconhecida';
-  }
-}
-
-/**
  * Formata a categoria de erro para exibição amigável
  */
 function formatErrorCategory(category: ErrorCategory): string {
@@ -231,7 +204,10 @@ export function CertificationBadgeGroup({ badges }: CertificationBadgeGroupProps
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       {badges.map((badge, index) => (
-        <CertificationBadge key={index} {...badge} />
+        <CertificationBadge
+          key={`${badge.status}-${badge.lastChecked || index}`}
+          {...badge}
+        />
       ))}
     </div>
   );

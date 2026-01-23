@@ -3,7 +3,7 @@
 
 import {
   Box, Typography, Switch, FormControlLabel, Slider, TextField,
-  Divider, Chip, alpha, useTheme, Tooltip, IconButton, Alert
+  Divider, Chip, Tooltip, IconButton, Alert
 } from '@mui/material';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import PushPinIcon from '@mui/icons-material/PushPin';
@@ -16,20 +16,11 @@ import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useLayout } from '../../../../contexts/LayoutContext';
 import { useModelCapabilities } from '../../../../hooks/useModelCapabilities';
-
-const DEFAULT_CONFIG = {
-  systemPrompt: 'Você é uma IA útil e direta.',
-  useCustomSystemPrompt: false,
-  pinnedEnabled: true,
-  recentEnabled: true,
-  recentCount: 10,
-  ragEnabled: true,
-  ragTopK: 5,
-  maxContextTokens: 6000,
-};
+import { DEFAULT_CONTEXT_CONFIG, CONTEXT_LIMITS } from '../../../../constants/contextDefaults';
+import { logger } from '../../../../utils/logger';
+import { formatTokens, formatPercentage, formatNumber } from '../../../../utils/formatters';
 
 export const ContextConfigTab = () => {
-  const theme = useTheme();
   const { contextConfig, updateContextConfig, chatHistorySnapshot, manualContext, chatConfig } = useLayout();
 
   // Hook de capabilities do modelo selecionado
@@ -37,6 +28,10 @@ export const ContextConfigTab = () => {
     chatConfig.provider,
     chatConfig.model
   );
+
+  // ✅ VALIDAÇÃO: Se capabilities não carregar, usar valores default seguros
+  const maxContextWindow = capabilities?.maxContextWindow ?? CONTEXT_LIMITS.maxContextTokens.max;
+  const hasCapabilities = !!capabilities;
 
   // Modo manual ativo desabilita as opções de pipeline automático
   const isManualMode = manualContext.hasAdditionalContext;
@@ -46,11 +41,11 @@ export const ContextConfigTab = () => {
   const totalMessages = chatHistorySnapshot.length;
 
   const handleReset = () => {
-    console.log('🔄 [ContextConfigTab] Reset to defaults:', {
+    logger.debug('🔄 [ContextConfigTab] Reset to defaults:', {
       from: contextConfig,
-      to: DEFAULT_CONFIG
+      to: DEFAULT_CONTEXT_CONFIG
     });
-    updateContextConfig(DEFAULT_CONFIG);
+    updateContextConfig(DEFAULT_CONTEXT_CONFIG);
   };
 
   return (
@@ -104,7 +99,7 @@ export const ContextConfigTab = () => {
               <Switch
                 checked={contextConfig.useCustomSystemPrompt}
                 onChange={(e) => {
-                  console.log('🧠 [ContextConfigTab] System Prompt toggle:', {
+                  logger.debug('🧠 [ContextConfigTab] System Prompt toggle:', {
                     enabled: e.target.checked,
                     promptLength: contextConfig.systemPrompt.length
                   });
@@ -130,7 +125,7 @@ export const ContextConfigTab = () => {
           size="small"
           sx={{
             '& .MuiOutlinedInput-root': {
-              bgcolor: alpha(theme.palette.background.default, 0.5),
+              bgcolor: 'backgrounds.defaultTransparent',
             }
           }}
         />
@@ -159,7 +154,7 @@ export const ContextConfigTab = () => {
           <Switch
             checked={contextConfig.pinnedEnabled}
             onChange={(e) => {
-              console.log('📌 [ContextConfigTab] Pinned messages toggle:', {
+              logger.debug('📌 [ContextConfigTab] Pinned messages toggle:', {
                 enabled: e.target.checked,
                 pinnedCount,
                 isManualMode
@@ -199,7 +194,7 @@ export const ContextConfigTab = () => {
           <Switch
             checked={contextConfig.recentEnabled}
             onChange={(e) => {
-              console.log('📜 [ContextConfigTab] Recent messages toggle:', {
+              logger.debug('📜 [ContextConfigTab] Recent messages toggle:', {
                 enabled: e.target.checked,
                 recentCount: contextConfig.recentCount,
                 totalMessages,
@@ -220,7 +215,7 @@ export const ContextConfigTab = () => {
           <Slider
             value={contextConfig.recentCount}
             onChange={(_, value) => {
-              console.log('📊 [ContextConfigTab] Recent count changed:', {
+              logger.debug('📊 [ContextConfigTab] Recent count changed:', {
                 from: contextConfig.recentCount,
                 to: value,
                 totalMessages
@@ -228,14 +223,9 @@ export const ContextConfigTab = () => {
               updateContextConfig({ recentCount: value as number });
             }}
             disabled={!contextConfig.recentEnabled || isManualMode}
-            min={1}
-            max={50}
-            marks={[
-              { value: 1, label: '1' },
-              { value: 10, label: '10' },
-              { value: 25, label: '25' },
-              { value: 50, label: '50' },
-            ]}
+            min={CONTEXT_LIMITS.recentCount.min}
+            max={CONTEXT_LIMITS.recentCount.max}
+            marks={CONTEXT_LIMITS.recentCount.marks}
             valueLabelDisplay="auto"
             color="success"
             size="small"
@@ -260,7 +250,7 @@ export const ContextConfigTab = () => {
           <Switch
             checked={contextConfig.ragEnabled}
             onChange={(e) => {
-              console.log('🔍 [ContextConfigTab] RAG toggle:', {
+              logger.debug('🔍 [ContextConfigTab] RAG toggle:', {
                 enabled: e.target.checked,
                 ragTopK: contextConfig.ragTopK,
                 isManualMode
@@ -280,21 +270,16 @@ export const ContextConfigTab = () => {
           <Slider
             value={contextConfig.ragTopK}
             onChange={(_, value) => {
-              console.log('📊 [ContextConfigTab] RAG topK changed:', {
+              logger.debug('📊 [ContextConfigTab] RAG topK changed:', {
                 from: contextConfig.ragTopK,
                 to: value
               });
               updateContextConfig({ ragTopK: value as number });
             }}
             disabled={!contextConfig.ragEnabled || isManualMode}
-            min={1}
-            max={20}
-            marks={[
-              { value: 1, label: '1' },
-              { value: 5, label: '5' },
-              { value: 10, label: '10' },
-              { value: 20, label: '20' },
-            ]}
+            min={CONTEXT_LIMITS.ragTopK.min}
+            max={CONTEXT_LIMITS.ragTopK.max}
+            marks={CONTEXT_LIMITS.ragTopK.marks}
             valueLabelDisplay="auto"
             color="secondary"
             size="small"
@@ -329,44 +314,56 @@ export const ContextConfigTab = () => {
           <Slider
             value={contextConfig.maxContextTokens}
             onChange={(_, value) => {
-              const maxWindow = capabilities?.maxContextWindow ?? 8000;
-              console.log('🎯 [ContextConfigTab] Max context tokens changed:', {
+              logger.debug('🎯 [ContextConfigTab] Max context tokens changed:', {
                 from: contextConfig.maxContextTokens,
                 to: value,
-                percentage: ((value as number) / maxWindow * 100).toFixed(0) + '%',
-                modelMaxWindow: maxWindow
+                percentage: ((value as number) / maxContextWindow * 100).toFixed(0) + '%',
+                modelMaxWindow: maxContextWindow
               });
               updateContextConfig({ maxContextTokens: value as number });
             }}
-            min={1000}
-            max={capabilities?.maxContextWindow ?? 8000}
-            step={1000}
+            min={CONTEXT_LIMITS.maxContextTokens.min}
+            max={maxContextWindow}
+            step={CONTEXT_LIMITS.maxContextTokens.step}
             marks={[
-              { value: 1000, label: '1K' },
-              { value: capabilities?.maxContextWindow ?? 8000, label: `${((capabilities?.maxContextWindow ?? 8000) / 1000).toFixed(0)}K` }
+              { value: CONTEXT_LIMITS.maxContextTokens.min, label: formatTokens(CONTEXT_LIMITS.maxContextTokens.min) },
+              { value: maxContextWindow, label: formatTokens(maxContextWindow) }
             ]}
             valueLabelDisplay="auto"
-            valueLabelFormat={(v) => `${(v / 1000).toFixed(1)}K`}
+            valueLabelFormat={(v) => formatTokens(v)}
             color="error"
             size="small"
           />
+
+          {/* Indicador de uso de tokens */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              {formatNumber(contextConfig.maxContextTokens)} tokens configurados
+            </Typography>
+            <Typography
+              variant="caption"
+              color={contextConfig.maxContextTokens > maxContextWindow * 0.8 ? 'warning.main' : 'success.main'}
+              fontWeight="bold"
+            >
+              {formatPercentage(contextConfig.maxContextTokens, maxContextWindow)} do limite
+            </Typography>
+          </Box>
           
-          {/* Aviso dinâmico baseado em capabilities */}
-          {capabilities && contextConfig.maxContextTokens > capabilities.maxContextWindow && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              ⚠️ O limite configurado ({contextConfig.maxContextTokens.toLocaleString()} tokens)
-              excede a capacidade do modelo ({capabilities.maxContextWindow.toLocaleString()} tokens).
-              O modelo usará no máximo {capabilities.maxContextWindow.toLocaleString()} tokens.
+          {/* Aviso se capabilities não carregaram */}
+          {!hasCapabilities && (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              ℹ️ Usando limite padrão de {(maxContextWindow / 1000).toFixed(0)}K tokens.
+              As configurações do modelo não puderam ser carregadas.
             </Alert>
           )}
         </Box>
       </PanelSection>
 
       {/* Preview do Pipeline */}
-      <Box sx={{ 
-        mt: 3, 
-        p: 2, 
-        bgcolor: alpha(isManualMode ? theme.palette.warning.main : theme.palette.secondary.main, 0.05), 
+      <Box sx={{
+        mt: 3,
+        p: 2,
+        bgcolor: isManualMode ? 'backgrounds.warningSubtle' : 'backgrounds.secondarySubtle',
         borderRadius: 2,
         border: '1px dashed',
         borderColor: isManualMode ? 'warning.main' : 'divider'

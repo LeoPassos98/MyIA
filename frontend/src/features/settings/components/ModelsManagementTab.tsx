@@ -57,7 +57,7 @@ export default function ModelsManagementTab() {
 
   const loadData = async () => {
     try {
-      logger.log('[ModelsManagementTab] 🔄 Iniciando loadData...');
+      logger.debug('[ModelsManagementTab] 🔄 Iniciando loadData...');
       setIsLoading(true);
       setError(null);
       
@@ -66,13 +66,13 @@ export default function ModelsManagementTab() {
         certificationService.getCertifiedModels()
       ]);
 
-      logger.log('[ModelsManagementTab] 📦 Providers recebidos:', providersData);
-      logger.log('[ModelsManagementTab] ✅ Modelos certificados recebidos:', certifiedData);
+      logger.debug('[ModelsManagementTab] 📦 Providers recebidos:', providersData);
+      logger.debug('[ModelsManagementTab] ✅ Modelos certificados recebidos:', certifiedData);
       
       setProviders(providersData);
       setCertifiedModels(certifiedData);
       
-      logger.log('[ModelsManagementTab] 💾 Estado atualizado - certifiedModels:', certifiedData);
+      logger.debug('[ModelsManagementTab] 💾 Estado atualizado - certifiedModels:', certifiedData);
     } catch (err) {
       logger.error('[ModelsManagementTab] ❌ Erro ao carregar dados:', err);
       setError('Erro ao carregar modelos');
@@ -106,16 +106,16 @@ export default function ModelsManagementTab() {
 
   // Handler para certificar modelo individual
   const handleCertifyModel = async (modelId: string) => {
-    logger.log(`[ModelsManagementTab] Iniciando certificação para: ${modelId}`);
+    logger.debug(`[ModelsManagementTab] Iniciando certificação para: ${modelId}`);
     setIsCertifying(modelId);
     setError(null);
     setSuccess(null);
 
     try {
       // Credenciais são buscadas automaticamente do banco pelo backend
-      logger.log(`[ModelsManagementTab] Chamando certificationService.certifyModel...`);
+      logger.debug(`[ModelsManagementTab] Chamando certificationService.certifyModel...`);
       const result = await certificationService.certifyModel(modelId);
-      logger.log(`[ModelsManagementTab] Resultado da certificação:`, result);
+      logger.debug(`[ModelsManagementTab] Resultado da certificação:`, result);
 
       if (result.isCertified) {
         // ✅ OTIMIZAÇÃO: Atualizar apenas certifiedModels (sem recarregar providers)
@@ -126,7 +126,7 @@ export default function ModelsManagementTab() {
         if (!awsEnabledModels.includes(modelId)) {
           setAWSEnabledModels([...awsEnabledModels, modelId]);
           await saveAWSConfig();
-          logger.log(`[ModelsManagementTab] ✅ Modelo ${modelId} salvo automaticamente`);
+          logger.debug(`[ModelsManagementTab] ✅ Modelo ${modelId} salvo automaticamente`);
         }
         
         // ✅ OTIMIZAÇÃO: Removido loadData() - não é necessário recarregar providers
@@ -155,7 +155,7 @@ export default function ModelsManagementTab() {
       return;
     }
 
-    logger.log(`[ModelsManagementTab] Certificando ${uncertifiedSelected.length} modelos...`);
+    logger.debug(`[ModelsManagementTab] Certificando ${uncertifiedSelected.length} modelos...`);
     setIsCertifyingBatch(true);
     setError(null);
     setSuccess(null);
@@ -191,7 +191,7 @@ export default function ModelsManagementTab() {
         const updatedModels = [...awsEnabledModels, ...modelsToAdd];
         setAWSEnabledModels(updatedModels);
         await saveAWSConfig();
-        logger.log(`[ModelsManagementTab] ✅ ${modelsToAdd.length} modelos salvos automaticamente`);
+        logger.debug(`[ModelsManagementTab] ✅ ${modelsToAdd.length} modelos salvos automaticamente`);
       }
     }
 
@@ -376,7 +376,7 @@ export default function ModelsManagementTab() {
                 const isCurrentlyCertifying = isCertifying === model.apiModelId;
                 const isSelected = selectedModels.includes(model.apiModelId);
                 
-                logger.log(`[ModelsManagementTab] 🎨 Renderizando badge para ${model.apiModelId}:`, {
+                logger.debug(`[ModelsManagementTab] 🎨 Renderizando badge para ${model.apiModelId}:`, {
                   isCertified,
                   certifiedModels,
                   includes: certifiedModels.includes(model.apiModelId)

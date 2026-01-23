@@ -1,7 +1,7 @@
 // frontend/src/features/chat/components/ControlPanel/PanelSection.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { Paper, PaperProps, alpha, useTheme } from '@mui/material';
+import { Paper, PaperProps } from '@mui/material';
 import { ReactNode } from 'react';
 
 interface PanelSectionProps extends PaperProps {
@@ -11,8 +11,6 @@ interface PanelSectionProps extends PaperProps {
 }
 
 export const PanelSection = ({ children, active = false, disabled = false, sx, ...props }: PanelSectionProps) => {
-  const theme = useTheme();
-  
   return (
     <Paper
       variant="outlined"
@@ -20,12 +18,12 @@ export const PanelSection = ({ children, active = false, disabled = false, sx, .
         p: 2,
         mb: 2,
         borderRadius: 2,
-        // Design System: Background adaptativo com alpha
+        // Design System: Background adaptativo com tokens do tema
         bgcolor: disabled
-          ? alpha(theme.palette.action.disabledBackground, 0.3)
-          : active 
-            ? alpha(theme.palette.background.paper, 0.8) 
-            : alpha(theme.palette.background.default, 0.5),
+          ? 'backgrounds.disabledSubtle'
+          : active
+            ? 'backgrounds.paperTransparent'
+            : 'backgrounds.defaultTransparent',
         borderColor: disabled ? 'action.disabled' : active ? 'warning.main' : 'divider',
         borderWidth: active && !disabled ? 2 : 1,
         transition: 'all 0.3s ease',

@@ -1,11 +1,12 @@
 // frontend/src/features/chat/components/ControlPanel/HelpTooltip.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { Tooltip, Box, Typography, alpha, useTheme, Link } from '@mui/material';
+import { Tooltip, Box, Typography, Link } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
 import { ReactNode } from 'react';
+import { UI_DIMENSIONS } from '../../../../constants/uiConstants';
 
 interface HelpTooltipProps {
   title: string;
@@ -30,10 +31,8 @@ export const HelpTooltip = ({
   warning,
   info
 }: HelpTooltipProps) => {
-  const theme = useTheme();
-
   const content: ReactNode = (
-    <Box sx={{ p: 0.5, maxWidth: 320 }}>
+    <Box sx={{ p: 0.5, maxWidth: UI_DIMENSIONS.tooltipMaxWidth }}>
       <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
         {title}
       </Typography>
@@ -49,9 +48,10 @@ export const HelpTooltip = ({
           gap: 0.5,
           mb: 1,
           p: 0.75,
-          bgcolor: alpha(theme.palette.warning.main, 0.15),
+          bgcolor: 'backgrounds.warningSubtle',
           borderRadius: 0.5,
-          border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`
+          borderColor: 'borders.warningSubtle',
+          border: '1px solid'
         }}>
           <WarningIcon sx={{ fontSize: 14, color: 'warning.main', mt: 0.25 }} />
           <Typography variant="caption" sx={{ flex: 1, color: 'warning.light' }}>
@@ -68,9 +68,10 @@ export const HelpTooltip = ({
           gap: 0.5,
           mb: 1,
           p: 0.75,
-          bgcolor: alpha(theme.palette.info.main, 0.15),
+          bgcolor: 'backgrounds.infoSubtle',
           borderRadius: 0.5,
-          border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`
+          borderColor: 'borders.infoSubtle',
+          border: '1px solid'
         }}>
           <InfoIcon sx={{ fontSize: 14, color: 'info.main', mt: 0.25 }} />
           <Typography variant="caption" sx={{ flex: 1, color: 'info.light' }}>
@@ -85,7 +86,7 @@ export const HelpTooltip = ({
           mt: 1,
           pt: 1,
           borderTop: '1px solid',
-          borderColor: alpha(theme.palette.common.white, 0.2)
+          borderColor: 'borders.whiteSubtle'
         }}>
           <Typography variant="caption" fontWeight="bold" sx={{ display: 'block', mb: 0.5 }}>
             Exemplos:
@@ -104,7 +105,7 @@ export const HelpTooltip = ({
           mt: 1,
           pt: 1,
           borderTop: '1px solid',
-          borderColor: alpha(theme.palette.common.white, 0.2)
+          borderColor: 'borders.whiteSubtle'
         }}>
           <Link
             href={docLink}

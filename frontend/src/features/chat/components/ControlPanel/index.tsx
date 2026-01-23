@@ -2,7 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 // Otimização Fase 2: Layout Optimization - CSS transforms para animações GPU-accelerated
 
-import { Box, Typography, Tabs, Tab, alpha, useTheme } from '@mui/material';
+import { Box, Typography, Tabs, Tab, useTheme } from '@mui/material';
 import TuneIcon from '@mui/icons-material/Tune';
 import MessageIcon from '@mui/icons-material/Message';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
@@ -14,6 +14,7 @@ import { ManualContextTab } from './ManualContextTab';
 import { PinnedMessagesTab } from './PinnedMessagesTab';
 import { ContextConfigTab } from './ContextConfigTab';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
+import { KEYFRAMES, ANIMATION_DURATIONS } from '../../../../constants/uiConstants';
 
 export default function ControlPanel() {
   const theme = useTheme();
@@ -39,7 +40,7 @@ export default function ControlPanel() {
         p: 2,
         borderBottom: '1px solid',
         borderColor: 'divider',
-        bgcolor: alpha(theme.palette.background.paper, 0.8),
+        bgcolor: 'backgrounds.paperTransparent',
         backdropFilter: 'blur(10px)',
         // Otimização Fase 2: GPU acceleration para backdrop
         willChange: 'auto',
@@ -77,12 +78,25 @@ export default function ControlPanel() {
           },
         }}
       >
-        <Tab icon={<SmartToyIcon fontSize="small" />} label="Modelo" />
-        <Tab icon={<AccountTreeIcon fontSize="small" />} label="Contexto" />
-        <Tab icon={<MessageIcon fontSize="small" />} label="Manual" />
+        <Tab
+          icon={<SmartToyIcon fontSize="small" />}
+          label="Modelo"
+          aria-label="Configurações de modelo de IA"
+        />
+        <Tab
+          icon={<AccountTreeIcon fontSize="small" />}
+          label="Contexto"
+          aria-label="Configurações de pipeline de contexto"
+        />
+        <Tab
+          icon={<MessageIcon fontSize="small" />}
+          label="Manual"
+          aria-label="Modo de seleção manual de mensagens"
+        />
         <Tab
           icon={<PushPinIcon fontSize="small" />}
           label={pinnedCount > 0 ? `${pinnedCount}` : "Fixadas"}
+          aria-label={`Mensagens fixadas (${pinnedCount} mensagens)`}
         />
       </Tabs>
 
@@ -93,11 +107,8 @@ export default function ControlPanel() {
         p: 2,
         ...scrollbarStyles,
         // Otimização Fase 2: Fade in suave ao trocar tabs
-        animation: 'fadeIn 0.2s ease-in',
-        '@keyframes fadeIn': {
-          from: { opacity: 0, transform: 'translateY(4px)' },
-          to: { opacity: 1, transform: 'translateY(0)' },
-        },
+        animation: `fadeIn ${ANIMATION_DURATIONS.fast}s ease-in`,
+        '@keyframes fadeIn': KEYFRAMES.fadeIn,
       }}>
         {currentEditorTab === 0 && <ModelTab />}
         {currentEditorTab === 1 && <ContextConfigTab />}

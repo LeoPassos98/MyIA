@@ -4,7 +4,7 @@
 import {
   Box, Typography, FormControlLabel, Switch, Divider,
   List, ListItemButton, ListItemIcon, Checkbox, ListItemText,
-  alpha, useTheme, Alert, Chip
+  Alert, Chip, Button, Tooltip
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -14,7 +14,6 @@ import { useControlPanelLogic } from './useControlPanelLogic';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 
 export const ManualContextTab = () => {
-  const theme = useTheme();
   const { manualContext, setManualContext, chatHistorySnapshot, toggleMessageSelection } = useControlPanelLogic();
 
   const selectedCount = manualContext.selectedMessageIds.length;
@@ -75,14 +74,50 @@ export const ManualContextTab = () => {
             examples={['Selecione perguntas anteriores relevantes', 'Inclua respostas importantes da IA', 'Marque instruções que deu antes']}
           />
         </Box>
-        <Chip
-          icon={selectedCount > 0 ? <CheckCircleIcon /> : undefined}
-          label={`${selectedCount} selecionadas`}
-          size="small"
-          color={selectedCount > 0 ? 'warning' : 'default'}
-          variant="outlined"
-        />
+        <Tooltip title={selectedCount > 0 ? `${selectedCount} mensagens serão enviadas para a IA` : 'Nenhuma mensagem selecionada'}>
+          <Chip
+            icon={selectedCount > 0 ? <CheckCircleIcon /> : undefined}
+            label={`${selectedCount} selecionadas`}
+            size="small"
+            color={selectedCount > 0 ? 'warning' : 'default'}
+            variant="outlined"
+          />
+        </Tooltip>
       </Box>
+
+      {/* Toolbar de Ações em Lote */}
+      {chatHistorySnapshot.length > 0 && (
+        <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'flex-end' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              const allIds = chatHistorySnapshot.map(msg => msg.id);
+              setManualContext({
+                ...manualContext,
+                selectedMessageIds: allIds
+              });
+            }}
+            disabled={selectedCount === chatHistorySnapshot.length}
+          >
+            Selecionar Todas ({chatHistorySnapshot.length})
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            onClick={() => {
+              setManualContext({
+                ...manualContext,
+                selectedMessageIds: []
+              });
+            }}
+            disabled={selectedCount === 0}
+          >
+            Limpar Seleção
+          </Button>
+        </Box>
+      )}
       
       <PanelSection sx={{ maxHeight: 350, overflow: 'auto', p: 0, ...scrollbarStyles }}>
         <List dense>
@@ -103,9 +138,11 @@ export const ManualContextTab = () => {
                   sx={{
                     borderBottom: '1px solid',
                     borderColor: 'divider',
+                    borderLeft: isSelected ? '3px solid' : 'none',
+                    borderLeftColor: 'warning.main',
                     '&.Mui-selected': {
-                      bgcolor: alpha(theme.palette.warning.main, 0.15),
-                      '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.25) }
+                      bgcolor: 'backgrounds.warningSubtle',
+                      '&:hover': { bgcolor: 'backgrounds.warningHover' }
                     }
                   }}
                 >
