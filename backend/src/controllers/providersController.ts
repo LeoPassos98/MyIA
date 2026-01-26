@@ -214,33 +214,52 @@ export const providersController = {
    */
   async getAvailableModels(req: AuthRequest, res: Response) {
     try {
+      console.log('\n🔍 [getAvailableModels] ========== INÍCIO ==========');
       const userId = req.userId!;
+      console.log('📋 [getAvailableModels] userId:', userId);
+      
       if (!userId) {
+        console.log('❌ [getAvailableModels] Usuário não autorizado');
         return res.status(401).json(jsend.fail({ auth: 'Não autorizado' }));
       }
 
+      console.log('🔐 [getAvailableModels] Buscando credenciais do usuário...');
       // Buscar credenciais salvas do usuário
       const userSettings = await prisma.userSettings.findUnique({
         where: { userId },
         select: { awsAccessKey: true, awsSecretKey: true, awsRegion: true },
       });
 
+      console.log('📊 [getAvailableModels] Credenciais encontradas:', {
+        hasAccessKey: !!userSettings?.awsAccessKey,
+        hasSecretKey: !!userSettings?.awsSecretKey,
+        region: userSettings?.awsRegion
+      });
+
       if (!userSettings?.awsAccessKey || !userSettings?.awsSecretKey) {
+        console.log('❌ [getAvailableModels] Credenciais não configuradas');
         return res.status(400).json(jsend.fail({
           credentials: 'Nenhuma credencial AWS configurada. Configure suas credenciais primeiro.',
         }));
       }
 
+      console.log('🔓 [getAvailableModels] Descriptografando credenciais...');
       // Descriptografar credenciais
       const accessKey = encryptionService.decrypt(userSettings.awsAccessKey);
       const secretKey = encryptionService.decrypt(userSettings.awsSecretKey);
       const region = userSettings.awsRegion || 'us-east-1';
+      
+      console.log('✅ [getAvailableModels] Credenciais descriptografadas com sucesso');
+      console.log('🌍 [getAvailableModels] Região:', region);
 
+      console.log('☁️ [getAvailableModels] Criando BedrockProvider...');
       // Buscar modelos disponíveis na AWS
       const bedrockProvider = new BedrockProvider(region);
       const apiKey = `${accessKey}:${secretKey}`;
       
+      console.log('📡 [getAvailableModels] Chamando AWS Bedrock API...');
       const awsModels = await bedrockProvider.getAvailableModels(apiKey);
+      console.log(`✅ [getAvailableModels] AWS retornou ${awsModels.length} modelos`);
 
       // Debug: Log all models from AWS
       console.log(`[ProvidersController] AWS returned ${awsModels.length} models`);
@@ -251,16 +270,20 @@ export const providersController = {
       console.log('[ProvidersController] Registry models:', ModelRegistry.getAll().map(m => m.modelId));
 
       // Filter only supported models using Model Registry
+      console.log('🔍 [getAvailableModels] Filtrando modelos suportados...');
+      console.log(`📦 [getAvailableModels] Registry tem ${ModelRegistry.count()} modelos registrados`);
+      
       const supportedModels = awsModels.filter(model => {
         const isSupported = ModelRegistry.isSupported(model.modelId);
         if (!isSupported) {
-          console.log(`[ProvidersController] Model NOT in registry: ${model.modelId}`);
+          console.log(`⚠️ [getAvailableModels] Modelo NÃO está no registry: ${model.modelId}`);
         }
         return isSupported;
       });
       
-      console.log(`[ProvidersController] Filtered to ${supportedModels.length} supported models`);
+      console.log(`✅ [getAvailableModels] Filtrados ${supportedModels.length} modelos suportados`);
 
+      console.log('💾 [getAvailableModels] Buscando modelos no banco de dados...');
       // Buscar modelos cadastrados no banco para enriquecer com informações de custo
       const dbModels = await prisma.aIModel.findMany({
         where: {
@@ -278,7 +301,9 @@ export const providersController = {
           contextWindow: true
         }
       });
+      console.log(`📊 [getAvailableModels] Encontrados ${dbModels.length} modelos no banco`);
 
+      console.log('🔄 [getAvailableModels] Enriquecendo modelos com dados do banco e registry...');
       // Criar mapa de modelos do banco para lookup rápido
       const dbModelsMap = new Map(dbModels.map(m => [m.apiModelId, m]));
 
@@ -325,7 +350,10 @@ export const providersController = {
         );
         return providerMatch || nameMatch;
       });
+      
+      console.log(`✅ [getAvailableModels] Filtrados ${chatModels.length} modelos compatíveis com chat`);
 
+      console.log('📝 [getAvailableModels] Logando sucesso...');
       logger.info('AWS Bedrock models fetched', {
         userId,
         region,
@@ -335,6 +363,7 @@ export const providersController = {
         timestamp: new Date().toISOString(),
       });
 
+      console.log('✅ [getAvailableModels] Retornando resposta de sucesso');
       return res.json(jsend.success({
         models: chatModels,
         totalCount: chatModels.length,
@@ -342,15 +371,31 @@ export const providersController = {
       }));
 
     } catch (error: any) {
+      console.log('\n❌ [getAvailableModels] ========== ERRO ==========');
+      console.log('❌ [getAvailableModels] Tipo do erro:', error?.constructor?.name);
+      console.log('❌ [getAvailableModels] Mensagem:', error?.message);
+      console.log('❌ [getAvailableModels] Stack:', error?.stack);
+      
       if (error instanceof AppError) {
+        console.log('❌ [getAvailableModels] É um AppError, re-lançando...');
         throw error;
       }
+      
       const err = isError(error) ? error : new Error(String(error));
-      logger.error('Error fetching AWS Bedrock models', {
-        userId: req.userId,
-        error: err.message,
-        stack: err.stack,
-      });
+      
+      console.log('📝 [getAvailableModels] Tentando logar erro...');
+      try {
+        logger.error('Error fetching AWS Bedrock models', {
+          userId: req.userId,
+          error: err.message,
+          stack: err.stack,
+        });
+        console.log('✅ [getAvailableModels] Erro logado com sucesso');
+      } catch (logError) {
+        console.log('❌ [getAvailableModels] ERRO AO LOGAR:', logError);
+      }
+      
+      console.log('❌ [getAvailableModels] Retornando erro 500');
       return res.status(500).json(jsend.error('Erro ao buscar modelos AWS', 500));
     }
   },

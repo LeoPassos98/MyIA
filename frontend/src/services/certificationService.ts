@@ -139,8 +139,8 @@ class CertificationService {
     const response = await api.get('/certification/all-failed-models');
     
     // 🐛 DEBUG: Verificar estrutura da resposta
-    console.log('[CertificationService] 🔍 DEBUG: Resposta completa do backend (all failed):', response.data);
-    console.log('[CertificationService] 🔍 DEBUG: response.data.modelIds:', response.data.modelIds);
+    logger.debug('[CertificationService] 🔍 DEBUG: Resposta completa do backend (all failed)', { data: response.data });
+    logger.debug('[CertificationService] 🔍 DEBUG: response.data.modelIds', { modelIds: response.data.modelIds });
     
     const modelIds = response.data.modelIds || [];
     this.cache.unavailableModels = modelIds;
@@ -170,9 +170,9 @@ class CertificationService {
     const response = await api.get('/certification/unavailable-models');
     
     // 🐛 DEBUG: Verificar estrutura da resposta
-    console.log('[CertificationService] 🔍 DEBUG: Resposta completa do backend (unavailable):', response.data);
-    console.log('[CertificationService] 🔍 DEBUG: response.data.modelIds:', response.data.modelIds);
-    console.log('[CertificationService] 🔍 DEBUG: response.data.models:', response.data.models);
+    logger.debug('[CertificationService] 🔍 DEBUG: Resposta completa do backend (unavailable)', { data: response.data });
+    logger.debug('[CertificationService] 🔍 DEBUG: response.data.modelIds', { modelIds: response.data.modelIds });
+    logger.debug('[CertificationService] 🔍 DEBUG: response.data.models', { models: response.data.models });
     
     const modelIds = response.data.modelIds || [];
     this.cache.unavailableModels = modelIds;
@@ -201,9 +201,9 @@ class CertificationService {
     const response = await api.get('/certification/quality-warning-models');
     
     // 🐛 DEBUG: Verificar estrutura da resposta
-    console.log('[CertificationService] 🔍 DEBUG: Resposta completa do backend:', response.data);
-    console.log('[CertificationService] 🔍 DEBUG: response.data.modelIds:', response.data.modelIds);
-    console.log('[CertificationService] 🔍 DEBUG: response.data.models:', response.data.models);
+    logger.debug('[CertificationService] 🔍 DEBUG: Resposta completa do backend', { data: response.data });
+    logger.debug('[CertificationService] 🔍 DEBUG: response.data.modelIds', { modelIds: response.data.modelIds });
+    logger.debug('[CertificationService] 🔍 DEBUG: response.data.models', { models: response.data.models });
     
     const modelIds = response.data.modelIds || [];
     this.cache.qualityWarningModels = modelIds;

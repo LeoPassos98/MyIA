@@ -25,6 +25,7 @@ import { certificationService } from '../../../../services/certificationService'
 import { OptimizedTooltip } from '../../../../components/OptimizedTooltip';
 import { ModelInfoDrawer } from '../../../../components/ModelInfoDrawer';
 import { CertificationProgressDialog, ModelCertificationProgress } from '../../../../components/CertificationProgressDialog';
+import { logger } from '../../../../utils/logger';
 
 // Regiões AWS atualizadas conforme padrão Amazon
 const REGION_GROUPS = [
@@ -248,7 +249,7 @@ export default function AWSProviderPanel() {
   useEffect(() => {
     async function loadCertifications() {
       try {
-        console.log('[AWSProviderPanel] 🔍 DEBUG: Carregando certificações...');
+        logger.debug('[AWSProviderPanel] 🔍 DEBUG: Carregando certificações...');
         // ✅ CORREÇÃO: Usar getAllFailedModels() para pegar TODOS os modelos com status 'failed'
         // Isso garante que o badge vermelho "❌ Indisponível" apareça para todos os modelos falhados
         const [certified, allFailed, warnings] = await Promise.all([
@@ -256,14 +257,14 @@ export default function AWSProviderPanel() {
           certificationService.getAllFailedModels(),
           certificationService.getQualityWarningModels()
         ]);
-        console.log('[AWSProviderPanel] 🔍 DEBUG: Certificados:', certified);
-        console.log('[AWSProviderPanel] 🔍 DEBUG: Todos os Failed:', allFailed);
-        console.log('[AWSProviderPanel] 🔍 DEBUG: Warnings:', warnings);
+        logger.debug('[AWSProviderPanel] 🔍 DEBUG: Certificados', { certified });
+        logger.debug('[AWSProviderPanel] 🔍 DEBUG: Todos os Failed', { allFailed });
+        logger.debug('[AWSProviderPanel] 🔍 DEBUG: Warnings', { warnings });
         setCertifiedModels(certified);
         setUnavailableModels(allFailed); // Usar lista completa de modelos failed
         setQualityWarningModels(warnings);
       } catch (error) {
-        console.error('Erro ao carregar certificações:', error);
+        logger.error('Erro ao carregar certificações', { error });
       }
     }
     loadCertifications();

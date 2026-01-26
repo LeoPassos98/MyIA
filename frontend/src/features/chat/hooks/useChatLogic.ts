@@ -9,6 +9,7 @@ import { useLayout } from '../../../contexts/LayoutContext';
 import { chatService, StreamChunk } from '../../../services/chatService';
 import { chatHistoryService, Message } from '../../../services/chatHistoryService';
 import { useStableCallback } from '../../../hooks/useMemoryOptimization';
+import { logger } from '../../../utils/logger';
 
 export function useChatLogic(chatId?: string) {
   const navigate = useNavigate();
@@ -77,7 +78,7 @@ export function useChatLogic(chatId?: string) {
       const chatMessages = await chatHistoryService.getChatMessages(id);
       setMessages(chatMessages);
     } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
+      logger.error('Erro ao carregar mensagens', { error });
     } finally {
       setIsLoading(false);
     }
@@ -260,7 +261,7 @@ export function useChatLogic(chatId?: string) {
               ));
               setDebugLogs(prev => [...prev, `❌ Erro: ${chunk.error}`]);
             }
-          } catch (e) { console.error(e); }
+          } catch (e) { logger.error('Erro ao processar chunk', { error: e }); }
         },
         () => {
           flushChunkBuffer();
@@ -274,7 +275,7 @@ export function useChatLogic(chatId?: string) {
         },
         (err) => {
           if (err.name === 'AbortError') return;
-          console.error(err);
+          logger.error('Erro no stream de chat', { error: err });
           setIsLoading(false);
           isSendingRef.current = false;
           setMessages(prev => prev.map(msg => msg.id === tempAiMsgId ? { ...msg, content: msg.content + "\n[Erro]" } : msg));
@@ -283,7 +284,7 @@ export function useChatLogic(chatId?: string) {
       );
 
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao enviar mensagem', { error });
       setIsLoading(false);
       isSendingRef.current = false;
     }
@@ -292,11 +293,11 @@ export function useChatLogic(chatId?: string) {
   const handleTogglePin = useCallback(async (messageId: string) => {
     try {
       const result = await chatHistoryService.toggleMessagePin(messageId);
-      setMessages(prev => prev.map(msg => 
+      setMessages(prev => prev.map(msg =>
         msg.id === messageId ? { ...msg, isPinned: result.isPinned } : msg
       ));
     } catch (error) {
-      console.error('Erro ao fixar/desafixar mensagem:', error);
+      logger.error('Erro ao fixar/desafixar mensagem', { error });
     }
   }, []);
 

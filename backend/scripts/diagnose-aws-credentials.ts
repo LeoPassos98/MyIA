@@ -1,7 +1,9 @@
 // backend/scripts/diagnose-aws-credentials.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 // Script de diagnóstico para investigar problema de credenciais AWS
 
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../src/utils/logger';
 
 const prisma = new PrismaClient();
 
@@ -10,62 +12,62 @@ const TARGET_EMAIL = '123@123.com';
 const TARGET_ACCESS_KEY = 'AKIA2JLLJVA5H7W7QT5R';
 
 async function diagnose() {
-  console.log('🔍 DIAGNÓSTICO DE CREDENCIAIS AWS\n');
-  console.log('=' .repeat(80));
-  console.log(`Target User ID: ${TARGET_USER_ID}`);
-  console.log(`Target Email: ${TARGET_EMAIL}`);
-  console.log(`Target Access Key: ${TARGET_ACCESS_KEY}`);
-  console.log('=' .repeat(80));
-  console.log('');
+  logger.info('🔍 DIAGNÓSTICO DE CREDENCIAIS AWS\n');
+  logger.info('=' .repeat(80));
+  logger.info(`Target User ID: ${TARGET_USER_ID}`);
+  logger.info(`Target Email: ${TARGET_EMAIL}`);
+  logger.info(`Target Access Key: ${TARGET_ACCESS_KEY}`);
+  logger.info('=' .repeat(80));
+  logger.info('');
 
   try {
     // 1. Verificar se o usuário existe
-    console.log('📋 1. Verificando usuário...');
+    logger.info('📋 1. Verificando usuário...');
     const user = await prisma.user.findUnique({
       where: { id: TARGET_USER_ID }
     });
 
     if (!user) {
-      console.log('❌ Usuário NÃO encontrado no banco!');
-      console.log('   Isso pode indicar que o userId está incorreto.\n');
+      logger.info('❌ Usuário NÃO encontrado no banco!');
+      logger.info('   Isso pode indicar que o userId está incorreto.\n');
     } else {
-      console.log('✅ Usuário encontrado:');
-      console.log(`   - ID: ${user.id}`);
-      console.log(`   - Email: ${user.email}`);
-      console.log(`   - Nome: ${user.name || 'N/A'}`);
-      console.log(`   - Criado em: ${user.createdAt}`);
-      console.log('');
+      logger.info('✅ Usuário encontrado:');
+      logger.info(`   - ID: ${user.id}`);
+      logger.info(`   - Email: ${user.email}`);
+      logger.info(`   - Nome: ${user.name || 'N/A'}`);
+      logger.info(`   - Criado em: ${user.createdAt}`);
+      logger.info('');
     }
 
     // 2. Verificar UserSettings
-    console.log('📋 2. Verificando UserSettings...');
+    logger.info('📋 2. Verificando UserSettings...');
     const settings = await prisma.userSettings.findUnique({
       where: { userId: TARGET_USER_ID }
     });
 
     if (!settings) {
-      console.log('❌ UserSettings NÃO encontrado!');
-      console.log('   O usuário não tem registro de configurações.\n');
+      logger.info('❌ UserSettings NÃO encontrado!');
+      logger.info('   O usuário não tem registro de configurações.\n');
     } else {
-      console.log('✅ UserSettings encontrado:');
-      console.log(`   - ID: ${settings.id}`);
-      console.log(`   - AWS Access Key: ${settings.awsAccessKey ? '***EXISTE*** (criptografado)' : 'NULL'}`);
-      console.log(`   - AWS Secret Key: ${settings.awsSecretKey ? '***EXISTE*** (criptografado)' : 'NULL'}`);
-      console.log(`   - AWS Region: ${settings.awsRegion || 'NULL'}`);
-      console.log(`   - AWS Enabled Models: ${settings.awsEnabledModels.length} modelos`);
+      logger.info('✅ UserSettings encontrado:');
+      logger.info(`   - ID: ${settings.id}`);
+      logger.info(`   - AWS Access Key: ${settings.awsAccessKey ? '***EXISTE*** (criptografado)' : 'NULL'}`);
+      logger.info(`   - AWS Secret Key: ${settings.awsSecretKey ? '***EXISTE*** (criptografado)' : 'NULL'}`);
+      logger.info(`   - AWS Region: ${settings.awsRegion || 'NULL'}`);
+      logger.info(`   - AWS Enabled Models: ${settings.awsEnabledModels.length} modelos`);
       
       if (settings.awsAccessKey) {
-        console.log('\n   ⚠️ PROBLEMA IDENTIFICADO:');
-        console.log('   O campo awsAccessKey está preenchido, mas pode conter:');
-        console.log('   a) Credenciais de uma tentativa anterior que falhou');
-        console.log('   b) Credenciais parciais (sem secretKey correspondente)');
-        console.log('   c) Credenciais inválidas que não foram limpas');
+        logger.info('\n   ⚠️ PROBLEMA IDENTIFICADO:');
+        logger.info('   O campo awsAccessKey está preenchido, mas pode conter:');
+        logger.info('   a) Credenciais de uma tentativa anterior que falhou');
+        logger.info('   b) Credenciais parciais (sem secretKey correspondente)');
+        logger.info('   c) Credenciais inválidas que não foram limpas');
       }
-      console.log('');
+      logger.info('');
     }
 
     // 3. Verificar ProviderCredentialValidation
-    console.log('📋 3. Verificando ProviderCredentialValidation...');
+    logger.info('📋 3. Verificando ProviderCredentialValidation...');
     const validation = await prisma.providerCredentialValidation.findUnique({
       where: {
         userId_provider: {
@@ -76,21 +78,21 @@ async function diagnose() {
     });
 
     if (!validation) {
-      console.log('❌ ProviderCredentialValidation NÃO encontrado!');
-      console.log('   Nenhuma validação registrada para AWS Bedrock.\n');
+      logger.info('❌ ProviderCredentialValidation NÃO encontrado!');
+      logger.info('   Nenhuma validação registrada para AWS Bedrock.\n');
     } else {
-      console.log('✅ ProviderCredentialValidation encontrado:');
-      console.log(`   - Status: ${validation.status}`);
-      console.log(`   - Última validação: ${validation.lastValidatedAt || 'Nunca'}`);
-      console.log(`   - Último erro: ${validation.lastError || 'Nenhum'}`);
-      console.log(`   - Error Code: ${validation.errorCode || 'N/A'}`);
-      console.log(`   - Latency: ${validation.latencyMs || 'N/A'}ms`);
-      console.log(`   - Modelos validados: ${validation.validatedModels.length}`);
-      console.log('');
+      logger.info('✅ ProviderCredentialValidation encontrado:');
+      logger.info(`   - Status: ${validation.status}`);
+      logger.info(`   - Última validação: ${validation.lastValidatedAt || 'Nunca'}`);
+      logger.info(`   - Último erro: ${validation.lastError || 'Nenhum'}`);
+      logger.info(`   - Error Code: ${validation.errorCode || 'N/A'}`);
+      logger.info(`   - Latency: ${validation.latencyMs || 'N/A'}ms`);
+      logger.info(`   - Modelos validados: ${validation.validatedModels.length}`);
+      logger.info('');
     }
 
     // 4. Buscar TODOS os UserSettings com awsAccessKey preenchido
-    console.log('📋 4. Buscando TODOS os usuários com AWS configurado...');
+    logger.info('📋 4. Buscando TODOS os usuários com AWS configurado...');
     const allAWSUsers = await prisma.userSettings.findMany({
       where: {
         awsAccessKey: { not: null }
@@ -104,62 +106,62 @@ async function diagnose() {
       }
     });
 
-    console.log(`   Total de usuários com AWS configurado: ${allAWSUsers.length}`);
+    logger.info(`   Total de usuários com AWS configurado: ${allAWSUsers.length}`);
     if (allAWSUsers.length > 0) {
-      console.log('   Lista:');
+      logger.info('   Lista:');
       allAWSUsers.forEach((s, idx) => {
-        console.log(`   ${idx + 1}. User: ${s.user.email} | Region: ${s.awsRegion} | Models: ${s.awsEnabledModels.length}`);
+        logger.info(`   ${idx + 1}. User: ${s.user.email} | Region: ${s.awsRegion} | Models: ${s.awsEnabledModels.length}`);
       });
     }
-    console.log('');
+    logger.info('');
 
     // 5. DIAGNÓSTICO FINAL
-    console.log('=' .repeat(80));
-    console.log('🎯 DIAGNÓSTICO FINAL\n');
+    logger.info('=' .repeat(80));
+    logger.info('🎯 DIAGNÓSTICO FINAL\n');
 
     if (!user) {
-      console.log('❌ PROBLEMA: Usuário não existe no banco de dados');
-      console.log('   SOLUÇÃO: Verificar se o userId está correto');
+      logger.info('❌ PROBLEMA: Usuário não existe no banco de dados');
+      logger.info('   SOLUÇÃO: Verificar se o userId está correto');
     } else if (!settings) {
-      console.log('✅ SITUAÇÃO NORMAL: Usuário existe mas não tem configurações AWS');
-      console.log('   O formulário deveria estar limpo e pronto para cadastro');
+      logger.info('✅ SITUAÇÃO NORMAL: Usuário existe mas não tem configurações AWS');
+      logger.info('   O formulário deveria estar limpo e pronto para cadastro');
     } else if (settings.awsAccessKey && !settings.awsSecretKey) {
-      console.log('❌ PROBLEMA: Credenciais PARCIAIS detectadas');
-      console.log('   - awsAccessKey: EXISTE');
-      console.log('   - awsSecretKey: NULL');
-      console.log('\n   CAUSA RAIZ:');
-      console.log('   O sistema detecta credenciais existentes baseado apenas no awsAccessKey,');
-      console.log('   mas o secretKey está ausente, causando o bloqueio incorreto.');
-      console.log('\n   SOLUÇÃO RECOMENDADA:');
-      console.log('   1. Limpar o registro de UserSettings para este usuário');
-      console.log('   2. Corrigir a lógica do frontend para verificar AMBOS os campos');
-      console.log('   3. Adicionar validação no backend para garantir consistência');
+      logger.info('❌ PROBLEMA: Credenciais PARCIAIS detectadas');
+      logger.info('   - awsAccessKey: EXISTE');
+      logger.info('   - awsSecretKey: NULL');
+      logger.info('\n   CAUSA RAIZ:');
+      logger.info('   O sistema detecta credenciais existentes baseado apenas no awsAccessKey,');
+      logger.info('   mas o secretKey está ausente, causando o bloqueio incorreto.');
+      logger.info('\n   SOLUÇÃO RECOMENDADA:');
+      logger.info('   1. Limpar o registro de UserSettings para este usuário');
+      logger.info('   2. Corrigir a lógica do frontend para verificar AMBOS os campos');
+      logger.info('   3. Adicionar validação no backend para garantir consistência');
     } else if (settings.awsAccessKey && settings.awsSecretKey) {
-      console.log('⚠️ SITUAÇÃO AMBÍGUA: Credenciais COMPLETAS detectadas');
-      console.log('   - awsAccessKey: EXISTE');
-      console.log('   - awsSecretKey: EXISTE');
+      logger.info('⚠️ SITUAÇÃO AMBÍGUA: Credenciais COMPLETAS detectadas');
+      logger.info('   - awsAccessKey: EXISTE');
+      logger.info('   - awsSecretKey: EXISTE');
       
       if (validation?.status === 'valid') {
-        console.log('   - Status de validação: VALID');
-        console.log('\n   POSSÍVEL CAUSA:');
-        console.log('   As credenciais estão salvas e válidas, mas o usuário está tentando');
-        console.log('   cadastrar NOVAS credenciais. O sistema está bloqueando corretamente.');
-        console.log('\n   SOLUÇÃO:');
-        console.log('   O usuário deve clicar em "Alterar Key" para editar as credenciais.');
+        logger.info('   - Status de validação: VALID');
+        logger.info('\n   POSSÍVEL CAUSA:');
+        logger.info('   As credenciais estão salvas e válidas, mas o usuário está tentando');
+        logger.info('   cadastrar NOVAS credenciais. O sistema está bloqueando corretamente.');
+        logger.info('\n   SOLUÇÃO:');
+        logger.info('   O usuário deve clicar em "Alterar Key" para editar as credenciais.');
       } else {
-        console.log(`   - Status de validação: ${validation?.status || 'NÃO VALIDADO'}`);
-        console.log('\n   POSSÍVEL CAUSA:');
-        console.log('   Credenciais salvas mas nunca validadas ou validação falhou.');
-        console.log('\n   SOLUÇÃO:');
-        console.log('   1. Limpar as credenciais inválidas');
-        console.log('   2. Permitir que o usuário cadastre novas credenciais');
+        logger.info(`   - Status de validação: ${validation?.status || 'NÃO VALIDADO'}`);
+        logger.info('\n   POSSÍVEL CAUSA:');
+        logger.info('   Credenciais salvas mas nunca validadas ou validação falhou.');
+        logger.info('\n   SOLUÇÃO:');
+        logger.info('   1. Limpar as credenciais inválidas');
+        logger.info('   2. Permitir que o usuário cadastre novas credenciais');
       }
     }
 
-    console.log('\n' + '=' .repeat(80));
-    console.log('\n💡 COMANDOS ÚTEIS:\n');
-    console.log('Para LIMPAR as credenciais deste usuário:');
-    console.log(`
+    logger.info('\n' + '=' .repeat(80));
+    logger.info('\n💡 COMANDOS ÚTEIS:\n');
+    logger.info('Para LIMPAR as credenciais deste usuário:');
+    logger.info(`
 UPDATE user_settings 
 SET "awsAccessKey" = NULL, 
     "awsSecretKey" = NULL, 
@@ -172,7 +174,7 @@ WHERE "userId" = '${TARGET_USER_ID}' AND provider = 'bedrock';
     `);
 
   } catch (error) {
-    console.error('❌ Erro durante diagnóstico:', error);
+    logger.error('❌ Erro durante diagnóstico', { error });
   } finally {
     await prisma.$disconnect();
   }
