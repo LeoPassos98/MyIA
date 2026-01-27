@@ -12,6 +12,7 @@ import { StreamChunk } from '../types';
 import { AdapterFactory } from '../adapters';
 import { ModelRegistry } from '../registry';
 import type { Message, UniversalOptions } from '../adapters';
+import logger from '../../../utils/logger';
 
 /**
  * Normaliza model ID removendo sufixos de context window
@@ -55,7 +56,7 @@ function getInferenceProfileId(modelId: string, region: string): string {
     // Usar system-defined inference profile
     const regionPrefix = region.split('-')[0]; // 'us' de 'us-east-1'
     const inferenceProfileId = `${regionPrefix}.${baseModelId}`;
-    console.log(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${region})`);
+    logger.info(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${region})`);
     return inferenceProfileId;
   }
   
@@ -157,7 +158,7 @@ export class BedrockProvider extends BaseAIProvider {
     let adapter;
     try {
       adapter = AdapterFactory.getAdapterForModel(options.modelId);
-      console.log(`🔍 [Bedrock] Using adapter: ${adapter.displayName} for model: ${options.modelId}`);
+      logger.info(`🔍 [Bedrock] Using adapter: ${adapter.displayName} for model: ${options.modelId}`);
     } catch (_error) {
       yield {
         type: 'error',
@@ -192,7 +193,7 @@ export class BedrockProvider extends BaseAIProvider {
     
     // Log se houve normalização
     if (normalizedModelId !== originalModelId) {
-      console.log(`🔄 [Bedrock] Normalized model ID: ${originalModelId} → ${normalizedModelId}`);
+      logger.info(`🔄 [Bedrock] Normalized model ID: ${originalModelId} → ${normalizedModelId}`);
     }
     
     // Obter inference profile se necessário
@@ -208,13 +209,13 @@ export class BedrockProvider extends BaseAIProvider {
       normalizedModelId.replace('nova-2-', 'nova-'),
     ];
     
-    console.log(`🧪 [Bedrock Auto-Test] Testing ${modelIdVariations.length} variations for: ${originalModelId}`);
+    logger.info(`🧪 [Bedrock Auto-Test] Testing ${modelIdVariations.length} variations for: ${originalModelId}`);
     
     let lastGlobalError: any = null;
     
     // Tentar cada variação
     for (const testModelId of modelIdVariations) {
-      console.log(`🔍 [Bedrock Auto-Test] Trying: ${testModelId}`);
+      logger.info(`🔍 [Bedrock Auto-Test] Trying: ${testModelId}`);
       
       // Retry loop com backoff exponencial para esta variação
       for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
@@ -229,12 +230,12 @@ export class BedrockProvider extends BaseAIProvider {
           const response = await client.send(command);
 
           if (!response.body) {
-            console.warn(`⚠️ [Bedrock Auto-Test] No response body for: ${testModelId}`);
+            logger.warn(`⚠️ [Bedrock Auto-Test] No response body for: ${testModelId}`);
             break; // Tenta próxima variação
           }
 
           // ✅ Stream bem-sucedido! Processa chunks
-          console.log(`✅ [Bedrock Auto-Test] SUCCESS with: ${testModelId}`);
+          logger.info(`✅ [Bedrock Auto-Test] SUCCESS with: ${testModelId}`);
           
           for await (const event of response.body) {
             if (event.chunk) {
@@ -265,13 +266,13 @@ export class BedrockProvider extends BaseAIProvider {
             const isLastAttempt = attempt === this.retryConfig.maxRetries;
             
             if (isLastAttempt) {
-              console.error(`[BedrockProvider] Rate limit após ${attempt + 1} tentativas para ${testModelId}:`, error);
+              logger.error(`[BedrockProvider] Rate limit após ${attempt + 1} tentativas para ${testModelId}:`, error);
               break; // Tenta próxima variação
             }
             
             // Calcula delay e aguarda antes do próximo retry
             const delayMs = this.calculateRetryDelay(attempt);
-            console.warn(
+            logger.warn(
               `[BedrockProvider] Rate limit detectado (tentativa ${attempt + 1}/${this.retryConfig.maxRetries + 1}). ` +
               `Aguardando ${delayMs}ms antes de tentar novamente...`
             );
@@ -288,7 +289,7 @@ export class BedrockProvider extends BaseAIProvider {
           
           // Erro não é de rate limiting - tenta próxima variação
           const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-          console.warn(`⚠️ [Bedrock Auto-Test] Failed with ${testModelId}: ${errorMessage}`);
+          logger.warn(`⚠️ [Bedrock Auto-Test] Failed with ${testModelId}: ${errorMessage}`);
           break; // Tenta próxima variação
         }
       }
@@ -296,7 +297,7 @@ export class BedrockProvider extends BaseAIProvider {
     
     // Se chegou aqui, todas as variações falharam
     const errorMessage = lastGlobalError instanceof Error ? lastGlobalError.message : 'Erro desconhecido no AWS Bedrock';
-    console.error(`❌ [Bedrock Auto-Test] All ${modelIdVariations.length} variations failed for: ${originalModelId}`);
+    logger.error(`❌ [Bedrock Auto-Test] All ${modelIdVariations.length} variations failed for: ${originalModelId}`);
     yield {
       type: 'error',
       error: `Falha ao invocar modelo ${originalModelId}. Tentativas: ${modelIdVariations.length} variações. Erro: ${errorMessage}`,

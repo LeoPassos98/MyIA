@@ -2,6 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { z } from 'zod';
+import logger from '../utils/logger';
 
 // Lista de regiões AWS permitidas para Bedrock
 // ✅ CORREÇÃO: Adicionar todas as regiões suportadas pelo AWS Bedrock
@@ -51,12 +52,12 @@ const bedrockConfigBodySchema = z.object({
     // ✅ CORREÇÃO: Se useStoredCredentials=true OU se não tem secretKey, permitir
     // Isso cobre o caso de "Teste Rápido" onde o backend busca credenciais do banco
     if (data.useStoredCredentials || !data.secretKey) {
-      console.log('🔍 [bedrockSchema] Validação: usando credenciais armazenadas ou teste rápido');
+      logger.info('🔍 [bedrockSchema] Validação: usando credenciais armazenadas ou teste rápido');
       return true;
     }
     
     // ✅ Se tem secretKey, validar formato completo
-    console.log('🔍 [bedrockSchema] Validação: credenciais novas fornecidas, validando formato...');
+    logger.info('🔍 [bedrockSchema] Validação: credenciais novas fornecidas, validando formato...');
     const isValid = (
       data.accessKey &&
       accessKeyRegex.test(data.accessKey) &&
@@ -65,7 +66,7 @@ const bedrockConfigBodySchema = z.object({
     );
     
     if (!isValid) {
-      console.log('❌ [bedrockSchema] Validação falhou:', {
+      logger.info('❌ [bedrockSchema] Validação falhou:', {
         hasAccessKey: !!data.accessKey,
         accessKeyValid: data.accessKey ? accessKeyRegex.test(data.accessKey) : false,
         hasSecretKey: !!data.secretKey,

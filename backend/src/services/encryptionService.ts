@@ -2,12 +2,13 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import * as CryptoJS from 'crypto-js';
+import logger from '../utils/logger';
 
 // Pega a chave mestra do .env
 const SECRET_KEY = process.env.ENCRYPTION_SECRET;
 
 if (!SECRET_KEY) {
-  throw new Error('❌ ENCRYPTION_SECRET is required. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  throw new Error('❌ ENCRYPTION_SECRET is required. Generate with: node -e "logger.info(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
 }
 
 if (SECRET_KEY.length < 32) {
@@ -26,7 +27,7 @@ export const encryptionService = {
     try {
       return CryptoJS.AES.encrypt(text, SECRET_KEY).toString();
     } catch (error) {
-      console.error("Erro ao criptografar:", error);
+      logger.error("Erro ao criptografar:", error);
       return text; // Retorna o texto original em caso de falha
     }
   },
@@ -43,7 +44,7 @@ export const encryptionService = {
       const originalText = bytes.toString(CryptoJS.enc.Utf8);
       return originalText;
     } catch (error) {
-      console.error("Erro ao descriptografar:", error);
+      logger.error("Erro ao descriptografar:", error);
       return ""; // Retorna vazio se a descriptografia falhar
     }
   },

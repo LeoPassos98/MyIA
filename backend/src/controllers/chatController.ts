@@ -377,14 +377,26 @@ export const chatController = {
               const vectorStr = '[' + emb.vector.join(',') + ']';
               await prisma.$executeRaw`UPDATE messages SET vector = ${vectorStr}::vector WHERE id = ${savedAssistantMsg.id}`;
             }
-          }).catch(e => console.error("Embed error:", e));
+          }).catch(e => {
+            logger.error("Erro ao gerar embedding da resposta", {
+              requestId: req.id,
+              messageId: savedAssistantMsg.id,
+              error: e instanceof Error ? e.message : String(e)
+            });
+          });
 
           aiService.embed(prepareForEmbedding(messageContent)).then(async (emb) => {
             if (emb) {
               const vectorStr = '[' + emb.vector.join(',') + ']';
               await prisma.$executeRaw`UPDATE messages SET vector = ${vectorStr}::vector WHERE id = ${userMsgRecord.id}`;
             }
-          }).catch(e => console.error("Embed user error:", e));
+          }).catch(e => {
+            logger.error("Erro ao gerar embedding da mensagem do usuário", {
+              requestId: req.id,
+              messageId: userMsgRecord.id,
+              error: e instanceof Error ? e.message : String(e)
+            });
+          });
         }
 
         res.end();
@@ -419,7 +431,12 @@ export const chatController = {
                 });
               }
             } catch (err) {
-              console.error("Erro ao gerar título automático:", err);
+              logger.error("Erro ao gerar título automático", {
+                requestId: req.id,
+                chatId: currentChat.id,
+                error: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined
+              });
             }
           })();
         }
@@ -429,7 +446,17 @@ export const chatController = {
         const errorCode = streamError instanceof Error && 'code' in streamError ? (streamError as any).code : undefined;
         const errorStatus = streamError instanceof Error && 'status' in streamError ? (streamError as any).status : undefined;
         
-        console.error("Stream Error:", streamError);
+        logger.error("Erro no stream", {
+          requestId: req.id,
+          chatId: currentChat.id,
+          userId: req.userId,
+          provider: lockedProvider,
+          model: targetModel,
+          error: errorMessage,
+          errorCode,
+          errorStatus,
+          stack: streamError instanceof Error ? streamError.stack : undefined
+        });
         
         // 🔥 NOVO: Salva mensagem de erro com audit trace para debug
         const errorContent = `[ERRO] ${errorMessage}`;
@@ -474,7 +501,12 @@ export const chatController = {
           // Envia o erro separadamente
           writeSSE({ type: 'debug', log: `❌ Erro salvo com ID: ${savedErrorMsg.id}` });
         } catch (saveErr) {
-          console.error("Erro ao salvar audit de erro:", saveErr);
+          logger.error("Erro ao salvar audit de erro", {
+            requestId: req.id,
+            chatId: currentChat.id,
+            error: saveErr instanceof Error ? saveErr.message : String(saveErr),
+            stack: saveErr instanceof Error ? saveErr.stack : undefined
+          });
         }
         
         writeSSE({ type: 'error', error: errorMessage });

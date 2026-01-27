@@ -99,7 +99,7 @@ export class ModelCertificationService {
     force: boolean = false,
     onProgress?: ProgressCallback
   ): Promise<CertificationResult> {
-    console.log(`[CertificationService] 🚀 Iniciando certificação para: ${modelId} (force=${force})`);
+    logger.info(`[CertificationService] 🚀 Iniciando certificação para: ${modelId} (force=${force})`);
     
     // ========================================================================
     // CORREÇÃO #1: Verificar cache ANTES de aplicar rate limiting
@@ -150,24 +150,24 @@ export class ModelCertificationService {
     logger.info(`[CertificationService] ⚠️ Cache miss para ${modelId}, executando testes (rate limit já aplicado)`);
     
     // 1. Obter metadata do modelo
-    console.log(`[CertificationService] 📖 Buscando metadata do modelo no registry...`);
+    logger.info(`[CertificationService] 📖 Buscando metadata do modelo no registry...`);
     const metadata = ModelRegistry.getModel(modelId);
     if (!metadata) {
-      console.error(`[CertificationService] ❌ Modelo ${modelId} não encontrado no registry`);
+      logger.error(`[CertificationService] ❌ Modelo ${modelId} não encontrado no registry`);
       throw new Error(`Model ${modelId} not found in registry`);
     }
-    console.log(`[CertificationService] ✅ Metadata encontrada:`, {
+    logger.info(`[CertificationService] ✅ Metadata encontrada:`, {
       modelId: metadata.modelId,
       vendor: metadata.vendor
     });
     
     // 2. Criar provider Bedrock
-    console.log(`[CertificationService] 🔧 Criando BedrockProvider para região: ${credentials.region}`);
+    logger.info(`[CertificationService] 🔧 Criando BedrockProvider para região: ${credentials.region}`);
     const provider = new BedrockProvider(credentials.region);
     
     // 3. Selecionar testes apropriados
     const tests = this.getTestsForVendor(metadata.vendor);
-    console.log(`[CertificationService] 📝 Testes selecionados para vendor ${metadata.vendor}:`, tests.length);
+    logger.info(`[CertificationService] 📝 Testes selecionados para vendor ${metadata.vendor}:`, tests.length);
     
     // Emitir progresso: iniciando testes
     if (onProgress) {
@@ -182,7 +182,7 @@ export class ModelCertificationService {
     // 4. Executar testes via TestRunner com callback de progresso
     // Formato esperado pelo BedrockProvider: ACCESS_KEY:SECRET_KEY
     const apiKey = `${credentials.accessKey}:${credentials.secretKey}`;
-    console.log(`[CertificationService] 🧪 Executando testes...`);
+    logger.info(`[CertificationService] 🧪 Executando testes...`);
     const runner = new TestRunner(provider, apiKey);
     
     // Contador de testes completados para progresso
@@ -208,7 +208,7 @@ export class ModelCertificationService {
       } : undefined
     );
     
-    console.log(`[CertificationService] 📊 Testes executados:`, {
+    logger.info(`[CertificationService] 📊 Testes executados:`, {
       total: testResults.length,
       passed: testResults.filter(r => r.passed).length,
       failed: testResults.filter(r => !r.passed).length
@@ -256,7 +256,7 @@ export class ModelCertificationService {
       categorizedError = categorizeError(lastError);
       overallSeverity = categorizedError.severity;
       
-      console.log(`[CertificationService] 🔍 DEBUG: Erro categorizado para ${modelId}:`, {
+      logger.info(`[CertificationService] 🔍 DEBUG: Erro categorizado para ${modelId}:`, {
         category: categorizedError.category,
         severity: categorizedError.severity,
         isTemporary: categorizedError.isTemporary,
@@ -302,7 +302,7 @@ export class ModelCertificationService {
         status = ModelCertificationStatus.FAILED;
         isAvailable = false;
         isCertified = false;
-        console.log(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED devido a erro crítico: ${categorizedError.category}`);
+        logger.info(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED devido a erro crítico: ${categorizedError.category}`);
       } else {
         // Erros não-críticos: determinar status baseado no successRate
         if (successRate >= 80) {
@@ -310,19 +310,19 @@ export class ModelCertificationService {
           status = ModelCertificationStatus.CERTIFIED;
           isAvailable = true;
           isCertified = true;
-          console.log(`[CertificationService] ✅ Modelo ${modelId} CERTIFIED com ${successRate.toFixed(1)}% (erros não-críticos ignorados)`);
+          logger.info(`[CertificationService] ✅ Modelo ${modelId} CERTIFIED com ${successRate.toFixed(1)}% (erros não-críticos ignorados)`);
         } else if (successRate >= 60) {
           // 60-79%: QUALITY_WARNING (funcional mas com problemas)
           status = ModelCertificationStatus.QUALITY_WARNING;
           isAvailable = true;
           isCertified = false;
-          console.log(`[CertificationService] ⚠️ Modelo ${modelId} marcado como QUALITY_WARNING (${successRate.toFixed(1)}%)`);
+          logger.info(`[CertificationService] ⚠️ Modelo ${modelId} marcado como QUALITY_WARNING (${successRate.toFixed(1)}%)`);
         } else {
           // < 60%: FAILED (não confiável)
           status = ModelCertificationStatus.FAILED;
           isAvailable = false;
           isCertified = false;
-          console.log(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED (${successRate.toFixed(1)}% < 60%)`);
+          logger.info(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED (${successRate.toFixed(1)}% < 60%)`);
         }
       }
     } else {
@@ -332,19 +332,19 @@ export class ModelCertificationService {
         status = ModelCertificationStatus.CERTIFIED;
         isAvailable = true;
         isCertified = true;
-        console.log(`[CertificationService] ✅ Modelo ${modelId} CERTIFIED com ${successRate.toFixed(1)}%`);
+        logger.info(`[CertificationService] ✅ Modelo ${modelId} CERTIFIED com ${successRate.toFixed(1)}%`);
       } else if (successRate >= 60) {
         // 60-79%: QUALITY_WARNING
         status = ModelCertificationStatus.QUALITY_WARNING;
         isAvailable = true;
         isCertified = false;
-        console.log(`[CertificationService] ⚠️ Modelo ${modelId} marcado como QUALITY_WARNING (${successRate.toFixed(1)}%)`);
+        logger.info(`[CertificationService] ⚠️ Modelo ${modelId} marcado como QUALITY_WARNING (${successRate.toFixed(1)}%)`);
       } else {
         // < 60%: FAILED
         status = ModelCertificationStatus.FAILED;
         isAvailable = false;
         isCertified = false;
-        console.log(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED (${successRate.toFixed(1)}% < 60%)`);
+        logger.info(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED (${successRate.toFixed(1)}% < 60%)`);
       }
     }
     
@@ -354,7 +354,7 @@ export class ModelCertificationService {
       ? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 dias
       : null;
     
-    console.log(`[CertificationService] 💾 Salvando no banco:`, {
+    logger.info(`[CertificationService] 💾 Salvando no banco:`, {
       modelId,
       status,
       isCertified,
@@ -394,13 +394,13 @@ export class ModelCertificationService {
       }
     });
     
-    console.log(`[CertificationService] ✅ Salvo no banco com sucesso:`, {
+    logger.info(`[CertificationService] ✅ Salvo no banco com sucesso:`, {
       id: savedCertification.id,
       modelId: savedCertification.modelId,
       status: savedCertification.status
     });
     
-    console.log(`[CertificationService] 🎯 Resultado final: ${modelId}: ${status} (${successRate.toFixed(1)}% success, available: ${isAvailable})`);
+    logger.info(`[CertificationService] 🎯 Resultado final: ${modelId}: ${status} (${successRate.toFixed(1)}% success, available: ${isAvailable})`);
     
     return {
       modelId,
@@ -429,7 +429,7 @@ export class ModelCertificationService {
     vendor: string,
     credentials: AWSCredentials
   ): Promise<CertificationResult[]> {
-    console.log(`[Certification] Starting vendor certification for ${vendor}`);
+    logger.info(`[Certification] Starting vendor certification for ${vendor}`);
     
     const models = ModelRegistry.getModelsByVendor(vendor);
     const results: CertificationResult[] = [];
@@ -439,7 +439,7 @@ export class ModelCertificationService {
         const result = await this.certifyModel(model.modelId, credentials, false);
         results.push(result);
       } catch (error: any) {
-        console.error(`[Certification] Failed to certify ${model.modelId}:`, error.message);
+        logger.error(`[Certification] Failed to certify ${model.modelId}:`, error.message);
         results.push({
           modelId: model.modelId,
           status: ModelCertificationStatus.FAILED,
@@ -453,7 +453,7 @@ export class ModelCertificationService {
       }
     }
     
-    console.log(`[Certification] Vendor ${vendor} certification complete: ${results.length} models`);
+    logger.info(`[Certification] Vendor ${vendor} certification complete: ${results.length} models`);
     return results;
   }
   
@@ -466,7 +466,7 @@ export class ModelCertificationService {
   async certifyAll(
     credentials: AWSCredentials
   ): Promise<CertificationResult[]> {
-    console.log('[Certification] Starting full certification of all models');
+    logger.info('[Certification] Starting full certification of all models');
     
     const models = ModelRegistry.getAllSupported();
     const results: CertificationResult[] = [];
@@ -476,7 +476,7 @@ export class ModelCertificationService {
         const result = await this.certifyModel(model.modelId, credentials, false);
         results.push(result);
       } catch (error: any) {
-        console.error(`[Certification] Failed to certify ${model.modelId}:`, error.message);
+        logger.error(`[Certification] Failed to certify ${model.modelId}:`, error.message);
         results.push({
           modelId: model.modelId,
           status: ModelCertificationStatus.FAILED,
@@ -490,7 +490,7 @@ export class ModelCertificationService {
       }
     }
     
-    console.log(`[Certification] Full certification complete: ${results.length} models`);
+    logger.info(`[Certification] Full certification complete: ${results.length} models`);
     return results;
   }
   
@@ -500,7 +500,7 @@ export class ModelCertificationService {
    * @returns Array de modelIds certificados
    */
   async getCertifiedModels(): Promise<string[]> {
-    console.log('[CertificationService] 🔍 Buscando modelos certificados no banco...');
+    logger.info('[CertificationService] 🔍 Buscando modelos certificados no banco...');
     const now = new Date();
     
     const certifications = await prisma.modelCertification.findMany({
@@ -517,7 +517,7 @@ export class ModelCertificationService {
     });
     
     const modelIds = certifications.map(c => c.modelId);
-    console.log('[CertificationService] ✅ Modelos certificados encontrados:', modelIds);
+    logger.info('[CertificationService] ✅ Modelos certificados encontrados:', modelIds);
     
     return modelIds;
   }
@@ -529,7 +529,7 @@ export class ModelCertificationService {
    * @returns Array de modelIds que falharam
    */
   async getFailedModels(): Promise<string[]> {
-    console.log('[CertificationService] 🔍 Buscando modelos que falharam na certificação...');
+    logger.info('[CertificationService] 🔍 Buscando modelos que falharam na certificação...');
     
     const certifications = await prisma.modelCertification.findMany({
       where: {
@@ -542,7 +542,7 @@ export class ModelCertificationService {
     });
     
     const modelIds = certifications.map(c => c.modelId);
-    console.log('[CertificationService] ❌ Modelos que falharam encontrados:', modelIds);
+    logger.info('[CertificationService] ❌ Modelos que falharam encontrados:', modelIds);
     
     return modelIds;
   }
@@ -554,7 +554,7 @@ export class ModelCertificationService {
    * @returns Array de modelIds indisponíveis
    */
   async getUnavailableModels(): Promise<string[]> {
-    console.log('[CertificationService] 🔍 Buscando modelos indisponíveis...');
+    logger.info('[CertificationService] 🔍 Buscando modelos indisponíveis...');
     
     const certs = await prisma.modelCertification.findMany({
       where: {
@@ -568,7 +568,7 @@ export class ModelCertificationService {
     });
     
     const modelIds = certs.map(c => c.modelId);
-    console.log('[CertificationService] 🚫 Modelos indisponíveis encontrados:', modelIds);
+    logger.info('[CertificationService] 🚫 Modelos indisponíveis encontrados:', modelIds);
     
     return modelIds;
   }
@@ -580,7 +580,7 @@ export class ModelCertificationService {
    * @returns Array de modelIds que falharam na certificação
    */
   async getAllFailedModels(): Promise<string[]> {
-    console.log('[CertificationService] 🔍 Buscando TODOS os modelos com status failed...');
+    logger.info('[CertificationService] 🔍 Buscando TODOS os modelos com status failed...');
     
     const certs = await prisma.modelCertification.findMany({
       where: {
@@ -591,7 +591,7 @@ export class ModelCertificationService {
     });
     
     const modelIds = certs.map(c => c.modelId);
-    console.log('[CertificationService] ❌ Modelos failed encontrados:', modelIds);
+    logger.info('[CertificationService] ❌ Modelos failed encontrados:', modelIds);
     
     return modelIds;
   }
@@ -602,7 +602,7 @@ export class ModelCertificationService {
    * @returns Array de modelIds com quality_warning
    */
   async getQualityWarningModels(): Promise<string[]> {
-    console.log('[CertificationService] 🔍 Buscando modelos com warning de qualidade...');
+    logger.info('[CertificationService] 🔍 Buscando modelos com warning de qualidade...');
     
     const certs = await prisma.modelCertification.findMany({
       where: {
@@ -613,7 +613,7 @@ export class ModelCertificationService {
     });
     
     const modelIds = certs.map(c => c.modelId);
-    console.log('[CertificationService] ⚠️ Modelos com warning encontrados:', modelIds);
+    logger.info('[CertificationService] ⚠️ Modelos com warning encontrados:', modelIds);
     
     return modelIds;
   }

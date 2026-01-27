@@ -288,6 +288,18 @@ status() {
     echo -e "  ${YELLOW}⚠️${NC}  Porta $FRONTEND_PORT ocupada por: $frontend_port_pids"
   fi
   
+  # Status Observability
+  echo -e "\n${BLUE}Observability (porta 3002):${NC}"
+  local grafana_port_pids=$(lsof -ti:3002 2>/dev/null || true)
+  if [ -n "$grafana_port_pids" ]; then
+    echo -e "  ${GREEN}✓${NC} Grafana em execução"
+    echo -e "  ${GREEN}🌐${NC} http://localhost:3002"
+  else
+    echo -e "  ${YELLOW}○${NC} Não iniciado"
+    echo -e "  ${BLUE}ℹ${NC}  Iniciar: ${YELLOW}cd observability && ./start.sh${NC}"
+  fi
+  echo -e "  ${BLUE}🔧${NC} Gerenciar: ${YELLOW}cd observability && ./validate.sh${NC}"
+  
   echo -e "\n${BLUE}📝 Logs:${NC}"
   echo -e "  Backend: ${YELLOW}$LOG_DIR/backend.*.log${NC}"
   echo -e "  Frontend: ${YELLOW}$LOG_DIR/frontend.*.log${NC}"
@@ -306,12 +318,22 @@ case "$ACTION" in
     case "$TARGET" in
       backend) start_backend ;; 
       frontend) start_frontend ;; 
-      both) 
+      both)
         start_backend
         start_frontend
         echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${GREEN}✓ Todos os servidores iniciados!${NC}"
-        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        
+        echo -e "\n${BLUE}📊 Sistema de Observabilidade Disponível${NC}\n"
+        echo -e "Para monitorar logs e métricas em tempo real:"
+        echo -e "  ${BLUE}1.${NC} Iniciar: ${YELLOW}cd observability && ./start.sh${NC}"
+        echo -e "  ${BLUE}2.${NC} Acessar Grafana: ${BLUE}http://localhost:3002${NC} ${YELLOW}(admin/admin)${NC}"
+        echo -e "  ${BLUE}3.${NC} Tutorial: ${YELLOW}observability/GRAFANA-TUTORIAL.md${NC}"
+        echo -e "\nDashboards disponíveis:"
+        echo -e "  ${GREEN}•${NC} MyIA - Overview (visão geral)"
+        echo -e "  ${GREEN}•${NC} MyIA - Errors (análise de erros)"
+        echo -e "  ${GREEN}•${NC} MyIA - Performance (métricas HTTP)\n"
         ;;
       *) usage ;;
     esac

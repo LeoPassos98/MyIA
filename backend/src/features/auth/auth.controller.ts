@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
 import { ApiResponse } from '../../utils/api-response';
+import logger from '../../utils/logger';
 
 export class AuthController {
   static async socialLoginCallback(req: any, res: Response) {
@@ -32,7 +33,7 @@ export class AuthController {
       return res.redirect(`${process.env.FRONTEND_URL}/auth-success?token=${token}`);
       
     } catch (error) {
-      console.error('Erro no callback social:', error);
+      logger.error('Erro no callback social:', error);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
     }
   }

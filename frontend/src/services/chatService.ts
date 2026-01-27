@@ -77,7 +77,31 @@ export const chatService = {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Tenta extrair mensagem de erro do backend
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          
+          // JSend format: { status: 'fail', data: { validation: [...] } }
+          if (errorData.status === 'fail' && errorData.data?.validation) {
+            errorMessage = errorData.data.validation
+              .map((e: any) => e.message)
+              .join('; ');
+          }
+          // JSend format: { status: 'error', message: '...' }
+          else if (errorData.status === 'error' && errorData.message) {
+            errorMessage = errorData.message;
+          }
+          // Legacy format
+          else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.errors && Array.isArray(errorData.errors)) {
+            errorMessage = errorData.errors.map((e: any) => e.message).join('; ');
+          }
+        } catch (e) {
+          // Se não conseguir parsear JSON, usa mensagem padrão
+        }
+        throw new Error(errorMessage);
       }
 
       console.log(`[StreamChat] Resposta recebida: status=${response.status}`);

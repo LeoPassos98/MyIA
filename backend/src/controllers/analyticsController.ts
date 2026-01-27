@@ -4,6 +4,7 @@
 import { Request, Response } from 'express';
 import { analyticsService } from '../services/analyticsService';
 import { jsend } from '../utils/jsend';
+import logger from '../utils/logger';
 
 export const analyticsController = {
   async getAnalytics(req: Request, res: Response) {
@@ -17,7 +18,12 @@ export const analyticsController = {
 
       res.json(jsend.success({ costOverTime, costEfficiency, loadMap }));
     } catch (error) {
-      console.error('Erro ao buscar analytics:', error);
+      logger.error('Erro ao buscar analytics', {
+        requestId: req.id,
+        userId: req.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json(jsend.error('Erro ao buscar dados de analytics'));
     }
   }

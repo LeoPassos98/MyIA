@@ -9,11 +9,8 @@ import { BedrockProvider } from '../services/ai/providers/bedrock';
 import { jsend } from '../utils/jsend';
 import { AppError } from '../middleware/errorHandler';
 import { ModelRegistry } from '../services/ai/registry';
-import winston from 'winston';
+import logger from '../utils/logger';
 import { VendorGroup, CertificationInfo } from '../types/vendors';
-
-// Logger configurado (assumindo logger global)
-const logger = winston.createLogger({ /* config existente */ });
 
 function isError(obj: unknown): obj is Error {
   return typeof obj === 'object' && obj !== null && 'message' in obj;
@@ -31,14 +28,12 @@ export const providersController = {
         return res.status(401).json(jsend.fail({ auth: 'Não autorizado' }));
       }
 
-      // ✅ LOG DETALHADO: Request recebido
-      console.log('\n🔍 [validateAWS] ========== INÍCIO DA VALIDAÇÃO ==========');
-      console.log('📥 [validateAWS] Request body recebido:', {
+      logger.info('Iniciando validação AWS Bedrock', {
+        requestId: req.id,
+        userId,
         hasAccessKey: !!req.body.accessKey,
         accessKeyLength: req.body.accessKey?.length,
-        accessKeyPrefix: req.body.accessKey?.substring(0, 4),
         hasSecretKey: !!req.body.secretKey,
-        secretKeyLength: req.body.secretKey?.length,
         region: req.body.region,
         useStoredCredentials: req.body.useStoredCredentials
       });
@@ -46,11 +41,6 @@ export const providersController = {
       // Validação já foi feita pelo middleware validateRequest
       // Apenas pegar o config do body
       const config = req.body;
-      console.log('✅ [validateAWS] Config recebido:', {
-        region: config.region,
-        hasAccessKey: !!config.accessKey,
-        useStoredCredentials: config.useStoredCredentials
-      });
 
       let accessKey: string;
       let secretKey: string;
@@ -178,14 +168,14 @@ export const providersController = {
       }));
 
     } catch (error) {
-      // ✅ LOG DETALHADO: Capturar erro de validação Zod
-      console.log('\n❌ [validateAWS] ========== ERRO NA VALIDAÇÃO ==========');
-      console.log('❌ [validateAWS] Tipo do erro:', error?.constructor?.name);
-      
       // Se for erro de validação Zod, exibir detalhes
       if (error?.constructor?.name === 'ZodError') {
         const zodError = error as any;
-        console.log('❌ [validateAWS] Erro de validação Zod:', JSON.stringify(zodError.errors, null, 2));
+        logger.warn('Erro de validação Zod na validação AWS', {
+          requestId: req.id,
+          userId: req.userId,
+          errors: zodError.errors
+        });
         return res.status(400).json(jsend.fail({
           validation: 'Dados inválidos',
           errors: zodError.errors
@@ -196,10 +186,9 @@ export const providersController = {
         throw error;
       }
       const err = isError(error) ? error : new Error(String(error));
-      console.log('❌ [validateAWS] Erro inesperado:', err.message);
-      console.log('❌ [validateAWS] Stack:', err.stack);
       
-      logger.error('Unexpected error in Bedrock validation', {
+      logger.error('Erro inesperado na validação AWS Bedrock', {
+        requestId: req.id,
         userId: req.userId,
         error: err.message,
         stack: err.stack,
@@ -214,76 +203,65 @@ export const providersController = {
    */
   async getAvailableModels(req: AuthRequest, res: Response) {
     try {
-      console.log('\n🔍 [getAvailableModels] ========== INÍCIO ==========');
       const userId = req.userId!;
-      console.log('📋 [getAvailableModels] userId:', userId);
+      
+      logger.info('Iniciando busca de modelos AWS disponíveis', {
+        requestId: req.id,
+        userId
+      });
       
       if (!userId) {
-        console.log('❌ [getAvailableModels] Usuário não autorizado');
+        logger.warn('Usuário não autorizado ao buscar modelos AWS', {
+          requestId: req.id
+        });
         return res.status(401).json(jsend.fail({ auth: 'Não autorizado' }));
       }
-
-      console.log('🔐 [getAvailableModels] Buscando credenciais do usuário...');
       // Buscar credenciais salvas do usuário
       const userSettings = await prisma.userSettings.findUnique({
         where: { userId },
         select: { awsAccessKey: true, awsSecretKey: true, awsRegion: true },
       });
 
-      console.log('📊 [getAvailableModels] Credenciais encontradas:', {
-        hasAccessKey: !!userSettings?.awsAccessKey,
-        hasSecretKey: !!userSettings?.awsSecretKey,
-        region: userSettings?.awsRegion
-      });
-
       if (!userSettings?.awsAccessKey || !userSettings?.awsSecretKey) {
-        console.log('❌ [getAvailableModels] Credenciais não configuradas');
+        logger.warn('Credenciais AWS não configuradas', {
+          requestId: req.id,
+          userId
+        });
         return res.status(400).json(jsend.fail({
           credentials: 'Nenhuma credencial AWS configurada. Configure suas credenciais primeiro.',
         }));
       }
 
-      console.log('🔓 [getAvailableModels] Descriptografando credenciais...');
       // Descriptografar credenciais
       const accessKey = encryptionService.decrypt(userSettings.awsAccessKey);
       const secretKey = encryptionService.decrypt(userSettings.awsSecretKey);
       const region = userSettings.awsRegion || 'us-east-1';
-      
-      console.log('✅ [getAvailableModels] Credenciais descriptografadas com sucesso');
-      console.log('🌍 [getAvailableModels] Região:', region);
 
-      console.log('☁️ [getAvailableModels] Criando BedrockProvider...');
       // Buscar modelos disponíveis na AWS
       const bedrockProvider = new BedrockProvider(region);
       const apiKey = `${accessKey}:${secretKey}`;
       
-      console.log('📡 [getAvailableModels] Chamando AWS Bedrock API...');
       const awsModels = await bedrockProvider.getAvailableModels(apiKey);
-      console.log(`✅ [getAvailableModels] AWS retornou ${awsModels.length} modelos`);
-
-      // Debug: Log all models from AWS
-      console.log(`[ProvidersController] AWS returned ${awsModels.length} models`);
-      console.log('[ProvidersController] AWS models:', awsModels.map(m => m.modelId));
       
-      // Debug: Log registry count
-      console.log(`[ProvidersController] Registry has ${ModelRegistry.count()} models`);
-      console.log('[ProvidersController] Registry models:', ModelRegistry.getAll().map(m => m.modelId));
+      logger.info('Modelos AWS Bedrock obtidos', {
+        requestId: req.id,
+        userId,
+        region,
+        totalModels: awsModels.length,
+        registryModels: ModelRegistry.count()
+      });
 
       // Filter only supported models using Model Registry
-      console.log('🔍 [getAvailableModels] Filtrando modelos suportados...');
-      console.log(`📦 [getAvailableModels] Registry tem ${ModelRegistry.count()} modelos registrados`);
-      
       const supportedModels = awsModels.filter(model => {
         const isSupported = ModelRegistry.isSupported(model.modelId);
         if (!isSupported) {
-          console.log(`⚠️ [getAvailableModels] Modelo NÃO está no registry: ${model.modelId}`);
+          logger.debug('Modelo não está no registry', {
+            requestId: req.id,
+            modelId: model.modelId
+          });
         }
         return isSupported;
       });
-      
-      console.log(`✅ [getAvailableModels] Filtrados ${supportedModels.length} modelos suportados`);
-
-      console.log('💾 [getAvailableModels] Buscando modelos no banco de dados...');
       // Buscar modelos cadastrados no banco para enriquecer com informações de custo
       const dbModels = await prisma.aIModel.findMany({
         where: {
@@ -301,9 +279,7 @@ export const providersController = {
           contextWindow: true
         }
       });
-      console.log(`📊 [getAvailableModels] Encontrados ${dbModels.length} modelos no banco`);
 
-      console.log('🔄 [getAvailableModels] Enriquecendo modelos com dados do banco e registry...');
       // Criar mapa de modelos do banco para lookup rápido
       const dbModelsMap = new Map(dbModels.map(m => [m.apiModelId, m]));
 
@@ -350,20 +326,18 @@ export const providersController = {
         );
         return providerMatch || nameMatch;
       });
-      
-      console.log(`✅ [getAvailableModels] Filtrados ${chatModels.length} modelos compatíveis com chat`);
 
-      console.log('📝 [getAvailableModels] Logando sucesso...');
       logger.info('AWS Bedrock models fetched', {
+        requestId: req.id,
         userId,
         region,
         totalModels: awsModels.length,
+        supportedModels: supportedModels.length,
         textModels: textModels.length,
         chatModels: chatModels.length,
         timestamp: new Date().toISOString(),
       });
 
-      console.log('✅ [getAvailableModels] Retornando resposta de sucesso');
       return res.json(jsend.success({
         models: chatModels,
         totalCount: chatModels.length,
@@ -371,31 +345,19 @@ export const providersController = {
       }));
 
     } catch (error: any) {
-      console.log('\n❌ [getAvailableModels] ========== ERRO ==========');
-      console.log('❌ [getAvailableModels] Tipo do erro:', error?.constructor?.name);
-      console.log('❌ [getAvailableModels] Mensagem:', error?.message);
-      console.log('❌ [getAvailableModels] Stack:', error?.stack);
-      
       if (error instanceof AppError) {
-        console.log('❌ [getAvailableModels] É um AppError, re-lançando...');
         throw error;
       }
       
       const err = isError(error) ? error : new Error(String(error));
       
-      console.log('📝 [getAvailableModels] Tentando logar erro...');
-      try {
-        logger.error('Error fetching AWS Bedrock models', {
-          userId: req.userId,
-          error: err.message,
-          stack: err.stack,
-        });
-        console.log('✅ [getAvailableModels] Erro logado com sucesso');
-      } catch (logError) {
-        console.log('❌ [getAvailableModels] ERRO AO LOGAR:', logError);
-      }
+      logger.error('Erro ao buscar modelos AWS Bedrock', {
+        requestId: req.id,
+        userId: req.userId,
+        error: err.message,
+        stack: err.stack,
+      });
       
-      console.log('❌ [getAvailableModels] Retornando erro 500');
       return res.status(500).json(jsend.error('Erro ao buscar modelos AWS', 500));
     }
   },
@@ -407,7 +369,11 @@ export const providersController = {
   async getByVendor(req: AuthRequest, res: Response) {
     try {
       const userId = req.userId!;
-      console.log('[providersController.getByVendor] Iniciando busca de vendors para usuário:', userId);
+      
+      logger.info('Iniciando busca de vendors', {
+        requestId: req.id,
+        userId
+      });
       
       // 1. Buscar configurações do usuário para filtrar modelos habilitados
       const settings = await prisma.userSettings.findUnique({
@@ -418,9 +384,6 @@ export const providersController = {
       const awsValidation = await prisma.providerCredentialValidation.findUnique({
         where: { userId_provider: { userId, provider: 'bedrock' } }
       });
-      
-      console.log('[providersController.getByVendor] AWS enabled models:', settings?.awsEnabledModels?.length || 0);
-      console.log('[providersController.getByVendor] AWS validation status:', awsValidation?.status);
       
       // 3. Buscar todos os providers ativos
       const allProviders = await prisma.aIProvider.findMany({
@@ -433,7 +396,12 @@ export const providersController = {
         }
       });
       
-      console.log(`[providersController.getByVendor] Encontrados ${allProviders.length} providers ativos`);
+      logger.debug('Providers encontrados', {
+        requestId: req.id,
+        totalProviders: allProviders.length,
+        awsEnabledModels: settings?.awsEnabledModels?.length || 0,
+        awsValidationStatus: awsValidation?.status
+      });
       
       // 4. Filtrar providers baseado em configuração (mesma lógica do /configured)
       const providers = allProviders.filter(provider => {
@@ -470,26 +438,27 @@ export const providersController = {
             
             provider.models = [...existingModels, ...dynamicModels];
             
-            console.log('[providersController.getByVendor] Bedrock modelos filtrados:', provider.models.length);
-            console.log('[providersController.getByVendor] Bedrock IDs:', provider.models.map(m => m.apiModelId));
+            logger.debug('Bedrock modelos filtrados', {
+              requestId: req.id,
+              totalModels: provider.models.length,
+              modelIds: provider.models.map(m => m.apiModelId)
+            });
             
             return provider.models.length > 0;
           }
-          console.log('[providersController.getByVendor] Bedrock excluído: não validado ou sem modelos habilitados');
+          logger.debug('Bedrock excluído: não validado ou sem modelos habilitados', {
+            requestId: req.id
+          });
           return false;
         }
         
         return true;
       });
       
-      console.log(`[providersController.getByVendor] Providers configurados: ${providers.length}`);
-      
       // 2. Agrupar modelos por vendor
       const vendorMap = new Map<string, VendorGroup>();
       
       for (const provider of providers) {
-        console.log(`[providersController.getByVendor] Processando provider: ${provider.slug} (${provider.models.length} modelos)`);
-        
         for (const model of provider.models) {
           // Extrair vendor do apiModelId ou usar campo vendor se existir
           const vendor = extractVendor(model.apiModelId);
@@ -502,7 +471,6 @@ export const providersController = {
               logo: `/assets/vendors/${vendor}.svg`,
               models: []
             });
-            console.log(`[providersController.getByVendor] Novo vendor criado: ${vendor}`);
           }
           
           const vendorGroup = vendorMap.get(vendor)!;
@@ -536,7 +504,6 @@ export const providersController = {
               }
             };
             vendorGroup.models.push(existingModel);
-            console.log(`[providersController.getByVendor] Novo modelo adicionado: ${model.apiModelId}`);
           }
           
           // Adicionar provider availability
@@ -556,18 +523,23 @@ export const providersController = {
         a.name.localeCompare(b.name)
       );
       
-      console.log(`[providersController.getByVendor] Total de vendors: ${vendors.length}`);
-      console.log(`[providersController.getByVendor] Vendors: ${vendors.map(v => v.name).join(', ')}`);
+      logger.info('Vendors obtidos com sucesso', {
+        requestId: req.id,
+        userId,
+        totalVendors: vendors.length,
+        totalProviders: providers.length,
+        vendorNames: vendors.map(v => v.name)
+      });
       
       return res.status(200).json(jsend.success({ vendors }));
       
     } catch (error) {
-      console.error('[providersController.getByVendor] Erro ao buscar vendors:', error);
       if (error instanceof AppError) {
         throw error;
       }
       const err = isError(error) ? error : new Error(String(error));
       logger.error('Erro ao buscar vendors', {
+        requestId: req.id,
         userId: req.userId,
         error: err.message,
         stack: err.stack,

@@ -3,6 +3,7 @@
 
 import { prisma } from '../lib/prisma';
 import { aiService } from './ai';
+import logger from '../utils/logger';
 
 // Interface para mensagem com similaridade
 interface MessageWithSimilarity {
@@ -36,7 +37,7 @@ export const ragService = {
       // 1. "Traduza" (V9.2) a pergunta
       const embedding = await aiService.embed(queryText);
       if (!embedding) {
-        console.error("V9.4: Falha ao 'traduzir' a pergunta (embedding nulo)");
+        logger.error("V9.4: Falha ao 'traduzir' a pergunta (embedding nulo)");
         return [];
       }
 
@@ -69,7 +70,7 @@ export const ragService = {
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      console.error("Erro na busca V9.4 (ragService):", errorMessage);
+      logger.error("Erro na busca V9.4 (ragService):", errorMessage);
       return [];
     }
   }

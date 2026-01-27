@@ -5,6 +5,7 @@ import { prisma } from '../../../lib/prisma';
 import { BaseAIProvider } from './base';
 import { OpenAIProvider } from './openai';
 import crypto from 'crypto';
+import logger from '../../../utils/logger';
 
 function decryptApiKey(encryptedKey: string): string {
   const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET;
@@ -97,7 +98,7 @@ export class AIProviderFactory {
       if (settings?.awsAccessKey && settings?.awsSecretKey) {
         const accessKey = encryptionService.decrypt(settings.awsAccessKey);
         const secretKey = encryptionService.decrypt(settings.awsSecretKey);
-        console.log(`[Factory] Usando credenciais AWS do userSettings para usuário ${userId}`);
+        logger.info(`[Factory] Usando credenciais AWS do userSettings para usuário ${userId}`);
         return `${accessKey}:${secretKey}`;
       }
     }
@@ -125,7 +126,7 @@ export class AIProviderFactory {
 
     const systemKey = envKeyMap[provider.slug];
     if (systemKey) {
-      console.log(`[Factory] Usando chave do sistema (.env) para ${provider.slug}`);
+      logger.info(`[Factory] Usando chave do sistema (.env) para ${provider.slug}`);
       return systemKey;
     }
     

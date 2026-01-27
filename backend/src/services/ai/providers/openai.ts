@@ -4,6 +4,7 @@
 import OpenAI from 'openai';
 import { BaseAIProvider, AIRequestOptions } from './base';
 import { StreamChunk } from '../types';
+import logger from '../../../utils/logger';
 
 export class OpenAIProvider extends BaseAIProvider {
   private baseURL?: string;
@@ -51,7 +52,7 @@ export class OpenAIProvider extends BaseAIProvider {
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no provedor OpenAI';
-      console.error(`[OpenAIProvider] Erro no stream:`, error);
+      logger.error(`[OpenAIProvider] Erro no stream:`, error);
       yield {
         type: 'error',
         error: errorMessage,

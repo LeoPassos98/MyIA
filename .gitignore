@@ -41,3 +41,7 @@ temp/
 
 # .github files
 .github/
+
+# Observability data
+observability/data/
+observability/*.pid

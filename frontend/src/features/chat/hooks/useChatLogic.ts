@@ -278,7 +278,15 @@ export function useChatLogic(chatId?: string) {
           logger.error('Erro no stream de chat', { error: err });
           setIsLoading(false);
           isSendingRef.current = false;
-          setMessages(prev => prev.map(msg => msg.id === tempAiMsgId ? { ...msg, content: msg.content + "\n[Erro]" } : msg));
+          
+          // Mensagem de erro mais descritiva
+          const errorMessage = typeof err === 'string' ? err : (err.message || 'Erro desconhecido');
+          setMessages(prev => prev.map(msg =>
+            msg.id === tempAiMsgId ? {
+              ...msg,
+              content: msg.content ? `${msg.content}\n\n❌ Erro: ${errorMessage}` : `❌ Erro: ${errorMessage}`
+            } : msg
+          ));
         },
         controller.signal
       );

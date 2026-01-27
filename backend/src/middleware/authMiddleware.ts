@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
 import { config } from '../config/env';
+import logger from '../utils/logger';
 
 // 1. Definição da Interface Estendida
 export interface AuthRequest extends Request {
@@ -23,8 +24,8 @@ export const authMiddleware = async (
   next: NextFunction
 ) => {
   // 👇 ADICIONE ESSES LOGS DE DEBUG
-  console.log(`[AuthMiddleware] Método: ${req.method} | URL: ${req.originalUrl}`);
-  console.log('[AuthMiddleware] Headers recebidos:', req.headers.authorization ? 'Com Token' : 'SEM TOKEN');
+  logger.info(`[AuthMiddleware] Método: ${req.method} | URL: ${req.originalUrl}`);
+  logger.info('[AuthMiddleware] Headers recebidos:', req.headers.authorization ? 'Com Token' : 'SEM TOKEN');
 
   // Se for uma requisição de pré-verificação (OPTIONS), deixa passar sem checar token
   if (req.method === 'OPTIONS') {
@@ -35,7 +36,7 @@ export const authMiddleware = async (
 
   if (!authHeader) {
     // Vamos logar o erro antes de retornar
-    console.error('[AuthMiddleware] ❌ Bloqueado: Header Authorization ausente');
+    logger.error('[AuthMiddleware] ❌ Bloqueado: Header Authorization ausente');
     return next(new AppError('No token provided', 401));
   }
 

@@ -3,6 +3,7 @@
 
 import OpenAI from 'openai';
 import { getProviderInfo } from '../../../config/providerMap';
+import logger from '../../../utils/logger';
 
 // Interface para o retorno V9.2 (com custo calculado)
 export interface EmbeddingResponse {
@@ -18,7 +19,7 @@ const apiKey = process.env.AZURE_API_KEY;
 const deploymentName = process.env.AZURE_EMBEDDING_DEPLOYMENT_NAME;
 
 if (!endpoint || !apiKey || !deploymentName) {
-  console.warn("⚠️ Azure Embedding Client (V9.2) não configurado. O RAG falhará.");
+  logger.warn("⚠️ Azure Embedding Client (V9.2) não configurado. O RAG falhará.");
 }
 
 // Criar cliente OpenAI configurado para Azure
@@ -37,7 +38,7 @@ const client = (endpoint && apiKey)
  */
 export async function getEmbedding(text: string): Promise<EmbeddingResponse | null> {
   if (!client || !deploymentName) {
-    console.warn("Azure Embedding não disponível. Retornando null.");
+    logger.warn("Azure Embedding não disponível. Retornando null.");
     return null;
   }
 
@@ -65,7 +66,7 @@ export async function getEmbedding(text: string): Promise<EmbeddingResponse | nu
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.error("❌ Erro ao gerar embedding (Azure V9.2):", errorMessage);
+    logger.error("❌ Erro ao gerar embedding (Azure V9.2):", errorMessage);
     return null;
   }
 }
@@ -76,7 +77,7 @@ export async function getEmbedding(text: string): Promise<EmbeddingResponse | nu
  */
 export async function getEmbeddingsBatch(texts: string[]): Promise<EmbeddingResponse[]> {
   if (!client || !deploymentName) {
-    console.warn("Azure Embedding não disponível. Retornando array vazio.");
+    logger.warn("Azure Embedding não disponível. Retornando array vazio.");
     return [];
   }
 
@@ -112,7 +113,7 @@ export async function getEmbeddingsBatch(texts: string[]): Promise<EmbeddingResp
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      console.error(`❌ Erro no batch ${i}-${i + batch.length}:`, errorMessage);
+      logger.error(`❌ Erro no batch ${i}-${i + batch.length}:`, errorMessage);
       // Retornar null para cada texto que falhou
       batch.forEach(() => {
         results.push({

@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { config } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
+import { requestIdMiddleware } from './middleware/requestId';
 import { prisma } from './lib/prisma';
 import { authLimiter, apiLimiter, chatLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/authRoutes';
@@ -21,6 +22,7 @@ import promptTraceRoutes from './routes/promptTraceRoutes';
 import providersRoutes from './routes/providers';
 import certificationRoutes from './routes/certificationRoutes';
 import modelsRoutes from './routes/modelsRoutes';
+import logsRoutes from './routes/logsRoutes';
 import passport from './config/passport';
 
 
@@ -75,15 +77,18 @@ app.use(cors({
 app.options('*', cors());
 app.use(express.json());
 
+// 🔍 Request ID Middleware - Gera UUID único para cada requisição
+app.use(requestIdMiddleware);
+
 // Inicializa Passport para OAuth (ANTES das rotas)
 app.use(passport.initialize());
 
 // Log de requisições
 app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`);
-  console.log(`📡 [Request] ${req.method} ${req.path}`);
+  logger.info(`📡 [Request] ${req.method} ${req.path}`);
   if (req.query && Object.keys(req.query).length > 0) {
-    console.log(`📡 [Query]:`, req.query);
+    logger.info(`📡 [Query]:`, req.query);
   }
   next();
 });
@@ -109,10 +114,11 @@ app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
 app.use('/api/providers', apiLimiter, providersRoutes);
 app.use('/api/certification', certificationRoutes);
 app.use('/api/models', apiLimiter, modelsRoutes);
+app.use('/api/logs', apiLimiter, logsRoutes);
 
 // Rota 404
 app.use((req, res) => {
-  console.log(`❌ [404] Rota não encontrada: ${req.method} ${req.path}`);
+  logger.info(`❌ [404] Rota não encontrada: ${req.method} ${req.path}`);
   res.status(404).json({ error: 'Route not found' });
 });
 
@@ -124,46 +130,50 @@ const PORT = process.env.PORT || 3001;
 
 async function startServer() {
   try {
-    console.log('🔧 Inicializando servidor...');
-    console.log('📦 Carregando dependências...');
+    logger.info('🔧 Inicializando servidor...');
+    logger.info('📦 Carregando dependências...');
     
     // Teste de conexão com banco
-    console.log('🗄️  Conectando ao banco de dados...');
+    logger.info('🗄️  Conectando ao banco de dados...');
     await prisma.$connect();
-    console.log('✅ Banco de dados conectado!');
+    logger.info('✅ Banco de dados conectado!');
     
     app.listen(PORT, () => {
-      console.log('✅ Servidor rodando!');
-      console.log(`🚀 Backend disponível em http://localhost:${PORT}`);
-      console.log(`💚 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`🌍 CORS configurado para: ${allowedOrigins.join(', ')}`);
-      console.log(`📝 Ambiente: ${config.nodeEnv}`);
+      logger.info('✅ Servidor rodando!');
+      logger.info(`🚀 Backend disponível em http://localhost:${PORT}`);
+      logger.info(`💚 Health check: http://localhost:${PORT}/api/health`);
+      logger.info(`🌍 CORS configurado para: ${allowedOrigins.join(', ')}`);
+      logger.info(`📝 Ambiente: ${config.nodeEnv}`);
     });
   } catch (error) {
-    console.error('❌ Erro ao iniciar servidor:', error);
-    console.error('💡 Verifique se o PostgreSQL está rodando e o .env está configurado');
+    logger.error('❌ Erro ao iniciar servidor:', error);
+    logger.error('💡 Verifique se o PostgreSQL está rodando e o .env está configurado');
     process.exit(1);
   }
 }
 
 // Graceful shutdown - desconecta do banco ao encerrar
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Encerrando servidor...');
+  logger.info('\n🛑 Encerrando servidor...');
   await prisma.$disconnect();
-  console.log('✅ Banco desconectado');
+  logger.info('✅ Banco desconectado');
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n🛑 Encerrando servidor...');
+  logger.info('\n🛑 Encerrando servidor...');
   await prisma.$disconnect();
-  console.log('✅ Banco desconectado');
+  logger.info('✅ Banco desconectado');
   process.exit(0);
 });
 
 // Capturar erros não tratados
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('Unhandled Rejection', {
+    promise: String(promise),
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined
+  });
   // Em produção, você pode querer encerrar o processo
   if (config.nodeEnv === 'production') {
     process.exit(1);
@@ -171,7 +181,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
+  logger.error('❌ Uncaught Exception:', error);
   // Em produção, encerre o processo
   if (config.nodeEnv === 'production') {
     process.exit(1);

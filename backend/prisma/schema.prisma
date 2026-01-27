@@ -30,7 +30,7 @@ model User {
 
   chats Chat[]
 
-  providerCredentials UserProviderCredential[]
+  providerCredentials   UserProviderCredential[]
   credentialValidations ProviderCredentialValidation[]
 
   @@map("users")
@@ -53,8 +53,8 @@ model UserSettings {
   // --- AWS Bedrock Configuration ---
   awsAccessKey     String?
   awsSecretKey     String?
-  awsRegion        String?   @default("us-east-1")
-  awsEnabledModels String[]  @default([]) // Array de apiModelId habilitados
+  awsRegion        String?  @default("us-east-1")
+  awsEnabledModels String[] @default([]) // Array de apiModelId habilitados
 
   // --- O Link de volta ao User ---
   userId String @unique // O '@unique' garante a relação 1-para-1
@@ -67,13 +67,13 @@ model UserSettings {
 model ProviderCredentialValidation {
   id              String    @id @default(uuid())
   userId          String
-  provider        String    // 'bedrock', 'azure', etc
-  status          String    // 'not_configured', 'validating', 'valid', 'invalid', 'expired'
+  provider        String // 'bedrock', 'azure', etc
+  status          String // 'not_configured', 'validating', 'valid', 'invalid', 'expired'
   lastValidatedAt DateTime?
-  lastError       String?   // Mensagem de erro detalhada
-  errorCode       String?   // AWS error code (ex: InvalidAccessKeyId)
+  lastError       String? // Mensagem de erro detalhada
+  errorCode       String? // AWS error code (ex: InvalidAccessKeyId)
   validatedModels String[]  @default([]) // Quais modelos foram testados
-  latencyMs       Int?      // Tempo de resposta do teste
+  latencyMs       Int? // Tempo de resposta do teste
 
   user User @relation(fields: [userId], references: [id])
 
@@ -209,42 +209,62 @@ model UserProviderCredential {
 
 // 4. Certificação de Modelos (Sistema de Validação Automática)
 model ModelCertification {
-  id                String   @id @default(cuid())
-  modelId           String   @unique
-  vendor            String   // anthropic, cohere, amazon
-  status            String   // certified, failed, untested, testing, quality_warning
-  
+  id      String @id @default(cuid())
+  modelId String @unique
+  vendor  String // anthropic, cohere, amazon
+  status  String // certified, failed, untested, testing, quality_warning
+
   // Certificação
-  certifiedAt       DateTime?
-  expiresAt         DateTime?
-  certifiedBy       String?  // 'system' ou userId
-  
+  certifiedAt DateTime?
+  expiresAt   DateTime?
+  certifiedBy String? // 'system' ou userId
+
   // Testes
-  lastTestedAt      DateTime?
-  testsPassed       Int      @default(0)
-  testsFailed       Int      @default(0)
-  successRate       Float    @default(0)
-  
+  lastTestedAt DateTime?
+  testsPassed  Int       @default(0)
+  testsFailed  Int       @default(0)
+  successRate  Float     @default(0)
+
   // Performance
-  avgLatencyMs      Int?
-  lastError         String?
-  failureReasons    Json?    // Array de erros
-  
+  avgLatencyMs   Int?
+  lastError      String?
+  failureReasons Json? // Array de erros
+
   // Categorização de Erros (Novo)
-  errorCategory     String?  // UNAVAILABLE, PERMISSION_ERROR, etc
-  errorSeverity     String?  // CRITICAL, HIGH, MEDIUM, LOW
-  
+  errorCategory String? // UNAVAILABLE, PERMISSION_ERROR, etc
+  errorSeverity String? // CRITICAL, HIGH, MEDIUM, LOW
+
   // Metadados
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // ✅ OTIMIZAÇÃO: Índices para queries comuns (70% mais rápido)
-  @@index([status])                    // Para getCertifiedModels()
-  @@index([status, expiresAt])         // Para query com OR
-  @@index([vendor])                    // Para certifyVendor()
-  @@index([lastTestedAt])              // Para ordenação por data
-  @@index([expiresAt])                 // Para queries de expiração
-  @@index([errorCategory])             // Para filtrar por categoria de erro
-  @@index([errorSeverity])             // Para filtrar por severidade
+  @@index([status]) // Para getCertifiedModels()
+  @@index([status, expiresAt]) // Para query com OR
+  @@index([vendor]) // Para certifyVendor()
+  @@index([lastTestedAt]) // Para ordenação por data
+  @@index([expiresAt]) // Para queries de expiração
+  @@index([errorCategory]) // Para filtrar por categoria de erro
+  @@index([errorSeverity]) // Para filtrar por severidade
   @@map("model_certifications")
+}
+
+// 5. Sistema de Logging Estruturado (Fase 2: PostgreSQL)
+model Log {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  level       String // 'info' | 'warn' | 'error' | 'debug'
+  message     String
+  requestId   String?
+  userId      String?
+  inferenceId String?
+  metadata    Json? // JSONB para contexto adicional
+  error       Json? // JSONB para stack traces e detalhes de erro
+
+  // Índices de performance para queries comuns
+  @@index([timestamp(sort: Desc)]) // Queries temporais (logs recentes)
+  @@index([level]) // Filtro por nível de severidade
+  @@index([userId]) // Filtro por usuário
+  @@index([requestId]) // Correlação de logs por requisição
+  @@map("logs")
 }

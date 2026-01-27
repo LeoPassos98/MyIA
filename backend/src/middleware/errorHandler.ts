@@ -43,7 +43,7 @@ export const errorHandler: ErrorRequestHandler = (
   // 4. Log detalhado para desenvolvedor
   logger.error(`${err.name}: ${err.message} (${err.statusCode || 500})`);
   if (process.env.NODE_ENV === 'development') {
-    console.error(' [ERROR] ', err);
+    logger.error(' [ERROR] ', err);
   }
 
   // 5. Determinar se é erro de cliente (4xx) ou servidor (5xx)

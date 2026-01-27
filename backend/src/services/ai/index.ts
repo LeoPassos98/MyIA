@@ -5,6 +5,7 @@ import { StreamChunk } from './types';
 import { AIProviderFactory } from './providers/factory';
 import { getEmbedding, getEmbeddingsBatch, EmbeddingResponse } from './client/azureEmbeddingClient';
 import { prisma } from '../../lib/prisma';
+import logger from '../../utils/logger';
 
 export interface AIStreamOptions {
   providerSlug: string;
@@ -25,7 +26,7 @@ export const aiService = {
     options: AIStreamOptions
   ): AsyncGenerator<StreamChunk> {
     
-    console.log(`[AI Service] Stream init: ${options.providerSlug} / ${options.modelId}`);
+    logger.info(`[AI Service] Stream init: ${options.providerSlug} / ${options.modelId}`);
 
     try {
       const provider = await AIProviderFactory.getProviderInstance(options.providerSlug);
@@ -62,7 +63,7 @@ export const aiService = {
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro interno no serviço de IA';
-      console.error(`[AI Service] Erro fatal:`, error);
+      logger.error(`[AI Service] Erro fatal:`, error);
       yield {
         type: 'error',
         error: errorMessage,

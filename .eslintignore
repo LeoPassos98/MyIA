@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+coverage/
+.vscode/
+.idea/
+observability/data/
+backend/test-logging-interface.ts
+*.log
+*.pid

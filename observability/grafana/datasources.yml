@@ -1,0 +1,56 @@
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki-myia
+    isDefault: true
+    version: 1
+    editable: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        # Extract requestId from logs
+        - datasourceUid: loki-myia
+          matcherRegex: '"requestId":"([^"]+)"'
+          name: RequestID
+          url: $${__value.raw}
+        
+        # Extract userId from logs
+        - datasourceUid: loki-myia
+          matcherRegex: '"userId":"([^"]+)"'
+          name: UserID
+          url: $${__value.raw}
+        
+        # Extract traceId if present
+        - datasourceUid: loki-myia
+          matcherRegex: '"traceId":"([^"]+)"'
+          name: TraceID
+          url: $${__value.raw}
+      
+      # Alert configuration
+      alertmanager_uid: alertmanager
+      
+      # Timeout settings
+      timeout: 60
+      
+      # Query settings
+      httpHeaderName1: 'X-Scope-OrgID'
+    
+    # HTTP settings
+    httpHeaderValue1: 'myia'
+    
+    # Basic auth (disabled)
+    basicAuth: false
+    
+    # With credentials
+    withCredentials: false
+    
+    # TLS settings
+    tlsAuth: false
+    tlsAuthWithCACert: false
+    
+    # Organization ID
+    orgId: 1

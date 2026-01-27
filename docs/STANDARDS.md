@@ -1,14 +1,15 @@
-# 🛑 LEIA-ME: REGRAS IMUTÁVEIS (NÃO EDITE ESTE ARQUIVO)
+# 🛑 LEIA-ME: PADRÕES DE DESENVOLVIMENTO
 
-> **AVISO PARA IAs, COPILOTS E DESENVOLVEDORES:**  
-> Este arquivo define a **"Constituição" do projeto**. Ele deve ser lido obrigatoriamente para entendimento do contexto, porém **NÃO DEVE SER EDITADO, REFATORADO OU REMOVIDO** sob nenhuma circunstância.  
+> **AVISO PARA IAs, COPILOTS E DESENVOLVEDORES:**
 > As regras aqui descritas **devem ser seguidas estritamente** ao criar ou modificar qualquer outro arquivo do projeto.
 
 ---
 
 # Padrões de Desenvolvimento – MyIA
 
-Este documento define regras **estritas e imutáveis** de arquitetura e codificação para o projeto MyIA.  
+> **NOTA SOBRE NUMERAÇÃO:** As seções têm gaps intencionais (ex: Seção 8 não existe) para permitir futuras adições sem renumerar todo o documento. Isso preserva referências existentes em código e documentação.
+
+Este documento define regras **estritas e imutáveis** de arquitetura e codificação para o projeto MyIA.
 **ESCOPO:** Estas regras aplicam-se a **TODOS** os diretórios (Frontend, Backend, Scripts e Docs).
 
 ---
@@ -16,24 +17,27 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
 ## 📑 Índice
 
 ### 🎯 Fundamentos
-1. [Convenções de Arquivos](#1-convenções-de-arquivos-header-obrigatório)
-2. [Convenção de Nomes](#2-convenção-de-nomes-naming-convention)
-14. [Commits e Versionamento](#14-commits-e-versionamento)
+- 1. [Convenções de Arquivos](#1-convenções-de-arquivos-header-obrigatório)
+- 2. [Convenção de Nomes](#2-convenção-de-nomes-naming-convention)
+- 13. [Sistema de Logging Estruturado](#13-sistema-de-logging-estruturado)
 
 ### 🎨 Frontend
-3. [Arquitetura Frontend](#3-arquitetura-frontend)
-10. [Identidade Visual e Design System](#10-identidade-visual-e-design-system)
-6. [ObservabilityPageLayout](#6-observabilitypagelayout-padrão-obrigatório-para-páginas-complexas)
+- 3. [Arquitetura Frontend](#3-arquitetura-frontend)
+- 6. [ObservabilityPageLayout](#6-observabilitypagelayout-padrão-obrigatório-para-páginas-complexas)
+- 10. [Identidade Visual e Design System](#10-identidade-visual-e-design-system)
 
 ### ⚙️ Backend
-4. [Arquitetura Backend](#4-arquitetura-backend)
-5. [Fonte Única de Verdade](#5-fonte-única-de-verdade-regra-arquitetural-imutável)
-7. [Armazenamento Lean](#7-armazenamento-lean-anti-duplicação-de-dados)
-11. [Versionamento de Mensagens](#11-versionamento-de-mensagens-arquitetura-preparada)
-12. [Padronização de API (JSend)](#12-padronização-de-api-e-respostas-jsend)
+- 4. [Arquitetura Backend](#4-arquitetura-backend)
+- 5. [Fonte Única de Verdade](#5-fonte-única-de-verdade-regra-arquitetural-imutável)
+- 7. [Armazenamento Lean](#7-armazenamento-lean-anti-duplicação-de-dados)
+- 11. [Versionamento de Mensagens](#11-versionamento-de-mensagens-arquitetura-preparada)
+- 12. [Padronização de API (JSend)](#12-padronização-de-api-e-respostas-jsend)
 
 ### 🔒 Segurança
-9. [Segurança (Padrões Obrigatórios)](#9-segurança-padrões-obrigatórios)
+- 9. [Segurança (Padrões Obrigatórios)](#9-segurança-padrões-obrigatórios)
+
+### 📋 Desenvolvimento
+- 14. [Commits e Versionamento](#14-commits-e-versionamento)
 
 ---
 
@@ -230,6 +234,8 @@ const messages = await prisma.message.findMany({
   orderBy: { createdAt: 'asc' }
 });
 ```
+
+<!-- Seção 8: RESERVADA para futuras adições -->
 
 ---
 
@@ -553,8 +559,397 @@ try {
 - [ ] Erros 5xx usam JSend `error` com mensagem genérica
 - [ ] Stack traces removidos em produção
 - [ ] Rate limit retorna 429 com `Retry-After`
-- [ ] Logs estruturados com Winston (não `console.log`)
 - [ ] Frontend trata 429 sem mostrar erro genérico
+- [ ] Logs estruturados com Winston (não `console.log`) — Ver [Seção 13](#13-sistema-de-logging-estruturado)
+
+---
+
+## 13. Sistema de Logging Estruturado
+
+### 13.1 Princípios Fundamentais
+
+**Logging estruturado é OBRIGATÓRIO em todo o projeto.**
+
+- ❌ **PROIBIDO:** `console.log()`, `console.error()`, `console.warn()`
+- ✅ **OBRIGATÓRIO:** `logger.info()`, `logger.error()`, `logger.warn()`, `logger.debug()`
+
+> **Integração com APIs:** Para tratamento de erros em rotas REST, veja [Seção 12.5](#125-tratamento-de-erros-error-handling)
+
+---
+
+### 13.2 Estrutura de Log Padronizada
+
+Todo log DEVE seguir a interface [`LogEntry`](../backend/src/types/logging.ts):
+
+```typescript
+// backend/src/types/logging.ts
+interface LogEntry {
+  // Metadados obrigatórios
+  timestamp: string;        // ISO 8601
+  level: LogLevel;          // 'info' | 'warn' | 'error' | 'debug'
+  message: string;
+  
+  // Contexto de requisição
+  requestId?: string;       // UUID da requisição HTTP
+  userId?: string;          // ID do usuário autenticado
+  
+  // Contexto de inferência
+  inferenceId?: string;     // ID da inferência (se aplicável)
+  provider?: string;        // Provider usado (bedrock, openai)
+  model?: string;           // Modelo usado
+  
+  // Dados adicionais
+  metadata?: Record<string, unknown>;
+  error?: {
+    name: string;
+    message: string;
+    stack?: string;         // APENAS em desenvolvimento
+  };
+  
+  // Performance e auditoria
+  duration?: number;        // Duração da operação (ms)
+  statusCode?: number;      // HTTP status code
+  action?: string;          // Ação executada
+  resource?: string;        // Recurso afetado
+}
+
+type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+```
+
+> **Detalhes de implementação:** Veja [LOGGING-SYSTEM-PROPOSAL.md](./LOGGING-SYSTEM-PROPOSAL.md)
+
+---
+
+### 13.3 Níveis de Log
+
+| Nível | Uso | Exemplo |
+|-------|-----|---------|
+| `info` | Operações normais | Login, inferência concluída, requisição processada |
+| `warn` | Situações anormais (não críticas) | Rate limit atingido, cache miss, retry |
+| `error` | Erros que impedem operação | Falha de autenticação, erro de API, timeout |
+| `debug` | Informações detalhadas (dev) | Payload enviado, resposta recebida, estado interno |
+
+---
+
+### 13.4 Uso Básico
+
+#### Exemplo 1: Log Simples (Informação)
+
+```typescript
+import { logger } from '../utils/logger';
+
+// Log básico sem contexto adicional
+logger.info('Aplicação iniciada');
+
+// Log com contexto simples
+logger.info('Usuário autenticado', {
+  userId: 'user-123',
+  requestId: req.id
+});
+```
+
+#### Exemplo 2: Log em Controller (Requisição HTTP)
+
+```typescript
+// backend/src/controllers/authController.ts
+import { logger } from '../utils/logger';
+import { AuthRequest } from '../middleware/authMiddleware';
+
+export async function login(req: AuthRequest, res: Response) {
+  const startTime = Date.now();
+  
+  try {
+    logger.info('Login attempt', {
+      requestId: req.id,
+      email: req.body.email // ❌ NÃO FAZER - dados sensíveis
+    });
+    
+    // ✅ CORRETO - apenas ID do usuário
+    logger.info('Login attempt', {
+      requestId: req.id,
+      // Não logar email ou senha
+    });
+    
+    const user = await authService.login(req.body);
+    
+    logger.info('Login successful', {
+      requestId: req.id,
+      userId: user.id,
+      duration: Date.now() - startTime
+    });
+    
+    return res.json(jsend.success({ user, token }));
+    
+  } catch (error) {
+    logger.error('Login failed', {
+      requestId: req.id,
+      duration: Date.now() - startTime,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    throw error;
+  }
+}
+```
+
+#### Exemplo 3: Log em Service (Inferência de IA)
+
+```typescript
+// backend/src/services/ai/adapters/anthropic.adapter.ts
+import { logger } from '../../../utils/logger';
+
+export class AnthropicAdapter {
+  async generate(payload: any, options: any) {
+    const startTime = Date.now();
+    
+    logger.info('Starting AI inference', {
+      requestId: options.requestId,
+      userId: options.userId,
+      provider: 'anthropic',
+      model: options.modelId,
+      metadata: {
+        messageCount: payload.length,
+        estimatedTokens: this.estimateTokens(payload)
+      }
+    });
+    
+    try {
+      const response = await this.client.messages.create({
+        model: options.modelId,
+        messages: payload,
+        max_tokens: options.maxTokens || 4096
+      });
+      
+      logger.info('AI inference completed', {
+        requestId: options.requestId,
+        userId: options.userId,
+        provider: 'anthropic',
+        model: options.modelId,
+        duration: Date.now() - startTime,
+        metadata: {
+          tokensIn: response.usage.input_tokens,
+          tokensOut: response.usage.output_tokens,
+          cost: this.calculateCost(response.usage)
+        }
+      });
+      
+      return response;
+      
+    } catch (error) {
+      logger.error('AI inference failed', {
+        requestId: options.requestId,
+        userId: options.userId,
+        provider: 'anthropic',
+        model: options.modelId,
+        duration: Date.now() - startTime,
+        error: error instanceof Error ? error.message : String(error),
+        stack: process.env.NODE_ENV === 'development' && error instanceof Error
+          ? error.stack
+          : undefined
+      });
+      
+      throw error;
+    }
+  }
+}
+```
+
+#### Exemplo 4: Log de Aviso (Warning)
+
+```typescript
+import { logger } from '../utils/logger';
+
+// Rate limit atingido
+logger.warn('Rate limit approaching', {
+  requestId: req.id,
+  userId: req.user.id,
+  metadata: {
+    currentRequests: 45,
+    limit: 50,
+    resetAt: new Date(Date.now() + 60000).toISOString()
+  }
+});
+
+// Cache miss
+logger.warn('Cache miss', {
+  requestId: req.id,
+  metadata: {
+    cacheKey: 'user-settings-123',
+    fallbackUsed: 'database'
+  }
+});
+
+// Retry de operação
+logger.warn('Retrying operation', {
+  requestId: req.id,
+  metadata: {
+    operation: 'fetch-embeddings',
+    attempt: 2,
+    maxAttempts: 3,
+    reason: 'timeout'
+  }
+});
+```
+
+#### Exemplo 5: Log de Debug (Desenvolvimento)
+
+```typescript
+import { logger } from '../utils/logger';
+
+// Debug de payload (apenas em desenvolvimento)
+if (process.env.NODE_ENV === 'development') {
+  logger.debug('Request payload', {
+    requestId: req.id,
+    metadata: {
+      body: req.body,
+      query: req.query,
+      params: req.params
+    }
+  });
+}
+
+// Debug de estado interno
+logger.debug('Context service state', {
+  requestId: req.id,
+  metadata: {
+    historySize: historyMessages.length,
+    pinnedCount: pinnedMessages.length,
+    ragEnabled: isRagMode,
+    estimatedTokens: totalTokens
+  }
+});
+```
+
+> **Guia completo de uso:** Veja [`LOGGING-USAGE-GUIDE.md`](./LOGGING-USAGE-GUIDE.md:1)
+
+---
+
+### 13.5 Segurança e Dados Sensíveis
+
+**REGRAS ESTRITAS:**
+
+- ❌ **NUNCA** logar senhas, tokens, chaves de API
+- ❌ **NUNCA** logar dados pessoais (CPF, cartão de crédito)
+- ❌ **NUNCA** logar payloads completos (podem conter dados sensíveis)
+- ✅ Logar apenas IDs de usuários (não nomes/emails)
+- ✅ Sanitizar inputs antes de logar
+- ✅ Stack traces **APENAS** em desenvolvimento
+
+```typescript
+// ❌ PROIBIDO
+logger.info('User login', {
+  email: user.email,
+  password: user.password
+});
+
+// ✅ PERMITIDO
+logger.info('User login', {
+  userId: user.id,
+  requestId: req.id
+});
+```
+
+---
+
+### 13.6 Performance
+
+**Logs NÃO DEVEM impactar performance da aplicação.**
+
+- ❌ Evitar logar objetos pesados (arrays grandes, payloads completos)
+- ✅ Logar apenas resumos ou tamanhos
+- ✅ Usar logs assíncronos (Winston cuida disso)
+
+```typescript
+// ❌ PROIBIDO
+logger.info('Processing data', { data: heavyArray });
+
+// ✅ PERMITIDO
+logger.info('Processing data', {
+  dataSize: heavyArray.length,
+  summary: heavyArray.slice(0, 5)
+});
+```
+
+---
+
+### 13.7 Correlação de Logs
+
+**Todo log DEVE incluir `requestId` quando disponível.**
+
+```typescript
+// Middleware de requestId (obrigatório)
+// backend/src/middleware/requestId.ts
+import { Request, Response, NextFunction } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+
+export function requestIdMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  req.id = uuidv4();
+  res.setHeader('X-Request-ID', req.id);
+  next();
+}
+```
+
+**Uso em toda a aplicação:**
+
+```typescript
+logger.info('Operation', {
+  requestId: req.id,  // ✅ SEMPRE incluir
+  userId: req.user?.id,
+  // ... outros campos
+});
+```
+
+> **Implementação completa:** Veja [LOGGING-SYSTEM-PROPOSAL.md](./LOGGING-SYSTEM-PROPOSAL.md#2-middleware-de-request-id)
+
+---
+
+### 13.8 Checklist de Conformidade
+
+Antes de commitar código que usa logging:
+
+- [ ] Usa `logger.info/warn/error/debug` (não `console.log`)
+- [ ] Inclui `requestId` quando disponível
+- [ ] Inclui `userId` quando disponível
+- [ ] NÃO loga dados sensíveis (senhas, tokens)
+- [ ] Stack traces apenas em desenvolvimento
+- [ ] Contexto rico (metadata relevante)
+- [ ] Nível de log correto (info/warn/error/debug)
+- [ ] Performance considerada (não loga objetos pesados)
+
+---
+
+### 13.9 Exemplo de Log Completo
+
+```json
+{
+  "timestamp": "2026-01-26T18:00:00.000Z",
+  "level": "info",
+  "message": "Inference completed successfully",
+  "requestId": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "user-123",
+  "inferenceId": "inf-456",
+  "provider": "bedrock",
+  "model": "anthropic.claude-3-sonnet-20240229-v1:0",
+  "duration": 1234,
+  "statusCode": 200,
+  "metadata": {
+    "tokens": 500,
+    "cost": 0.01,
+    "strategy": "rag"
+  }
+}
+```
+
+---
+
+### 13.10 Referências
+
+- **Proposta Completa:** [LOGGING-SYSTEM-PROPOSAL.md](./LOGGING-SYSTEM-PROPOSAL.md)
+- **ADR:** [ADR-005-LOGGING-SYSTEM.md](./architecture/ADR-005-LOGGING-SYSTEM.md)
 
 ---
 

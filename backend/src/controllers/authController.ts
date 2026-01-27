@@ -88,27 +88,46 @@ export const authController = {
 
   async socialLoginCallback(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('\n=== SOCIAL LOGIN CALLBACK ===');
-      console.log('[socialLoginCallback] req.user:', JSON.stringify(req.user, null, 2));
+      logger.info('Social login callback iniciado', {
+        requestId: req.id,
+        user: req.user ? { id: (req.user as any).id, email: (req.user as any).email } : null
+      });
+      
       const user = req.user as any;
       
       if (!user || !user.id) {
-        console.error('[socialLoginCallback] ❌ Usuário não encontrado em req.user');
+        logger.error('Usuário não encontrado em req.user', {
+          requestId: req.id,
+          hasUser: !!user,
+          userId: user?.id
+        });
         throw new AppError('Falha na autenticação social', 401);
       }
 
-      console.log('[socialLoginCallback] ✅ Gerando JWT para:', user.id, user.email);
+      logger.info('Gerando JWT para usuário', {
+        requestId: req.id,
+        userId: user.id,
+        email: user.email
+      });
+      
       const token = generateToken({ userId: user.id, email: user.email });
-      console.log('[socialLoginCallback] ✅ Token gerado:', token.substring(0, 20) + '...');
-
+      
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const redirectUrl = `${frontendUrl}/auth-success?token=${token}`;
-      console.log('[socialLoginCallback] ✅ Redirecionando para:', redirectUrl);
-      console.log('=== END SOCIAL LOGIN CALLBACK ===\n');
+      
+      logger.info('Redirecionando para frontend', {
+        requestId: req.id,
+        userId: user.id,
+        redirectUrl: frontendUrl + '/auth-success'
+      });
       
       return res.redirect(redirectUrl);
     } catch (error) {
-      console.error('[socialLoginCallback] ❌ Erro:', error);
+      logger.error('Erro no callback social', {
+        requestId: req.id,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return next(error);
     }
   },

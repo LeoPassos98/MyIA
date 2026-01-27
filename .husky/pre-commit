@@ -20,5 +20,24 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# Console.log Check (FASE 1 - Avisos apenas, não bloqueia)
+echo "📊 Verificando uso de console.log/error/warn..."
+CONSOLE_USAGE=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx)$' | xargs grep -n "console\.\(log\|error\|warn\)" 2>/dev/null || true)
+
+if [ -n "$CONSOLE_USAGE" ]; then
+  echo ""
+  echo "⚠️  AVISO: Encontrado console.log/error/warn nos arquivos:"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "$CONSOLE_USAGE"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo "📝 RECOMENDAÇÃO: Migre para logger.info/error/warn"
+  echo "📖 Veja: docs/STANDARDS-SECTION-13-LOGGING.md"
+  echo ""
+  echo "⚠️  FASE 1: Este é apenas um AVISO (commit permitido)"
+  echo "🔒 FASE 2: Após migração completa, commits serão bloqueados"
+  echo ""
+fi
+
 echo "✅ Quality Gates passaram! Commit permitido."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

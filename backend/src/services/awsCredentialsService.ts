@@ -3,6 +3,7 @@
 
 import { prisma } from '../lib/prisma';
 import { encryptionService } from './encryptionService';
+import logger from '../utils/logger';
 
 export interface AWSCredentials {
   accessKey: string;
@@ -42,7 +43,7 @@ export class AWSCredentialsService {
       };
 
     } catch (error) {
-      console.error('[AWSCredentialsService] Erro ao buscar credenciais:', error);
+      logger.error('[AWSCredentialsService] Erro ao buscar credenciais:', error);
       return null;
     }
   }

@@ -9,6 +9,7 @@ import {
   AdapterChunk,
 } from './base.adapter';
 import { ModelRegistry } from '../registry/model-registry';
+import logger from '../../../utils/logger';
 
 /**
  * Adapter for Amazon Titan and Nova models
@@ -67,7 +68,7 @@ export class AmazonAdapter extends BaseModelAdapter {
     }
     
     // Default: try Nova format (newer models)
-    console.warn(`[AmazonAdapter] Unknown Amazon model: ${modelId}, using Nova format`);
+    logger.warn(`[AmazonAdapter] Unknown Amazon model: ${modelId}, using Nova format`);
     return this.formatNovaRequest(messages, options);
   }
 
@@ -113,7 +114,7 @@ export class AmazonAdapter extends BaseModelAdapter {
       body.inferenceConfig.stopSequences = options.stopSequences;
     }
 
-    console.log(`[AmazonAdapter] Nova request format:`, {
+    logger.info(`[AmazonAdapter] Nova request format:`, {
       modelId: options.modelId,
       messageCount: formattedMessages.length,
       hasSystem: !!systemMessage,
@@ -167,7 +168,7 @@ export class AmazonAdapter extends BaseModelAdapter {
       body.textGenerationConfig.stopSequences = options.stopSequences;
     }
 
-    console.log(`[AmazonAdapter] Titan request format:`, {
+    logger.info(`[AmazonAdapter] Titan request format:`, {
       modelId: options.modelId,
       inputTextLength: inputText.length,
       textGenerationConfig: body.textGenerationConfig,

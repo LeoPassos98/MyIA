@@ -47,7 +47,12 @@ export const checkCertificationCache = async (req: Request, res: Response) => {
       cached: false
     }));
   } catch (error: any) {
-    console.error('[CertificationController] Erro ao verificar cache:', error);
+    logger.error('Erro ao verificar cache de certificação', {
+      requestId: (req as any).id,
+      modelId: req.params.modelId,
+      error: error.message,
+      stack: error.stack
+    });
     return res.status(500).json(jsend.error('Erro ao verificar cache'));
   }
 };
@@ -66,48 +71,67 @@ export const checkCertificationCache = async (req: Request, res: Response) => {
  */
 export const certifyModel = async (req: AuthRequest, res: Response) => {
   try {
-    console.log('[CertificationController] 🚀 POST /certify-model recebido');
+    logger.info('POST /certify-model recebido', {
+      requestId: req.id,
+      userId: req.userId
+    });
+    
     const { modelId, force = false } = req.body;
     const userId = req.userId;
     
-    console.log('[CertificationController] 📋 Dados recebidos:', { modelId, force, userId });
-    
     if (!modelId) {
-      console.log('[CertificationController] ❌ modelId não fornecido');
+      logger.warn('modelId não fornecido', {
+        requestId: req.id,
+        userId
+      });
       return res.status(400).json(
         jsend.fail({ message: 'modelId is required' })
       );
     }
     
     if (!userId) {
-      console.log('[CertificationController] ❌ userId não autenticado');
+      logger.warn('userId não autenticado', {
+        requestId: req.id
+      });
       return res.status(401).json(
         jsend.fail({ message: 'User not authenticated' })
       );
     }
     
     // Buscar credenciais AWS do banco
-    console.log('[CertificationController] 🔑 Buscando credenciais AWS para userId:', userId);
+    logger.info('Buscando credenciais AWS', {
+      requestId: req.id,
+      userId,
+      modelId,
+      force
+    });
+    
     const credentials = await AWSCredentialsService.getCredentials(userId);
     
     if (!credentials) {
-      console.log('[CertificationController] ❌ Credenciais AWS não encontradas');
+      logger.warn('Credenciais AWS não encontradas', {
+        requestId: req.id,
+        userId
+      });
       return res.status(400).json(
         jsend.fail({ message: 'Credenciais AWS não configuradas' })
       );
     }
     
-    console.log('[CertificationController] ✅ Credenciais encontradas:', {
-      region: credentials.region,
-      hasAccessKey: !!credentials.accessKey,
-      hasSecretKey: !!credentials.secretKey
+    // Certificar modelo (com parâmetro force)
+    logger.info('Iniciando certificação do modelo', {
+      requestId: req.id,
+      userId,
+      modelId,
+      force,
+      region: credentials.region
     });
     
-    // Certificar modelo (com parâmetro force)
-    console.log('[CertificationController] 🧪 Iniciando certificação do modelo:', modelId, 'force:', force);
     const result = await certificationService.certifyModel(modelId, credentials, force);
     
-    console.log('[CertificationController] 📊 Resultado da certificação:', {
+    logger.info('Resultado da certificação', {
+      requestId: req.id,
+      userId,
       modelId: result.modelId,
       status: result.status,
       isCertified: result.isCertified,
@@ -136,7 +160,14 @@ export const certifyModel = async (req: AuthRequest, res: Response) => {
           ? result.results[0].error
           : 'Modelo indisponível ou falhou nos testes de certificação');
       
-      console.log('[CertificationController] ❌ Modelo indisponível:', errorMessage);
+      logger.warn('Modelo indisponível', {
+        requestId: req.id,
+        userId,
+        modelId,
+        errorMessage,
+        categorizedError: result.categorizedError
+      });
+      
       return res.status(400).json(jsend.fail({
         message: errorMessage,
         certification: result,
@@ -147,7 +178,13 @@ export const certifyModel = async (req: AuthRequest, res: Response) => {
     
     // Se modelo está disponível mas com warning de qualidade, retornar 200 com aviso
     if (result.status === 'quality_warning') {
-      console.log('[CertificationController] ⚠️ Modelo disponível mas com limitações de qualidade');
+      logger.warn('Modelo disponível mas com limitações de qualidade', {
+        requestId: req.id,
+        userId,
+        modelId,
+        successRate: result.successRate
+      });
+      
       return res.status(200).json(jsend.success({
         message: 'Modelo disponível mas com limitações de qualidade',
         certification: result,
@@ -157,14 +194,28 @@ export const certifyModel = async (req: AuthRequest, res: Response) => {
     }
 
     // Sucesso completo
-    console.log('[CertificationController] ✅ Modelo certificado com sucesso');
+    logger.info('Modelo certificado com sucesso', {
+      requestId: req.id,
+      userId,
+      modelId,
+      status: result.status,
+      successRate: result.successRate
+    });
+    
     return res.status(200).json(jsend.success({
       message: 'Modelo certificado com sucesso',
       certification: result,
       isAvailable: true
     }));
   } catch (error: any) {
-    console.error('[CertificationController] ❌ Erro ao certificar modelo:', error);
+    logger.error('Erro ao certificar modelo', {
+      requestId: req.id,
+      userId: req.userId,
+      modelId: req.body.modelId,
+      error: error.message,
+      stack: error.stack
+    });
+    
     return res.status(500).json(
       jsend.error(error.message || 'Failed to certify model')
     );
@@ -252,16 +303,27 @@ export const certifyAll = async (req: AuthRequest, res: Response) => {
  * GET /api/certification/certified-models
  * Lista modelos certificados
  */
-export const getCertifiedModels = async (_req: Request, res: Response) => {
+export const getCertifiedModels = async (req: Request, res: Response) => {
   try {
-    console.log('[CertificationController] 📋 GET /certified-models recebido');
+    logger.info('GET /certified-models recebido', {
+      requestId: (req as any).id
+    });
+    
     const modelIds = await certificationService.getCertifiedModels();
     
-    console.log('[CertificationController] ✅ Modelos certificados retornados:', modelIds);
+    logger.info('Modelos certificados retornados', {
+      requestId: (req as any).id,
+      count: modelIds.length
+    });
     
     return res.status(200).json(jsend.success({ modelIds }));
   } catch (error: any) {
-    console.error('[CertificationController] ❌ Erro ao buscar modelos certificados:', error);
+    logger.error('Erro ao buscar modelos certificados', {
+      requestId: (req as any).id,
+      error: error.message,
+      stack: error.stack
+    });
+    
     return res.status(500).json(
       jsend.error(error.message || 'Failed to get certified models')
     );
@@ -272,16 +334,27 @@ export const getCertifiedModels = async (_req: Request, res: Response) => {
  * GET /api/certification/failed-models
  * Lista modelos que falharam na certificação (mantido para compatibilidade)
  */
-export const getFailedModels = async (_req: Request, res: Response) => {
+export const getFailedModels = async (req: Request, res: Response) => {
   try {
-    console.log('[CertificationController] 📋 GET /failed-models recebido');
+    logger.info('GET /failed-models recebido', {
+      requestId: (req as any).id
+    });
+    
     const modelIds = await certificationService.getFailedModels();
     
-    console.log('[CertificationController] ❌ Modelos que falharam retornados:', modelIds);
+    logger.info('Modelos que falharam retornados', {
+      requestId: (req as any).id,
+      count: modelIds.length
+    });
     
     return res.status(200).json(jsend.success({ modelIds }));
   } catch (error: any) {
-    console.error('[CertificationController] ❌ Erro ao buscar modelos que falharam:', error);
+    logger.error('Erro ao buscar modelos que falharam', {
+      requestId: (req as any).id,
+      error: error.message,
+      stack: error.stack
+    });
+    
     return res.status(500).json(
       jsend.error(error.message || 'Failed to get failed models')
     );
@@ -292,18 +365,29 @@ export const getFailedModels = async (_req: Request, res: Response) => {
  * GET /api/certification/all-failed-models
  * Lista TODOS os modelos com status 'failed' (para exibir badge vermelho no frontend)
  */
-export const getAllFailedModels = async (_req: Request, res: Response) => {
+export const getAllFailedModels = async (req: Request, res: Response) => {
   try {
-    console.log('[CertificationController] 📋 GET /all-failed-models recebido');
+    logger.info('GET /all-failed-models recebido', {
+      requestId: (req as any).id
+    });
+    
     const failed = await certificationService.getAllFailedModels();
     
-    console.log('[CertificationController] ❌ Todos os modelos failed retornados:', failed);
+    logger.info('Todos os modelos failed retornados', {
+      requestId: (req as any).id,
+      count: failed.length
+    });
     
     return res.status(200).json(jsend.success({
       modelIds: failed
     }));
   } catch (error: any) {
-    console.error('[CertificationController] ❌ Erro ao buscar modelos failed:', error);
+    logger.error('Erro ao buscar modelos failed', {
+      requestId: (req as any).id,
+      error: error.message,
+      stack: error.stack
+    });
+    
     return res.status(500).json(
       jsend.error(error.message || 'Failed to fetch all failed models')
     );
@@ -315,7 +399,7 @@ export const getAllFailedModels = async (_req: Request, res: Response) => {
  * Lista modelos realmente indisponíveis (não podem ser usados)
  * Retorna apenas modelos com categorias de erro críticas
  */
-export const getUnavailableModels = async (_req: Request, res: Response) => {
+export const getUnavailableModels = async (req: Request, res: Response) => {
   try {
     const unavailable = await certificationService.getUnavailableModels();
     
@@ -323,7 +407,12 @@ export const getUnavailableModels = async (_req: Request, res: Response) => {
       modelIds: unavailable
     }));
   } catch (error: any) {
-    console.error('[CertificationController] ❌ Erro ao buscar modelos indisponíveis:', error);
+    logger.error('Erro ao buscar modelos indisponíveis', {
+      requestId: (req as any).id,
+      error: error.message,
+      stack: error.stack
+    });
+    
     return res.status(500).json(
       jsend.error(error.message || 'Failed to fetch unavailable models')
     );
@@ -334,7 +423,7 @@ export const getUnavailableModels = async (_req: Request, res: Response) => {
  * GET /api/certification/quality-warning-models
  * Lista modelos disponíveis mas com warnings de qualidade
  */
-export const getQualityWarningModels = async (_req: Request, res: Response) => {
+export const getQualityWarningModels = async (req: Request, res: Response) => {
   try {
     const warnings = await certificationService.getQualityWarningModels();
     
@@ -342,7 +431,12 @@ export const getQualityWarningModels = async (_req: Request, res: Response) => {
       modelIds: warnings
     }));
   } catch (error: any) {
-    console.error('[CertificationController] ❌ Erro ao buscar modelos com warning:', error);
+    logger.error('Erro ao buscar modelos com warning', {
+      requestId: (req as any).id,
+      error: error.message,
+      stack: error.stack
+    });
+    
     return res.status(500).json(
       jsend.error(error.message || 'Failed to fetch quality warning models')
     );

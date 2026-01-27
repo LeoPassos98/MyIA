@@ -7,12 +7,13 @@ import passport from 'passport';
 import { authMiddleware, protect } from '../middleware/authMiddleware';
 import { prisma } from '../lib/prisma';
 import { generateToken } from '../utils/jwt';
+import logger from '../utils/logger';
 
 const router = Router();
 
 // --- OAuth (Google/GitHub) ---
 router.get('/test-callback', async (_req, res) => {
-  console.log('\n=== TEST CALLBACK (BYPASS GITHUB) ===');
+  logger.info('\n=== TEST CALLBACK (BYPASS GITHUB) ===');
   
   try {
     // Simula um usuário do GitHub
@@ -27,69 +28,69 @@ router.get('/test-callback', async (_req, res) => {
       }
     });
     
-    console.log('✅ Usuário de teste criado:', testUser.id);
+    logger.info('✅ Usuário de teste criado:', testUser.id);
     
     const token = generateToken({ userId: testUser.id, email: testUser.email });
-    console.log('✅ Token gerado:', token.substring(0, 20) + '...');
+    logger.info('✅ Token gerado:', token.substring(0, 20) + '...');
     
     const redirectUrl = `http://localhost:3000/auth-success?token=${token}`;
-    console.log('✅ Redirecionando para:', redirectUrl);
+    logger.info('✅ Redirecionando para:', redirectUrl);
     
     return res.redirect(redirectUrl);
   } catch (error) {
-    console.error('❌ Erro:', error);
+    logger.error('❌ Erro:', error);
     return res.status(500).json({ error: 'Erro no teste' });
   }
 });
 
 router.get('/test-redirect', (_req, res) => {
-  console.log('🧪 [Test] Testando redirect simples');
+  logger.info('🧪 [Test] Testando redirect simples');
   res.redirect('https://github.com');
 });
 
 router.get('/github', (_req, res) => {
-  console.log('\n=== GITHUB OAUTH START ===');
-  console.log('🔵 [OAuth] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID);
-  console.log('🔵 [OAuth] GITHUB_OAUTH_CALLBACK_URL:', process.env.GITHUB_OAUTH_CALLBACK_URL);
+  logger.info('\n=== GITHUB OAUTH START ===');
+  logger.info('🔵 [OAuth] GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID);
+  logger.info('🔵 [OAuth] GITHUB_OAUTH_CALLBACK_URL:', process.env.GITHUB_OAUTH_CALLBACK_URL);
   
   const clientId = process.env.GITHUB_CLIENT_ID;
   const redirectUri = encodeURIComponent(process.env.GITHUB_OAUTH_CALLBACK_URL || 'http://localhost:3001/api/auth/github/callback');
   const scope = encodeURIComponent('user:email');
   
   const githubUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
-  console.log('🔵 [OAuth] Redirecionando para:', githubUrl);
+  logger.info('🔵 [OAuth] Redirecionando para:', githubUrl);
   
   res.redirect(githubUrl);
 });
 
 router.get('/github/callback', (req, res, next) => {
-  console.log('\n=== GITHUB OAUTH CALLBACK ===');
-  console.log('🔵 [OAuth] GitHub callback recebido');
-  console.log('🔵 [OAuth] Query params:', JSON.stringify(req.query, null, 2));
-  console.log('🔵 [OAuth] URL completa:', req.url);
-  console.log('🔵 [OAuth] Headers:', JSON.stringify(req.headers, null, 2));
+  logger.info('\n=== GITHUB OAUTH CALLBACK ===');
+  logger.info('🔵 [OAuth] GitHub callback recebido');
+  logger.info('🔵 [OAuth] Query params:', JSON.stringify(req.query, null, 2));
+  logger.info('🔵 [OAuth] URL completa:', req.url);
+  logger.info('🔵 [OAuth] Headers:', JSON.stringify(req.headers, null, 2));
   
   passport.authenticate('github', { 
     failureRedirect: 'http://localhost:3000/login?error=auth_failed', 
     session: false 
   }, (err: any, user: any, info: any) => {
-    console.log('\n=== PASSPORT CALLBACK ===');
-    console.log('🔵 [OAuth] Passport authenticate callback');
-    console.log('🔵 [OAuth] Error:', err);
-    console.log('🔵 [OAuth] User:', user ? { id: user.id, email: user.email } : null);
-    console.log('🔵 [OAuth] Info:', info);
+    logger.info('\n=== PASSPORT CALLBACK ===');
+    logger.info('🔵 [OAuth] Passport authenticate callback');
+    logger.info('🔵 [OAuth] Error:', err);
+    logger.info('🔵 [OAuth] User:', user ? { id: user.id, email: user.email } : null);
+    logger.info('🔵 [OAuth] Info:', info);
     
     if (err) {
-      console.error('❌ [OAuth] Erro na autenticação:', err);
+      logger.error('❌ [OAuth] Erro na autenticação:', err);
       return res.redirect(`http://localhost:3000/login?error=auth_failed`);
     }
     
     if (!user) {
-      console.error('❌ [OAuth] Usuário não encontrado');
+      logger.error('❌ [OAuth] Usuário não encontrado');
       return res.redirect(`http://localhost:3000/login?error=no_user`);
     }
     
-    console.log('✅ [OAuth] Usuário autenticado, passando para socialLoginCallback');
+    logger.info('✅ [OAuth] Usuário autenticado, passando para socialLoginCallback');
     req.user = user;
     next();
   })(req, res, next);

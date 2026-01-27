@@ -8,7 +8,9 @@ declare global {
   namespace Express {
     interface Request {
       // Estamos dizendo ao TS que o middleware anexa o ID como uma string
-      userId?: string; 
+      userId?: string;
+      // UUID único gerado pelo requestIdMiddleware para rastreamento de requisições
+      id: string;
     }
   }
 }
