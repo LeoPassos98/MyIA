@@ -21,6 +21,8 @@ import {
 } from './types';
 import { categorizeError } from './error-categorizer';
 import { logger } from '../../../utils/logger';
+import { RatingCalculator } from '../rating/rating-calculator';
+import { ModelMetrics } from '../../../types/model-rating';
 
 interface AWSCredentials {
   accessKey: string;
@@ -179,16 +181,16 @@ export class ModelCertificationService {
       });
     }
     
-    // 4. Executar testes via TestRunner com callback de progresso
+    // 4. Executar testes via TestRunner com callback de progresso e retry
     // Formato esperado pelo BedrockProvider: ACCESS_KEY:SECRET_KEY
     const apiKey = `${credentials.accessKey}:${credentials.secretKey}`;
-    logger.info(`[CertificationService] 🧪 Executando testes...`);
+    logger.info(`[CertificationService] 🧪 Executando testes com retry...`);
     const runner = new TestRunner(provider, apiKey);
     
     // Contador de testes completados para progresso
     let completedTests = 0;
     
-    const testResults = await runner.runTests(
+    const { results: testResults, metrics: allMetrics } = await runner.runTestsWithRetry(
       modelId,
       tests,
       onProgress ? (testName, status) => {
@@ -296,13 +298,21 @@ export class ModelCertificationService {
         categorizedError.category === ErrorCategory.UNAVAILABLE ||
         categorizedError.category === ErrorCategory.PERMISSION_ERROR ||
         categorizedError.category === ErrorCategory.AUTHENTICATION_ERROR ||
-        categorizedError.category === ErrorCategory.CONFIGURATION_ERROR
+        categorizedError.category === ErrorCategory.CONFIGURATION_ERROR ||
+        categorizedError.category === ErrorCategory.PROVISIONING_REQUIRED
       ) {
         // Erros críticos: modelo não pode ser usado independente do successRate
         status = ModelCertificationStatus.FAILED;
         isAvailable = false;
         isCertified = false;
         logger.info(`[CertificationService] ❌ Modelo ${modelId} marcado como FAILED devido a erro crítico: ${categorizedError.category}`);
+        
+        // Se erro é de provisionamento, adicionar nota explicativa
+        if (categorizedError.category === ErrorCategory.PROVISIONING_REQUIRED) {
+          qualityIssues.push('⚠️ Modelo requer habilitação prévia na conta AWS');
+          qualityIssues.push('📋 Acesse AWS Console → Bedrock → Model Access para solicitar acesso');
+          logger.info(`[CertificationService] 📋 Ação necessária: Habilitar modelo no AWS Console → Bedrock → Model Access`);
+        }
       } else {
         // Erros não-críticos: determinar status baseado no successRate
         if (successRate >= 80) {
@@ -348,7 +358,29 @@ export class ModelCertificationService {
       }
     }
     
-    // 7. Salvar no banco via Prisma (upsert)
+    // 7. Calcular rating usando RatingCalculator
+    logger.info(`[CertificationService] 📊 Calculando rating para ${modelId}...`);
+    
+    const aggregatedMetrics: ModelMetrics = {
+      testsPassed,
+      totalTests: testResults.length,
+      successRate,
+      averageRetries: allMetrics.reduce((sum, m) => sum + m.retries, 0) / allMetrics.length,
+      averageLatency: avgLatencyMs,
+      errorCount: allMetrics.filter(m => m.errors.length > 0).length
+    };
+    
+    const ratingCalculator = new RatingCalculator();
+    const ratingResult = ratingCalculator.calculateRating(modelId, aggregatedMetrics);
+    
+    logger.info(`[CertificationService] ✅ Rating calculado:`, {
+      modelId,
+      rating: ratingResult.rating,
+      badge: ratingResult.badge,
+      scores: ratingResult.scores
+    });
+    
+    // 8. Salvar no banco via Prisma (upsert)
     const now = new Date();
     const expiresAt = isCertified
       ? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 dias
@@ -366,7 +398,7 @@ export class ModelCertificationService {
       errorSeverity: categorizedError?.severity
     });
     
-    // Preparar dados para salvar (incluindo categorização de erros)
+    // Preparar dados para salvar (incluindo categorização de erros e rating)
     const updateData: any = {
       vendor: metadata.vendor,
       status,
@@ -382,6 +414,12 @@ export class ModelCertificationService {
       failureReasons: failureReasons.length > 0 ? failureReasons : Prisma.JsonNull,
       errorCategory: categorizedError?.category || null,
       errorSeverity: categorizedError?.severity || null,
+      // Campos de rating
+      rating: ratingResult.rating,
+      badge: ratingResult.badge,
+      metrics: ratingResult.metrics,
+      scores: ratingResult.scores,
+      ratingUpdatedAt: now,
       updatedAt: now
     };
     
@@ -560,7 +598,7 @@ export class ModelCertificationService {
       where: {
         status: { in: ['failed'] },
         errorCategory: {
-          in: ['UNAVAILABLE', 'PERMISSION_ERROR', 'AUTHENTICATION_ERROR', 'CONFIGURATION_ERROR']
+          in: ['UNAVAILABLE', 'PERMISSION_ERROR', 'AUTHENTICATION_ERROR', 'CONFIGURATION_ERROR', 'PROVISIONING_REQUIRED']
         }
       },
       select: { modelId: true },

@@ -13,6 +13,7 @@ import { AdapterFactory } from '../adapters';
 import { ModelRegistry } from '../registry';
 import type { Message, UniversalOptions } from '../adapters';
 import logger from '../../../utils/logger';
+import { categorizeError } from '../certification/error-categorizer';
 
 /**
  * Normaliza model ID removendo sufixos de context window
@@ -298,9 +299,32 @@ export class BedrockProvider extends BaseAIProvider {
     // Se chegou aqui, todas as variações falharam
     const errorMessage = lastGlobalError instanceof Error ? lastGlobalError.message : 'Erro desconhecido no AWS Bedrock';
     logger.error(`❌ [Bedrock Auto-Test] All ${modelIdVariations.length} variations failed for: ${originalModelId}`);
+    
+    // Categorizar erro para mensagem amigável
+    const categorizedError = categorizeError(errorMessage);
+    
+    // Formatar mensagem amigável com sugestões
+    let friendlyMessage = `❌ ${categorizedError.message}\n\n`;
+    
+    if (categorizedError.suggestedActions.length > 0) {
+      friendlyMessage += 'Sugestões:\n';
+      categorizedError.suggestedActions.forEach((action, index) => {
+        friendlyMessage += `${index + 1}. ${action}\n`;
+      });
+    }
+    
+    // Log detalhado para debug
+    logger.error(`[Bedrock] Error categorized as ${categorizedError.category} (severity: ${categorizedError.severity})`, {
+      modelId: originalModelId,
+      category: categorizedError.category,
+      severity: categorizedError.severity,
+      isTemporary: categorizedError.isTemporary,
+      originalError: errorMessage
+    });
+    
     yield {
       type: 'error',
-      error: `Falha ao invocar modelo ${originalModelId}. Tentativas: ${modelIdVariations.length} variações. Erro: ${errorMessage}`,
+      error: friendlyMessage.trim(),
     };
   }
 

@@ -79,6 +79,18 @@ export function categorizeError(error: Error | string): CategorizedError {
   ) {
     category = ErrorCategory.TIMEOUT;
   }
+  // PROVISIONING_REQUIRED - Modelo requer provisionamento prévio
+  else if (
+    /on-demand throughput/i.test(errorLower) ||
+    /provisioned throughput/i.test(errorLower) ||
+    /model access/i.test(errorLower) ||
+    /model.*not enabled/i.test(errorLower) ||
+    /enable.*model.*access/i.test(errorLower) ||
+    /request.*model access/i.test(errorLower) ||
+    /provisioning.*required/i.test(errorLower)
+  ) {
+    category = ErrorCategory.PROVISIONING_REQUIRED;
+  }
   // CONFIGURATION_ERROR - Problema de configuração
   else if (
     /requires.*inference profile/i.test(errorLower) ||
@@ -165,6 +177,7 @@ function getSeverity(category: ErrorCategory): ErrorSeverity {
     [ErrorCategory.UNAVAILABLE]: ErrorSeverity.CRITICAL,
     [ErrorCategory.PERMISSION_ERROR]: ErrorSeverity.CRITICAL,
     [ErrorCategory.AUTHENTICATION_ERROR]: ErrorSeverity.CRITICAL,
+    [ErrorCategory.PROVISIONING_REQUIRED]: ErrorSeverity.CRITICAL,
     [ErrorCategory.CONFIGURATION_ERROR]: ErrorSeverity.HIGH,
     [ErrorCategory.RATE_LIMIT]: ErrorSeverity.MEDIUM,
     [ErrorCategory.TIMEOUT]: ErrorSeverity.MEDIUM,
@@ -198,6 +211,13 @@ function getSuggestedActions(category: ErrorCategory): string[] {
       'Confirmar que credenciais não expiraram',
       'Gerar novas credenciais no AWS IAM',
       'Verificar formato: ACCESS_KEY:SECRET_KEY'
+    ],
+    [ErrorCategory.PROVISIONING_REQUIRED]: [
+      '1. Acesse o AWS Console → Bedrock → Model Access',
+      '2. Solicite acesso ao modelo (pode levar até 24h)',
+      '3. Ou configure Provisioned Throughput para o modelo',
+      '4. Enquanto isso, tente modelos alternativos disponíveis',
+      'Documentação: https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html'
     ],
     [ErrorCategory.RATE_LIMIT]: [
       'Aguardar alguns minutos e tentar novamente',
@@ -259,6 +279,7 @@ function createUserFriendlyMessage(category: ErrorCategory, originalError: strin
     [ErrorCategory.UNAVAILABLE]: 'Modelo não está disponível',
     [ErrorCategory.PERMISSION_ERROR]: 'Sem permissão para acessar o modelo',
     [ErrorCategory.AUTHENTICATION_ERROR]: 'Credenciais AWS inválidas ou expiradas',
+    [ErrorCategory.PROVISIONING_REQUIRED]: '❌ Modelo requer provisionamento prévio na sua conta AWS',
     [ErrorCategory.RATE_LIMIT]: 'Limite de taxa excedido - tente novamente em alguns minutos',
     [ErrorCategory.TIMEOUT]: 'Tempo limite excedido - modelo demorou muito para responder',
     [ErrorCategory.CONFIGURATION_ERROR]: 'Problema de configuração do modelo',
@@ -296,6 +317,7 @@ export function shouldRetry(category: ErrorCategory, attemptNumber: number): boo
     [ErrorCategory.UNAVAILABLE]: 0,
     [ErrorCategory.PERMISSION_ERROR]: 0,
     [ErrorCategory.AUTHENTICATION_ERROR]: 0,
+    [ErrorCategory.PROVISIONING_REQUIRED]: 0,
     [ErrorCategory.CONFIGURATION_ERROR]: 0,
     [ErrorCategory.QUALITY_ISSUE]: 0,
     [ErrorCategory.UNKNOWN_ERROR]: 0
@@ -316,6 +338,7 @@ export function getRetryDelay(category: ErrorCategory, attemptNumber: number): n
     [ErrorCategory.UNAVAILABLE]: 0,
     [ErrorCategory.PERMISSION_ERROR]: 0,
     [ErrorCategory.AUTHENTICATION_ERROR]: 0,
+    [ErrorCategory.PROVISIONING_REQUIRED]: 0,
     [ErrorCategory.CONFIGURATION_ERROR]: 0,
     [ErrorCategory.QUALITY_ISSUE]: 0,
     [ErrorCategory.UNKNOWN_ERROR]: 0

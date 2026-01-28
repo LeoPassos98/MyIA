@@ -144,6 +144,20 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
   }
 });
 
+// GET /api/providers/models
+router.get(
+  '/models',
+  protect,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await providersController.getModelsWithRating(req as any, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /api/providers/by-vendor
 router.get(
   '/by-vendor',

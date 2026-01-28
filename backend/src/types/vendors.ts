@@ -34,6 +34,7 @@ export interface ProviderAvailability {
   providerSlug: string;
   providerName: string;
   isConfigured: boolean;
+  hasRegistry: boolean; // ✅ NOVO: Indica se modelo tem configuração no registry
   certification: CertificationInfo | null;
 }
 
@@ -41,4 +42,18 @@ export interface CertificationInfo {
   status: string;
   successRate?: number;
   lastChecked?: string;
+  // Campos de rating (Fase 2)
+  rating?: number;
+  badge?: string;
+  metrics?: any;
+  scores?: any;
+  ratingUpdatedAt?: string;
 }
+
+/**
+ * Status de disponibilidade do modelo
+ * - 'available': Modelo configurado e certificado
+ * - 'unconfigured': Modelo existe no AWS mas sem registry
+ * - 'unavailable': Modelo realmente indisponível (erro de acesso, provisionamento, etc.)
+ */
+export type ModelAvailabilityStatus = 'available' | 'unconfigured' | 'unavailable';

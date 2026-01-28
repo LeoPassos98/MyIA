@@ -11,7 +11,7 @@ export const anthropicTestSpecs: TestSpec[] = [
     id: 'anthropic-system-message',
     name: 'System Message Test',
     description: 'Valida suporte a system messages',
-    timeout: 30000,
+    timeout: 60000,
     
     async run(modelId: string, provider: any, apiKey: string): Promise<TestResult> {
       const startTime = Date.now();
@@ -57,7 +57,7 @@ export const anthropicTestSpecs: TestSpec[] = [
     id: 'anthropic-temperature-top-p-conflict',
     name: 'Temperature + Top-P Conflict Test',
     description: 'Valida se modelo aceita temperature e top_p juntos',
-    timeout: 30000,
+    timeout: 60000,
     
     async run(modelId: string, provider: any, apiKey: string): Promise<TestResult> {
       const startTime = Date.now();

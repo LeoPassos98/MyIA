@@ -8,6 +8,7 @@ import { config } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { requestIdMiddleware } from './middleware/requestId';
+import { httpLoggerMiddleware } from './middleware/httpLogger';
 import { prisma } from './lib/prisma';
 import { authLimiter, apiLimiter, chatLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/authRoutes';
@@ -80,18 +81,12 @@ app.use(express.json());
 // 🔍 Request ID Middleware - Gera UUID único para cada requisição
 app.use(requestIdMiddleware);
 
+// 📊 HTTP Logger Middleware - Log estruturado de requisições HTTP
+// Fase 1 HTTP Logging: docs/LOGGING-ENHANCEMENT-PROPOSAL.md
+app.use(httpLoggerMiddleware);
+
 // Inicializa Passport para OAuth (ANTES das rotas)
 app.use(passport.initialize());
-
-// Log de requisições
-app.use((req, _res, next) => {
-  logger.info(`${req.method} ${req.path}`);
-  logger.info(`📡 [Request] ${req.method} ${req.path}`);
-  if (req.query && Object.keys(req.query).length > 0) {
-    logger.info(`📡 [Query]:`, req.query);
-  }
-  next();
-});
 
 // Health check endpoint (adicione antes das outras rotas)
 app.get('/api/health', (_req, res) => {

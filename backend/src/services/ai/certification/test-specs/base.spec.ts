@@ -1,7 +1,7 @@
 // backend/src/services/ai/certification/test-specs/base.spec.ts
 // Standards: docs/STANDARDS.md
 
-import { TestSpec, TestResult } from '../types';
+import { TestSpec, TestResult, ErrorCategory } from '../types';
 
 /**
  * Testes base aplicados a todos os modelos
@@ -239,6 +239,159 @@ export const baseTestSpecs: TestSpec[] = [
           passed: true,
           latencyMs: Date.now() - startTime,
           metadata: { errorCaught: true }
+        };
+      }
+    }
+  },
+  
+  {
+    id: 'availability-check',
+    name: 'Model Availability Check',
+    description: 'Valida disponibilidade real do modelo com 2 invocações consecutivas',
+    timeout: 60000, // 60s (2 invocações × 30s)
+    
+    async run(modelId: string, provider: any, apiKey: string): Promise<TestResult> {
+      const startTime = Date.now();
+      
+      try {
+        const messages = [{ role: 'user', content: 'Test availability' }];
+        
+        // ========================================
+        // PRIMEIRA INVOCAÇÃO
+        // ========================================
+        let firstSuccess = false;
+        let firstError: string | null = null;
+        
+        for await (const chunk of provider.streamChat(messages, { modelId, apiKey })) {
+          if (chunk.type === 'chunk' && chunk.content) {
+            firstSuccess = true;
+            break; // Primeira resposta recebida
+          }
+          
+          if (chunk.type === 'error') {
+            firstError = chunk.error;
+            
+            // Detectar erro de provisionamento IMEDIATAMENTE
+            if (
+              /on-demand throughput/i.test(chunk.error) ||
+              /provisioned throughput/i.test(chunk.error) ||
+              /model access/i.test(chunk.error) ||
+              /enable.*model.*access/i.test(chunk.error)
+            ) {
+              return {
+                testId: 'availability-check',
+                testName: 'Model Availability Check',
+                passed: false,
+                error: 'PROVISIONING_REQUIRED: Model requires provisioning in AWS account',
+                errorCategory: ErrorCategory.PROVISIONING_REQUIRED,
+                latencyMs: Date.now() - startTime,
+                metadata: {
+                  errorType: 'provisioning_required',
+                  originalError: chunk.error,
+                  userAction: 'Enable model in AWS Console → Bedrock → Model Access',
+                  documentationUrl: 'https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html'
+                }
+              };
+            }
+            
+            break; // Outro tipo de erro
+          }
+        }
+        
+        if (!firstSuccess) {
+          return {
+            testId: 'availability-check',
+            testName: 'Model Availability Check',
+            passed: false,
+            error: firstError || 'No response from model on first invocation',
+            latencyMs: Date.now() - startTime
+          };
+        }
+        
+        // ========================================
+        // DELAY ENTRE INVOCAÇÕES
+        // ========================================
+        // Aguardar 2s para simular uso real
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // ========================================
+        // SEGUNDA INVOCAÇÃO (validar consistência)
+        // ========================================
+        let secondSuccess = false;
+        let secondError: string | null = null;
+        
+        for await (const chunk of provider.streamChat(messages, { modelId, apiKey })) {
+          if (chunk.type === 'chunk' && chunk.content) {
+            secondSuccess = true;
+            break;
+          }
+          
+          if (chunk.type === 'error') {
+            secondError = chunk.error;
+            
+            // Detectar erro de provisionamento na segunda tentativa
+            if (
+              /on-demand throughput/i.test(chunk.error) ||
+              /provisioned throughput/i.test(chunk.error) ||
+              /model access/i.test(chunk.error)
+            ) {
+              return {
+                testId: 'availability-check',
+                testName: 'Model Availability Check',
+                passed: false,
+                error: 'PROVISIONING_REQUIRED: Model succeeded once but requires provisioning',
+                errorCategory: ErrorCategory.PROVISIONING_REQUIRED,
+                latencyMs: Date.now() - startTime,
+                metadata: {
+                  errorType: 'intermittent_provisioning',
+                  firstInvocation: 'success',
+                  secondInvocation: 'failed',
+                  warning: 'Model has intermittent availability - not reliable for production'
+                }
+              };
+            }
+            
+            break;
+          }
+        }
+        
+        const latency = Date.now() - startTime;
+        
+        if (!secondSuccess) {
+          return {
+            testId: 'availability-check',
+            testName: 'Model Availability Check',
+            passed: false,
+            error: `Inconsistent availability: first succeeded, second failed (${secondError || 'unknown error'})`,
+            latencyMs: latency,
+            metadata: {
+              warning: 'Model may have intermittent availability issues',
+              firstInvocation: 'success',
+              secondInvocation: 'failed'
+            }
+          };
+        }
+        
+        // ✅ AMBAS INVOCAÇÕES SUCEDERAM
+        return {
+          testId: 'availability-check',
+          testName: 'Model Availability Check',
+          passed: true,
+          latencyMs: latency,
+          metadata: {
+            consecutiveSuccesses: 2,
+            totalLatency: latency,
+            avgLatencyPerInvocation: Math.round(latency / 2)
+          }
+        };
+        
+      } catch (error: any) {
+        return {
+          testId: 'availability-check',
+          testName: 'Model Availability Check',
+          passed: false,
+          error: error.message || 'Unknown error during availability check',
+          latencyMs: Date.now() - startTime
         };
       }
     }
