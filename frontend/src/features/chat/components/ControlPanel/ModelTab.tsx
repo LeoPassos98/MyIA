@@ -21,6 +21,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { HelpTooltip } from './HelpTooltip';
 import { VendorSelector } from './VendorSelector';
 import { ModelCardList } from './ModelCard';
+import { ModelListFilters } from '../../../../components/ModelRating';
 import { useModelTabLogic } from './useModelTabLogic';
 import { useModelCapabilities } from '../../../../hooks/useModelCapabilities';
 import { useLayout } from '../../../../contexts/LayoutContext';
@@ -46,7 +47,7 @@ export function ModelTab() {
   // Estado de accordion exclusivo
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   
-  // Hook de lógica (vendor-first)
+  // Hook de lógica (vendor-first) com filtros e ordenação
   const {
     vendors,
     selectedVendor,
@@ -55,6 +56,8 @@ export function ModelTab() {
     selectedProvider,
     isLoading,
     error,
+    filters,
+    setFilters,
     handleSelectVendor,
     handleSelectModel,
     handleChangeProvider
@@ -150,6 +153,26 @@ export function ModelTab() {
         onSelect={handleSelectVendor}
         isLoading={isLoading}
       />
+
+      {/* === SEÇÃO 2.5: Filtros de Rating === */}
+      {selectedVendor && selectedVendor.models.length > 0 && (
+        <Box
+          sx={{
+            animation: 'fadeIn 0.3s ease-in',
+            '@keyframes fadeIn': {
+              from: { opacity: 0, transform: 'translateY(8px)' },
+              to: { opacity: 1, transform: 'translateY(0)' }
+            }
+          }}
+        >
+          <ModelListFilters
+            onFilterChange={setFilters}
+            currentFilters={filters}
+            totalModels={selectedVendor.models.length}
+            filteredCount={filteredModels.length}
+          />
+        </Box>
+      )}
 
       {/* === SEÇÃO 3: Model List === */}
       {selectedVendor && (

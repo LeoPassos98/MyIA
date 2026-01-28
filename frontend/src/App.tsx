@@ -6,6 +6,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline, Box, CircularProgress } from '@mui/material';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
+// Estilos de integração do sistema de rating
+import './styles/model-rating-integration.css';
+
 // React Query
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 

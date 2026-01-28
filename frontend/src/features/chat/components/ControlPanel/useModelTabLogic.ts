@@ -4,7 +4,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { aiProvidersService } from '../../../../services/aiProvidersService';
 import { useLayout } from '../../../../contexts/LayoutContext';
+import { useModelRating } from '../../../../hooks/useModelRating';
+import { filterModels, sortModels } from '../../../../utils/rating-helpers';
 import type { VendorGroup, ModelWithProviders } from '../../../../types/ai';
+import type { ModelFilters, ModelWithRating } from '../../../../types/model-rating';
 import { logger } from '../../../../utils/logger';
 
 export interface UseModelTabLogicReturn {
@@ -18,6 +21,10 @@ export interface UseModelTabLogicReturn {
   // Estados
   isLoading: boolean;
   error: string | null;
+  
+  // Filtros e ordenação
+  filters: ModelFilters;
+  setFilters: (filters: ModelFilters) => void;
   
   // Handlers
   handleSelectVendor: (vendorSlug: string) => void;
@@ -50,12 +57,19 @@ export interface UseModelTabLogicReturn {
  */
 export function useModelTabLogic(): UseModelTabLogicReturn {
   const { chatConfig, updateChatConfig } = useLayout();
+  const { getModelById } = useModelRating();
   
   // Estados locais
   const [vendors, setVendors] = useState<VendorGroup[]>([]);
   const [selectedVendorSlug, setSelectedVendorSlug] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Estado de filtros e ordenação
+  const [filters, setFilters] = useState<ModelFilters>({
+    sortBy: 'rating',
+    sortOrder: 'desc'
+  });
   
   // Ref para rastrear se a seleção foi manual (evitar sobrescrever com auto-detecção)
   const isManualSelectionRef = useRef(false);
@@ -151,7 +165,7 @@ export function useModelTabLogic(): UseModelTabLogicReturn {
   }, [vendors, selectedVendorSlug]);
 
   /**
-   * Modelos filtrados do vendor selecionado
+   * Modelos filtrados do vendor selecionado com rating, filtros e ordenação aplicados
    * Validação de edge case: vendor sem modelos
    */
   const filteredModels = useMemo(() => {
@@ -159,10 +173,54 @@ export function useModelTabLogic(): UseModelTabLogicReturn {
     
     if (selectedVendor && models.length === 0) {
       logger.warn('⚠️ [useModelTabLogic] Vendor sem modelos:', selectedVendor.slug);
+      return [];
     }
     
-    return models;
-  }, [selectedVendor]);
+    // Enriquecer modelos com dados de rating
+    const modelsWithRating: ModelWithRating[] = models.map(model => {
+      const ratingData = getModelById(model.apiModelId);
+      return {
+        id: model.id,
+        name: model.name,
+        provider: model.availableOn[0]?.providerName || 'Unknown',
+        isAvailable: model.availableOn.some(p => p.isConfigured),
+        apiModelId: model.apiModelId,
+        contextWindow: model.contextWindow,
+        rating: ratingData?.rating,
+        badge: ratingData?.badge,
+        metrics: ratingData?.metrics,
+        scores: ratingData?.scores,
+        ratingUpdatedAt: ratingData?.ratingUpdatedAt
+      };
+    });
+    
+    // Aplicar filtros
+    let filtered = filterModels(modelsWithRating, filters);
+    
+    // Aplicar ordenação
+    if (filters.sortBy) {
+      filtered = sortModels(filtered, filters.sortBy, filters.sortOrder);
+    }
+    
+    // Converter de volta para ModelWithProviders mantendo os dados originais
+    const filteredIds = new Set(filtered.map(m => m.apiModelId));
+    const result = models.filter(m => filteredIds.has(m.apiModelId));
+    
+    // Ordenar result na mesma ordem que filtered
+    result.sort((a, b) => {
+      const indexA = filtered.findIndex(f => f.apiModelId === a.apiModelId);
+      const indexB = filtered.findIndex(f => f.apiModelId === b.apiModelId);
+      return indexA - indexB;
+    });
+    
+    logger.info('🔍 [useModelTabLogic] Modelos filtrados:', {
+      total: models.length,
+      filtered: result.length,
+      filters
+    });
+    
+    return result;
+  }, [selectedVendor, filters, getModelById]);
 
   /**
    * Modelo selecionado (baseado em chatConfig.model)
@@ -270,6 +328,10 @@ export function useModelTabLogic(): UseModelTabLogicReturn {
     // Estados
     isLoading,
     error,
+    
+    // Filtros e ordenação
+    filters,
+    setFilters,
     
     // Handlers
     handleSelectVendor,
