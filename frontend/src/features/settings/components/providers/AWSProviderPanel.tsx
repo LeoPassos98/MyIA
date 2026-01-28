@@ -26,6 +26,8 @@ import { OptimizedTooltip } from '../../../../components/OptimizedTooltip';
 import { ModelInfoDrawer } from '../../../../components/ModelInfoDrawer';
 import { CertificationProgressDialog, ModelCertificationProgress } from '../../../../components/CertificationProgressDialog';
 import { logger } from '../../../../utils/logger';
+import { useModelRating } from '../../../../hooks/useModelRating';
+import { ModelBadge } from '../../../../components/ModelRating';
 
 // Regiões AWS atualizadas conforme padrão Amazon
 const REGION_GROUPS = [
@@ -94,8 +96,12 @@ const ModelCheckboxItem = memo(({
   isUnavailable: boolean;
   onShowInfo: (model: EnrichedAWSModel) => void;
 }) => {
-  const hasDbInfo = model.isInDatabase !== false;
   const hasCostInfo = model.costPer1kInput > 0 || model.costPer1kOutput > 0;
+  
+  // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
+  const { getModelById } = useModelRating();
+  const modelWithRating = getModelById(model.apiModelId);
+  const hasBadge = !!modelWithRating?.badge;
   
   return (
     <FormControlLabel
@@ -118,6 +124,9 @@ const ModelCheckboxItem = memo(({
           <Box sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2">{model.name}</Typography>
+              {modelWithRating?.badge && (
+                <ModelBadge badge={modelWithRating.badge} size="sm" showIcon />
+              )}
               {isCertified && (
                 <Chip
                   label="✅ Certificado"
@@ -134,7 +143,10 @@ const ModelCheckboxItem = memo(({
                   sx={{ height: 18, fontSize: '0.65rem' }}
                 />
               )}
-              {isUnavailable && (
+              {/* ✅ CORREÇÃO: Só mostrar "Indisponível" se o modelo NÃO tiver badge de rating
+                  Modelos com badge FUNCIONAL/BOM/EXCELENTE não devem mostrar "Indisponível"
+                  mesmo que tenham status 'failed', pois o rating indica que são utilizáveis */}
+              {isUnavailable && !hasBadge && (
                 <Chip
                   label="❌ Indisponível"
                   size="small"
@@ -142,11 +154,13 @@ const ModelCheckboxItem = memo(({
                   sx={{ height: 18, fontSize: '0.65rem' }}
                 />
               )}
-              {!hasDbInfo && (
+              {/* ✅ CORREÇÃO: Mostrar "Não Testado" apenas se o modelo não tem badge de rating
+                  e não tem outros badges (certificado, qualidade, indisponível) */}
+              {!hasBadge && !isCertified && !hasQualityWarning && !isUnavailable && (
                 <Chip
-                  label="Novo"
+                  label="Não Testado"
                   size="small"
-                  color="info"
+                  color="default"
                   sx={{ height: 18, fontSize: '0.65rem' }}
                 />
               )}

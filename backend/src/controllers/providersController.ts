@@ -478,10 +478,10 @@ export const providersController = {
           // Verificar se modelo já existe no grupo
           let existingModel = vendorGroup.models.find(m => m.apiModelId === model.apiModelId);
           
+          // Buscar metadata do registry (sempre, para usar no hasRegistry)
+          const registryMetadata = ModelRegistry.getModel(model.apiModelId);
+          
           if (!existingModel) {
-            // Buscar metadata do registry
-            const registryMetadata = ModelRegistry.getModel(model.apiModelId);
-            
             existingModel = {
               id: model.id,
               name: model.name,
@@ -508,11 +508,13 @@ export const providersController = {
           
           // Adicionar provider availability
           const certification = await getCertificationForModel(model.apiModelId, provider.slug);
+          const hasRegistry = !!registryMetadata; // ✅ Verifica se modelo tem configuração no registry
           
           existingModel.availableOn.push({
             providerSlug: provider.slug,
             providerName: provider.name,
             isConfigured: true, // Se está na lista, está configurado
+            hasRegistry, // ✅ NOVO: Indica se modelo tem configuração no registry
             certification
           });
         }
@@ -545,6 +547,132 @@ export const providersController = {
         stack: err.stack,
       });
       return res.status(500).json(jsend.error('Erro ao buscar vendors', 500));
+    }
+  },
+
+  /**
+   * GET /api/providers/models
+   * Retorna todos os modelos configurados em formato flat com rating
+   */
+  async getModelsWithRating(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.userId!;
+      
+      logger.info('Iniciando busca de modelos com rating', {
+        requestId: req.id,
+        userId
+      });
+      
+      // 1. Buscar configurações do usuário
+      const settings = await prisma.userSettings.findUnique({
+        where: { userId }
+      });
+      
+      // 2. Buscar validação AWS
+      const awsValidation = await prisma.providerCredentialValidation.findUnique({
+        where: { userId_provider: { userId, provider: 'bedrock' } }
+      });
+      
+      // 3. Buscar todos os providers ativos
+      const allProviders = await prisma.aIProvider.findMany({
+        where: { isActive: true },
+        include: {
+          models: {
+            where: { isActive: true },
+            orderBy: { name: 'asc' }
+          }
+        }
+      });
+      
+      // 4. Filtrar providers (mesma lógica do /configured)
+      const providers = allProviders.filter(provider => {
+        if (['openai', 'groq', 'together'].includes(provider.slug)) {
+          return true;
+        }
+        
+        if (provider.slug === 'bedrock') {
+          if (awsValidation?.status === 'valid' && settings?.awsEnabledModels?.length) {
+            const existingModels = provider.models.filter(m =>
+              settings.awsEnabledModels.includes(m.apiModelId)
+            );
+            
+            const missingModelIds = settings.awsEnabledModels.filter(
+              (modelId: string) => !provider.models.some(m => m.apiModelId === modelId)
+            );
+            
+            const dynamicModels = missingModelIds.map((apiModelId: string) => ({
+              id: `dynamic-${apiModelId}`,
+              name: apiModelId.split('.').pop()?.replace(/-/g, ' ').toUpperCase() || apiModelId,
+              apiModelId,
+              contextWindow: 200000,
+              costPer1kInput: 0,
+              costPer1kOutput: 0,
+              isActive: true,
+              providerId: provider.id,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }));
+            
+            provider.models = [...existingModels, ...dynamicModels];
+            return provider.models.length > 0;
+          }
+          return false;
+        }
+        
+        return true;
+      });
+      
+      // 5. Converter para formato flat com rating
+      const modelsWithRating = [];
+      
+      for (const provider of providers) {
+        for (const model of provider.models) {
+          // Buscar certificação do modelo
+          const cert = await prisma.modelCertification.findFirst({
+            where: { modelId: model.apiModelId },
+            orderBy: { createdAt: 'desc' }
+          });
+          
+          modelsWithRating.push({
+            id: model.id,
+            name: model.name,
+            apiModelId: model.apiModelId,
+            provider: provider.slug,
+            providerName: provider.name,
+            isAvailable: true,
+            contextWindow: model.contextWindow,
+            capabilities: [],
+            // Campos de rating
+            rating: cert?.rating ?? undefined,
+            badge: cert?.badge ?? undefined,
+            metrics: cert?.metrics as any ?? undefined,
+            scores: cert?.scores as any ?? undefined,
+            ratingUpdatedAt: cert?.ratingUpdatedAt?.toISOString() ?? undefined
+          });
+        }
+      }
+      
+      logger.info('Modelos com rating obtidos', {
+        requestId: req.id,
+        userId,
+        totalModels: modelsWithRating.length,
+        withRating: modelsWithRating.filter(m => m.rating !== undefined).length
+      });
+      
+      return res.status(200).json(jsend.success({ data: modelsWithRating }));
+      
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      const err = isError(error) ? error : new Error(String(error));
+      logger.error('Erro ao buscar modelos com rating', {
+        requestId: req.id,
+        userId: req.userId,
+        error: err.message,
+        stack: err.stack,
+      });
+      return res.status(500).json(jsend.error('Erro ao buscar modelos', 500));
     }
   },
 };
@@ -598,13 +726,13 @@ function extractVersion(apiModelId: string): string | undefined {
  */
 async function getCertificationForModel(
   modelId: string,
-  providerSlug: string
+  _providerSlug: string
 ): Promise<CertificationInfo | null> {
   try {
-    const fullModelId = `${providerSlug}:${modelId}`;
-    
+    // O modelId no banco já contém o vendor (ex: anthropic.claude-...)
+    // Não precisa adicionar o providerSlug como prefixo
     const cert = await prisma.modelCertification.findFirst({
-      where: { modelId: fullModelId },
+      where: { modelId: modelId },
       orderBy: { createdAt: 'desc' }
     });
     
@@ -613,7 +741,13 @@ async function getCertificationForModel(
     return {
       status: cert.status,
       successRate: cert.successRate,
-      lastChecked: cert.createdAt.toISOString()
+      lastChecked: cert.createdAt.toISOString(),
+      // Campos de rating
+      rating: cert.rating ?? undefined,
+      badge: cert.badge ?? undefined,
+      metrics: cert.metrics as any ?? undefined,
+      scores: cert.scores as any ?? undefined,
+      ratingUpdatedAt: cert.ratingUpdatedAt?.toISOString() ?? undefined
     };
   } catch {
     return null;

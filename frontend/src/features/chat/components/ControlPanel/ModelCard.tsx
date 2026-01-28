@@ -31,6 +31,8 @@ import CachedIcon from '@mui/icons-material/Cached';
 import FunctionsIcon from '@mui/icons-material/Functions';
 import { formatTokens } from '../../../../utils/formatters';
 import { ProviderBadgeGroup } from './ProviderBadge';
+import { ModelRatingStars, ModelBadge, ModelMetricsTooltip } from '../../../../components/ModelRating';
+import { useModelRating } from '../../../../hooks/useModelRating';
 import type { ModelWithProviders } from '../../../../types/ai';
 
 /**
@@ -118,6 +120,10 @@ export const ModelCard = React.memo(function ModelCard({
   // Estado de expansão do accordion (interno ou controlado)
   const [internalIsExpanded, setInternalIsExpanded] = useState(false);
   const isExpanded = controlledIsExpanded !== undefined ? controlledIsExpanded : internalIsExpanded;
+  
+  // Hook para buscar rating do modelo
+  const { getModelById } = useModelRating();
+  const modelWithRating = getModelById(model.apiModelId);
   
   const hasMultipleProviders = model.availableOn.length > 1;
   const showProviderSelector = isSelected && hasMultipleProviders && !!onProviderChange;
@@ -291,12 +297,32 @@ export const ModelCard = React.memo(function ModelCard({
                     v{model.version}
                   </Typography>
                 )}
+                {modelWithRating?.badge && (
+                  <ModelBadge badge={modelWithRating.badge} size="sm" showIcon />
+                )}
               </Box>
+              
+              {/* Rating com Tooltip */}
+              {modelWithRating?.rating && (
+                <Box sx={{ mb: 1 }}>
+                  <ModelMetricsTooltip
+                    metrics={modelWithRating.metrics!}
+                    scores={modelWithRating.scores!}
+                  >
+                    <ModelRatingStars
+                      rating={modelWithRating.rating}
+                      size="sm"
+                      showValue
+                    />
+                  </ModelMetricsTooltip>
+                </Box>
+              )}
               
               {/* Badges de Providers */}
               <Box sx={{ mb: 1.5 }}>
                 <ProviderBadgeGroup
                   providers={model.availableOn}
+                  modelId={model.apiModelId}
                   showCertification
                   size="small"
                 />

@@ -24,8 +24,11 @@ import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CancelIcon from '@mui/icons-material/Cancel';
+import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import { useTheme } from '@mui/material/styles';
 import { CertificationDetails } from '../types/ai';
+import { useModelRating } from '../hooks/useModelRating';
+import { ModelBadge } from './ModelRating';
 
 export interface ModelCertificationProgress {
   modelId: string;
@@ -53,6 +56,7 @@ export const CertificationProgressDialog = memo(({
   canCancel
 }: CertificationProgressDialogProps) => {
   const theme = useTheme();
+  const { getModelById } = useModelRating();
   
   const totalModels = models.length;
   const completedModels = models.filter(m => m.status === 'success' || m.status === 'error').length;
@@ -75,57 +79,18 @@ export const CertificationProgressDialog = memo(({
       return <WarningIcon color="warning" />;
     }
     
+    // Verificar se é rate limit
+    const isRateLimited = model.error?.includes('Limite de certificações excedido');
+    
     switch (model.status) {
       case 'success':
         return <CheckCircleIcon color="success" />;
       case 'error':
-        return <ErrorIcon color="error" />;
+        return isRateLimited ? <PauseCircleIcon color="disabled" /> : <ErrorIcon color="error" />;
       case 'running':
         return <HourglassEmptyIcon color="primary" />;
       default:
         return <HourglassEmptyIcon color="disabled" />;
-    }
-  };
-  
-  const getStatusColor = (model: ModelCertificationProgress) => {
-    if (model.status === 'success' && model.result?.status === 'quality_warning') {
-      return 'warning';
-    }
-    
-    switch (model.status) {
-      case 'success':
-        return 'success';
-      case 'error':
-        return 'error';
-      case 'running':
-        return 'primary';
-      default:
-        return 'default';
-    }
-  };
-  
-  const getStatusLabel = (model: ModelCertificationProgress) => {
-    // ========================================================================
-    // CORREÇÃO: Melhorar labels para diferenciar status
-    // ========================================================================
-    // - quality_warning: "⚠️ Disponível" (amarelo)
-    // - certified: "✅ Certificado" (verde)
-    // - failed/unavailable: "❌ Indisponível" (vermelho)
-    // ========================================================================
-    
-    if (model.status === 'success' && model.result?.status === 'quality_warning') {
-      return '⚠️ Disponível';
-    }
-    
-    switch (model.status) {
-      case 'success':
-        return '✅ Certificado';
-      case 'error':
-        return '❌ Indisponível';
-      case 'running':
-        return 'Certificando...';
-      default:
-        return 'Aguardando';
     }
   };
   
@@ -222,56 +187,97 @@ export const CertificationProgressDialog = memo(({
         
         {/* Lista de modelos */}
         <List sx={{ maxHeight: 400, overflow: 'auto' }}>
-          {models.map((model, _index) => (
-            <ListItem
-              key={model.modelId}
-              sx={{
-                borderRadius: 1,
-                mb: 1,
-                bgcolor: model.status === 'running' ? theme.palette.action.hover : 'transparent',
-                border: model.status === 'running' ? `1px solid ${theme.palette.primary.main}` : '1px solid transparent'
-              }}
-            >
-              <ListItemIcon>
-                {getStatusIcon(model)}
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2">{model.modelName}</Typography>
-                    <Chip
-                      label={getStatusLabel(model)}
-                      size="small"
-                      color={getStatusColor(model)}
-                      sx={{ height: 20, fontSize: '0.65rem' }}
-                    />
-                  </Box>
-                }
-                secondary={
-                  <>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                      {model.modelId}
-                    </Typography>
-                    {model.error && (
-                      <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                        ❌ {model.error}
+          {models.map((model, _index) => {
+            // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
+            const modelWithRating = getModelById(model.modelId);
+            const hasBadge = !!modelWithRating?.badge;
+            const isCertified = model.status === 'success' && model.result?.status === 'certified';
+            const isUnavailable = model.status === 'error';
+            
+            // ✅ NOVO: Verificar se é rate limit
+            const isRateLimited = model.error?.includes('Limite de certificações excedido');
+            
+            return (
+              <ListItem
+                key={model.modelId}
+                sx={{
+                  borderRadius: 1,
+                  mb: 1,
+                  bgcolor: model.status === 'running' ? theme.palette.action.hover : 'transparent',
+                  border: model.status === 'running' ? `1px solid ${theme.palette.primary.main}` : '1px solid transparent'
+                }}
+              >
+                <ListItemIcon>
+                  {getStatusIcon(model)}
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2">{model.modelName}</Typography>
+                      {/* ✅ CORREÇÃO: Mostrar badge de rating se existir */}
+                      {modelWithRating?.badge && (
+                        <ModelBadge badge={modelWithRating.badge} size="sm" showIcon />
+                      )}
+                      {/* ✅ Badge de certificado */}
+                      {isCertified && (
+                        <Chip
+                          label="✅ Certificado"
+                          size="small"
+                          color="success"
+                          sx={{ height: 20, fontSize: '0.65rem' }}
+                        />
+                      )}
+                      {/* ✅ NOVO: Badge de "Não Testado" para rate limit */}
+                      {isUnavailable && !hasBadge && isRateLimited && (
+                        <Chip
+                          label="⏸️ Não Testado"
+                          size="small"
+                          color="default"
+                          sx={{ height: 20, fontSize: '0.65rem' }}
+                        />
+                      )}
+                      {/* ✅ CORREÇÃO: Badge "Indisponível" apenas para erros reais (não rate limit)
+                          Só mostrar se o modelo NÃO tiver badge de rating e NÃO for rate limit */}
+                      {isUnavailable && !hasBadge && !isRateLimited && (
+                        <Chip
+                          label="❌ Indisponível"
+                          size="small"
+                          color="error"
+                          sx={{ height: 20, fontSize: '0.65rem' }}
+                        />
+                      )}
+                    </Box>
+                  }
+                  secondary={
+                    <>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        {model.modelId}
                       </Typography>
-                    )}
-                    {model.status === 'success' && model.result?.status === 'quality_warning' && model.startTime && model.endTime && (
-                      <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
-                        ⚠️ Disponível com limitações em {Math.round((model.endTime - model.startTime) / 1000)}s
-                      </Typography>
-                    )}
-                    {model.status === 'success' && model.result?.status === 'certified' && model.startTime && model.endTime && (
-                      <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>
-                        ✅ Certificado em {Math.round((model.endTime - model.startTime) / 1000)}s
-                      </Typography>
-                    )}
-                  </>
-                }
-              />
-            </ListItem>
-          ))}
+                      {model.error && (
+                        <Typography
+                          variant="caption"
+                          color={isRateLimited ? "text.secondary" : "error"}
+                          sx={{ display: 'block', mt: 0.5 }}
+                        >
+                          {isRateLimited ? '⏸️' : '❌'} {model.error}
+                        </Typography>
+                      )}
+                      {model.status === 'success' && model.result?.status === 'quality_warning' && model.startTime && model.endTime && (
+                        <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+                          ⚠️ Disponível com limitações em {Math.round((model.endTime - model.startTime) / 1000)}s
+                        </Typography>
+                      )}
+                      {model.status === 'success' && model.result?.status === 'certified' && model.startTime && model.endTime && (
+                        <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>
+                          ✅ Certificado em {Math.round((model.endTime - model.startTime) / 1000)}s
+                        </Typography>
+                      )}
+                    </>
+                  }
+                />
+              </ListItem>
+            );
+          })}
         </List>
       </DialogContent>
       

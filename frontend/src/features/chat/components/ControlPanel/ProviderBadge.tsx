@@ -13,6 +13,7 @@
 import { Chip, Tooltip, Box, type ChipProps } from '@mui/material';
 import { getProviderIcon } from '../../../../constants/providerIcons';
 import { CertificationBadge } from './CertificationBadge';
+import { useModelRating } from '../../../../hooks/useModelRating';
 import type { ProviderAvailability } from '../../../../types/ai';
 
 /**
@@ -21,6 +22,8 @@ import type { ProviderAvailability } from '../../../../types/ai';
 export interface ProviderBadgeProps {
   /** Informações de disponibilidade do provider */
   provider: ProviderAvailability;
+  /** ID do modelo (para buscar rating) */
+  modelId?: string;
   /** Tamanho do badge */
   size?: ChipProps['size'];
   /** Se deve mostrar badge de certificação ao lado */
@@ -61,10 +64,20 @@ export interface ProviderBadgeProps {
  * ```
  */
 export function ProviderBadge({ 
-  provider, 
+  provider,
+  modelId,
   size = 'small',
   showCertification = false 
 }: ProviderBadgeProps) {
+  
+  // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
+  const { getModelById } = useModelRating();
+  const modelWithRating = modelId ? getModelById(modelId) : null;
+  const hasBadge = !!modelWithRating?.badge;
+  
+  // ✅ CORREÇÃO: Não mostrar CertificationBadge "Indisponível" se o modelo tiver badge de rating
+  const shouldShowCertification = showCertification && provider.certification && 
+    !(provider.certification.status === 'failed' && hasBadge);
   
   /**
    * Conteúdo do tooltip com informações do provider
@@ -117,7 +130,7 @@ export function ProviderBadge({
         />
       </Tooltip>
       
-      {showCertification && provider.certification && (
+      {shouldShowCertification && provider.certification && (
         <CertificationBadge
           status={provider.certification.status as any}
           successRate={provider.certification.successRate}
@@ -135,6 +148,8 @@ export function ProviderBadge({
 export interface ProviderBadgeGroupProps {
   /** Lista de providers disponíveis */
   providers: ProviderAvailability[];
+  /** ID do modelo (para buscar rating) */
+  modelId?: string;
   /** Tamanho dos badges */
   size?: ChipProps['size'];
   /** Se deve mostrar badges de certificação */
@@ -159,7 +174,8 @@ export interface ProviderBadgeGroupProps {
  * ```
  */
 export function ProviderBadgeGroup({ 
-  providers, 
+  providers,
+  modelId,
   size = 'small',
   showCertification = false 
 }: ProviderBadgeGroupProps) {
@@ -178,6 +194,7 @@ export function ProviderBadgeGroup({
         <ProviderBadge
           key={provider.providerSlug}
           provider={provider}
+          modelId={modelId}
           size={size}
           showCertification={showCertification}
         />

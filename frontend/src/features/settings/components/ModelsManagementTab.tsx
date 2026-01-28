@@ -28,6 +28,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { SettingsSection } from './SettingsSection';
+import { ModelRatingStars, ModelBadge } from '../../../components/ModelRating';
+import { useModelRating } from '../../../hooks/useModelRating';
 import { certificationService } from '../../../services/certificationService';
 import { aiProvidersService } from '../../../services/aiProvidersService';
 import { AIProvider } from '../../../types/ai';
@@ -49,6 +51,9 @@ export default function ModelsManagementTab() {
   
   // Hook para auto-save de certificações
   const { selectedModels: awsEnabledModels, setSelectedModels: setAWSEnabledModels, handleSave: saveAWSConfig } = useAWSConfig();
+  
+  // Hook para buscar ratings dos modelos
+  const { getModelById } = useModelRating();
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -366,6 +371,7 @@ export default function ModelsManagementTab() {
                 <TableCell><strong>Modelo</strong></TableCell>
                 <TableCell><strong>Vendor</strong></TableCell>
                 <TableCell align="center"><strong>Status</strong></TableCell>
+                <TableCell align="center"><strong>Rating</strong></TableCell>
                 <TableCell align="center"><strong>Context Window</strong></TableCell>
                 <TableCell align="right"><strong>Ações</strong></TableCell>
               </TableRow>
@@ -375,6 +381,7 @@ export default function ModelsManagementTab() {
                 const isCertified = certifiedModels.includes(model.apiModelId);
                 const isCurrentlyCertifying = isCertifying === model.apiModelId;
                 const isSelected = selectedModels.includes(model.apiModelId);
+                const modelWithRating = getModelById(model.apiModelId);
                 
                 logger.debug(`[ModelsManagementTab] 🎨 Renderizando badge para ${model.apiModelId}:`, {
                   isCertified,
@@ -424,6 +431,22 @@ export default function ModelsManagementTab() {
                           color="default"
                           size="small"
                         />
+                      )}
+                    </TableCell>
+                    <TableCell align="center">
+                      {modelWithRating?.rating ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
+                          <ModelRatingStars
+                            rating={modelWithRating.rating}
+                            size="sm"
+                            showValue={false}
+                          />
+                          {modelWithRating.badge && (
+                            <ModelBadge badge={modelWithRating.badge} size="sm" showIcon={false} />
+                          )}
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">N/A</Typography>
                       )}
                     </TableCell>
                     <TableCell align="center">

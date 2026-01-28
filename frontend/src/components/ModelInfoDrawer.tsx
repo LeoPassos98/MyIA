@@ -24,6 +24,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import EventIcon from '@mui/icons-material/Event';
 import { EnrichedAWSModel, CertificationDetails } from '../types/ai';
 import { certificationService } from '../services/certificationService';
+import { useModelRating } from '../hooks/useModelRating';
 import Alert from '@mui/material/Alert';
 
 export interface ModelInfoDrawerProps {
@@ -60,6 +61,11 @@ export const ModelInfoDrawer = memo(({
   const theme = useTheme();
   const [certDetails, setCertDetails] = useState<CertificationDetails | null>(null);
   const [loadingCertDetails, setLoadingCertDetails] = useState(false);
+
+  // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
+  const { getModelById } = useModelRating();
+  const modelWithRating = model ? getModelById(model.apiModelId) : null;
+  const hasBadge = !!modelWithRating?.badge;
 
   // Buscar detalhes da certificação quando o drawer abrir
   useEffect(() => {
@@ -155,7 +161,10 @@ export const ModelInfoDrawer = memo(({
                 sx={{ fontWeight: 'bold' }}
               />
             )}
-            {isUnavailable && (
+            {/* ✅ CORREÇÃO: Só mostrar "Indisponível" se o modelo NÃO tiver badge de rating
+                Modelos com badge FUNCIONAL/BOM/EXCELENTE não devem mostrar "Indisponível"
+                mesmo que tenham status 'failed', pois o rating indica que são utilizáveis */}
+            {isUnavailable && !hasBadge && (
               <Chip
                 icon={<ErrorIcon />}
                 label="❌ Indisponível"
