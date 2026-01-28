@@ -230,9 +230,16 @@ model ModelCertification {
   lastError      String?
   failureReasons Json? // Array de erros
 
-  // Categorização de Erros (Novo)
+  // Categorização de Erros
   errorCategory String? // UNAVAILABLE, PERMISSION_ERROR, etc
   errorSeverity String? // CRITICAL, HIGH, MEDIUM, LOW
+
+  // Sistema de Rating (Fase 2)
+  rating           Float?    // 0-5.0
+  badge            String?   // PREMIUM, RECOMENDADO, FUNCIONAL, etc
+  metrics          Json?     // ModelMetrics (successRate, averageRetries, etc.)
+  scores           Json?     // ModelScores (success, resilience, performance, stability)
+  ratingUpdatedAt  DateTime? // Timestamp da última atualização do rating
 
   // Metadados
   createdAt DateTime @default(now())
@@ -246,6 +253,9 @@ model ModelCertification {
   @@index([expiresAt]) // Para queries de expiração
   @@index([errorCategory]) // Para filtrar por categoria de erro
   @@index([errorSeverity]) // Para filtrar por severidade
+  @@index([rating]) // Para ordenação por rating
+  @@index([badge]) // Para filtros por badge
+  @@index([ratingUpdatedAt]) // Para cache de rating
   @@map("model_certifications")
 }
 
