@@ -8,11 +8,31 @@
  * register themselves in the ModelRegistry.
  */
 
+import './ai21.models';
+import './amazon.models';
 import './anthropic.models';
 import './cohere.models';
-import './amazon.models';
+import './google.models';
+import './meta.models';
+import './minimax.models';
+import './mistral.models';
+import './moonshot.models';
+import './nvidia.models';
+import './openai.models';
+import './qwen.models';
+import './twelvelabs.models';
 
 // Re-export for convenience
+export * from './ai21.models';
+export * from './amazon.models';
 export * from './anthropic.models';
 export * from './cohere.models';
-export * from './amazon.models';
+export * from './google.models';
+export * from './meta.models';
+export * from './minimax.models';
+export * from './mistral.models';
+export * from './moonshot.models';
+export * from './nvidia.models';
+export * from './openai.models';
+export * from './qwen.models';
+export * from './twelvelabs.models';

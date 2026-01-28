@@ -98,28 +98,6 @@ const cohereModels: ModelMetadata[] = [
       maxTokens: 2048,
     },
   },
-
-  {
-    modelId: 'cohere.rerank-v3-5:0',
-    vendor: 'cohere',
-    displayName: 'Rerank 3.5',
-    description: 'Auto-generated model configuration',
-    capabilities: {
-      streaming: false,
-      vision: false,
-      functionCalling: false,
-      maxContextWindow: 128000,
-      maxOutputTokens: 4000,
-    },
-    supportedPlatforms: ['bedrock'],
-    adapterClass: 'CohereAdapter',
-    recommendedParams: {
-      temperature: 0.3,
-      topP: 0.75,
-      topK: 0,
-      maxTokens: 2048,
-    },
-  },
 ];
 
 // Auto-register all models
