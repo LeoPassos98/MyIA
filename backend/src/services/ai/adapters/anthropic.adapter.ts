@@ -8,18 +8,22 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
+import { InferenceType } from '../types';
 import { ModelRegistry } from '../registry/model-registry';
 
 /**
- * Adapter for Anthropic Claude models
- * 
+ * Adapter for Anthropic Claude models (Legacy - ON_DEMAND)
+ *
  * Supports all Claude models across different platforms:
  * - AWS Bedrock (anthropic.*)
  * - Direct API (claude-*)
  * - Azure (if available)
+ *
+ * @deprecated Use AnthropicOnDemandAdapter or AnthropicProfileAdapter instead
  */
 export class AnthropicAdapter extends BaseModelAdapter {
   readonly vendor = 'anthropic';
+  readonly inferenceType: InferenceType = 'ON_DEMAND';
   
   readonly supportedModels = [
     // AWS Bedrock format (only format currently supported)
@@ -52,17 +56,19 @@ export class AnthropicAdapter extends BaseModelAdapter {
       anthropic_version: 'bedrock-2023-05-31',
       max_tokens: maxTokens,
       messages: conversationMessages,
-      temperature: temperature,
     };
+
+    // ⚠️ IMPORTANTE: Claude Sonnet 4.5 não aceita temperature e top_p juntos
+    // Priorizar temperature se ambos estiverem definidos
+    if (temperature !== undefined) {
+      body.temperature = temperature;
+    } else if (topP !== undefined) {
+      body.top_p = topP;
+    }
 
     // Only add top_k if specified (Anthropic doesn't support it officially)
     if (options.topK !== undefined) {
       body.top_k = options.topK;
-    }
-
-    // Add top_p (Anthropic supports it)
-    if (topP !== undefined) {
-      body.top_p = topP;
     }
 
     if (systemMessage) {

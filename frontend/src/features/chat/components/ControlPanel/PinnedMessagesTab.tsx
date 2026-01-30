@@ -1,12 +1,14 @@
 // frontend/src/features/chat/components/ControlPanel/PinnedMessagesTab.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// MIGRATED: Fase 3 - Padronização Visual
 
 import {
   Box, Typography, List, ListItem, ListItemText,
-  IconButton, Chip, Button
+  IconButton, Button
 } from '@mui/material';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { CounterBadge, StatusBadge } from '@/components/Badges';
 import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useControlPanelLogic } from './useControlPanelLogic';
@@ -32,11 +34,10 @@ export const PinnedMessagesTab = () => {
             examples={['Fixe instruções importantes do projeto', 'Preserve decisões técnicas', 'Mantenha contexto crítico sempre visível']}
           />
         </Box>
-        <Chip 
-          label={`${pinnedMessages.length} pinadas`}
-          size="small"
+        <CounterBadge
+          count={pinnedMessages.length}
+          label="pinadas"
           color="secondary"
-          variant="outlined"
         />
       </Box>
 
@@ -114,11 +115,10 @@ export const PinnedMessagesTab = () => {
                 <ListItemText
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip 
+                      <StatusBadge
                         label={msg.role === 'user' ? '👤 Você' : '🤖 IA'}
-                        size="small"
+                        status="default"
                         variant="outlined"
-                        sx={{ fontSize: '0.7rem' }}
                       />
                       <Typography variant="caption" color="text.secondary">
                         {new Date(msg.createdAt).toLocaleString()}

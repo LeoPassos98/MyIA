@@ -1,5 +1,6 @@
 // frontend/src/features/promptTrace/components/PromptTraceTimeline.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+// MIGRATED: Fase 3 - Padronização Visual
 
 import {
   Box,
@@ -8,11 +9,11 @@ import {
   ListItemIcon,
   ListItemText,
   Typography,
-  Chip,
   alpha,
   useTheme,
   Tooltip,
 } from '@mui/material';
+import { StatusBadge, MetricBadge } from '@/components/Badges';
 import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -31,12 +32,12 @@ interface Props {
 
 const ROLE_CONFIG: Record<
   PromptTraceStep['role'],
-  { icon: React.ReactNode; label: string; color: string }
+  { icon: React.ReactNode; label: string; status: 'success' | 'warning' | 'error' | 'info' | 'default' }
 > = {
-  system: { icon: <SettingsIcon />, label: 'System', color: 'info' },
-  user: { icon: <PersonIcon />, label: 'User', color: 'primary' },
-  assistant: { icon: <SmartToyIcon />, label: 'Assistant', color: 'success' },
-  tool: { icon: <BuildIcon />, label: 'Tool', color: 'warning' },
+  system: { icon: <SettingsIcon />, label: 'System', status: 'info' },
+  user: { icon: <PersonIcon />, label: 'User', status: 'info' },
+  assistant: { icon: <SmartToyIcon />, label: 'Assistant', status: 'success' },
+  tool: { icon: <BuildIcon />, label: 'Tool', status: 'warning' },
 };
 
 /**
@@ -46,49 +47,49 @@ const ORIGIN_CONFIG: Record<StepOrigin, {
   label: string; 
   tooltip: string; 
   icon: React.ReactNode;
-  color: 'primary' | 'secondary' | 'success' | 'warning' | 'info' | 'error';
+  status: 'success' | 'warning' | 'error' | 'info' | 'default';
 }> = {
   pinned: { 
     label: '📌', 
     tooltip: 'Mensagem Fixada (sempre incluída)', 
     icon: <PushPinIcon fontSize="inherit" />,
-    color: 'primary'
+    status: 'info'
   },
   rag: { 
     label: '🧠', 
     tooltip: 'Recuperada via RAG (busca semântica)', 
     icon: <PsychologyIcon fontSize="inherit" />,
-    color: 'secondary'
+    status: 'info'
   },
   recent: { 
     label: '🕐', 
     tooltip: 'Memória Recente', 
     icon: <HistoryIcon fontSize="inherit" />,
-    color: 'info'
+    status: 'info'
   },
   'rag+recent': { 
     label: '🧠🕐', 
     tooltip: 'Encontrada via RAG e também é recente', 
     icon: <PsychologyIcon fontSize="inherit" />,
-    color: 'success'
+    status: 'success'
   },
   manual: { 
     label: '✋', 
     tooltip: 'Selecionada manualmente', 
     icon: <EditIcon fontSize="inherit" />,
-    color: 'warning'
+    status: 'warning'
   },
   system: { 
     label: '⚙️', 
     tooltip: 'System Prompt', 
     icon: <SettingsIcon fontSize="inherit" />,
-    color: 'info'
+    status: 'info'
   },
   'user-input': { 
     label: '✏️', 
     tooltip: 'Mensagem atual do usuário', 
     icon: <PersonIcon fontSize="inherit" />,
-    color: 'primary'
+    status: 'info'
   },
 };
 
@@ -135,10 +136,9 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
                     <Typography variant="body2" fontWeight={600}>
                       #{step.stepNumber}
                     </Typography>
-                    <Chip
+                    <StatusBadge
                       label={config.label}
-                      size="small"
-                      color={config.color as 'primary'}
+                      status={config.status}
                       variant="outlined"
                     />
                     {step.isPinned && (
@@ -151,31 +151,18 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
                     )}
                     {step.origin && ORIGIN_CONFIG[step.origin] && (
                       <Tooltip title={ORIGIN_CONFIG[step.origin].tooltip} arrow>
-                        <Chip
+                        <StatusBadge
                           label={ORIGIN_CONFIG[step.origin].label}
-                          size="small"
-                          color={ORIGIN_CONFIG[step.origin].color}
-                          variant="filled"
-                          sx={{ 
-                            fontSize: '0.7rem', 
-                            height: 20,
-                            '& .MuiChip-label': { px: 0.75 }
-                          }}
+                          status={ORIGIN_CONFIG[step.origin].status}
                         />
                       </Tooltip>
                     )}
                     {step.wasTruncatedForEmbedding && (
                       <Tooltip title="Embedding gerado de versão truncada (~8K tokens). A busca semântica pode não considerar todo o conteúdo." arrow>
-                        <Chip
+                        <StatusBadge
                           label="⚠️"
-                          size="small"
-                          color="warning"
+                          status="warning"
                           variant="outlined"
-                          sx={{ 
-                            fontSize: '0.7rem', 
-                            height: 20,
-                            '& .MuiChip-label': { px: 0.5 }
-                          }}
                         />
                       </Tooltip>
                     )}
@@ -201,21 +188,19 @@ export function PromptTraceTimeline({ steps, selectedStepId, onStepSelect }: Pro
 
               {/* Tokens da resposta (output) */}
               {step.usage?.tokensOut !== undefined && step.usage.tokensOut > 0 && (
-                <Chip
-                  label={`${step.usage.tokensOut} tokens`}
-                  size="small"
-                  variant="outlined"
-                  color="success"
-                  sx={{ ml: 1 }}
+                <MetricBadge
+                  label="Out"
+                  value={step.usage.tokensOut}
+                  unit=" tokens"
+                  color="primary"
                 />
               )}
               {/* Tokens de entrada (input) - só mostra se não tiver tokensOut */}
               {step.usage?.tokensIn !== undefined && step.usage.tokensIn > 0 && !step.usage?.tokensOut && (
-                <Chip
-                  label={`${step.usage.tokensIn} tokens`}
-                  size="small"
-                  variant="outlined"
-                  sx={{ ml: 1 }}
+                <MetricBadge
+                  label="In"
+                  value={step.usage.tokensIn}
+                  unit=" tokens"
                 />
               )}
             </ListItemButton>

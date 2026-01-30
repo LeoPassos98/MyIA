@@ -1,24 +1,147 @@
 // backend/src/services/ai/adapters/adapter-factory.ts
 // Standards: docs/STANDARDS.md
 
+/**
+ * @file adapter-factory.ts
+ * @description Factory para criar adapters baseado em vendor e inference type
+ * @module services/ai/adapters
+ */
+
 import { BaseModelAdapter } from './base.adapter';
+import { InferenceType } from '../types';
+import { logger } from '../../../utils/logger';
+import { ModelRegistry } from '../registry/model-registry';
+
+// Adapters antigos (ON_DEMAND)
 import { AnthropicAdapter } from './anthropic.adapter';
-import { CohereAdapter } from './cohere.adapter';
 import { AmazonAdapter } from './amazon.adapter';
+import { CohereAdapter } from './cohere.adapter';
+
+// Adapters novos (INFERENCE_PROFILE)
+import { AnthropicProfileAdapter, AmazonProfileAdapter } from './inference-profile';
 
 /**
- * Factory for creating and caching model adapters
- * 
- * Adapters are singletons (one instance per vendor) to avoid
- * unnecessary object creation.
+ * Feature flag para migração gradual (verificação dinâmica para suportar testes)
+ */
+function isUseNewAdapters(): boolean {
+  return process.env.USE_NEW_ADAPTERS === 'true';
+}
+
+/**
+ * Mapa de adapters por vendor e inference type
+ */
+const adapterMap: Record<string, Record<InferenceType, new () => BaseModelAdapter>> = {
+  anthropic: {
+    ON_DEMAND: AnthropicAdapter,
+    INFERENCE_PROFILE: AnthropicProfileAdapter,
+    PROVISIONED: AnthropicAdapter, // Fallback
+    CROSS_REGION: AnthropicAdapter // Fallback
+  },
+  amazon: {
+    ON_DEMAND: AmazonAdapter,
+    INFERENCE_PROFILE: AmazonProfileAdapter,
+    PROVISIONED: AmazonAdapter,
+    CROSS_REGION: AmazonAdapter
+  },
+  cohere: {
+    ON_DEMAND: CohereAdapter,
+    INFERENCE_PROFILE: CohereAdapter, // Cohere não suporta profiles
+    PROVISIONED: CohereAdapter,
+    CROSS_REGION: CohereAdapter
+  }
+};
+
+/**
+ * Factory para criar adapters
  */
 export class AdapterFactory {
   private static adapters: Map<string, BaseModelAdapter> = new Map();
   private static allAdapters: BaseModelAdapter[] | null = null;
 
   /**
-   * Get adapter for a specific vendor
+   * Cria adapter apropriado baseado em vendor e inference type
+   */
+  static createAdapter(vendor: string, inferenceType: InferenceType = 'ON_DEMAND'): BaseModelAdapter {
+    const useNewAdapters = isUseNewAdapters();
+    logger.debug('Creating adapter', { vendor, inferenceType, useNewAdapters });
+
+    // Se feature flag desabilitada, usar adapters antigos
+    if (!useNewAdapters) {
+      return this.createLegacyAdapter(vendor);
+    }
+
+    // Buscar adapter no mapa
+    const vendorAdapters = adapterMap[vendor.toLowerCase()];
+    if (!vendorAdapters) {
+      logger.warn(`No adapters found for vendor: ${vendor}, using legacy`);
+      return this.createLegacyAdapter(vendor);
+    }
+
+    const AdapterClass = vendorAdapters[inferenceType];
+    if (!AdapterClass) {
+      logger.warn(`No adapter found for ${vendor}/${inferenceType}, using ON_DEMAND`);
+      return new vendorAdapters.ON_DEMAND();
+    }
+
+    logger.info(`Using adapter: ${vendor}/${inferenceType}`);
+    return new AdapterClass();
+  }
+
+  /**
+   * Cria adapter legado (compatibilidade)
+   */
+  private static createLegacyAdapter(vendor: string): BaseModelAdapter {
+    switch (vendor.toLowerCase()) {
+      case 'anthropic':
+        return new AnthropicAdapter();
+      case 'amazon':
+        return new AmazonAdapter();
+      case 'cohere':
+        return new CohereAdapter();
+      default:
+        throw new Error(`Unsupported vendor: ${vendor}`);
+    }
+  }
+
+  /**
+   * Detecta inference type de um modelId
+   * Consulta o registry para verificar platformRules
+   */
+  static detectInferenceType(modelId: string): InferenceType {
+    // 1. Verificar formato do modelId primeiro (mais rápido)
+    // Inference Profile: {region}.{vendor}.{model}
+    if (/^(us|eu|apac)\.[a-z]+\./i.test(modelId)) {
+      return 'INFERENCE_PROFILE';
+    }
+
+    // Provisioned: arn:aws:bedrock:...
+    if (modelId.startsWith('arn:aws:bedrock')) {
+      return 'PROVISIONED';
+    }
+
+    // 2. Consultar registry para verificar platformRules
+    try {
+      const metadata = ModelRegistry.getModel(modelId);
+      if (metadata?.platformRules) {
+        const bedrockRule = metadata.platformRules.find(rule => rule.platform === 'bedrock');
+        if (bedrockRule?.rule === 'requires_inference_profile') {
+          logger.debug(`Model ${modelId} requires INFERENCE_PROFILE per registry rules`);
+          return 'INFERENCE_PROFILE';
+        }
+      }
+    } catch (error) {
+      // Se modelo não está no registry, continuar com detecção por formato
+      logger.debug(`Model ${modelId} not found in registry, using format-based detection`);
+    }
+
+    // 3. Default: ON_DEMAND
+    return 'ON_DEMAND';
+  }
+
+  /**
+   * Get adapter for a specific vendor (Legacy method - mantido para compatibilidade)
    * 
+   * @deprecated Use createAdapter(vendor, inferenceType) instead
    * @param vendor - Vendor name (e.g., 'anthropic', 'cohere', 'amazon')
    * @returns Adapter instance
    * @throws Error if vendor not supported
@@ -31,25 +154,8 @@ export class AdapterFactory {
       return this.adapters.get(normalizedVendor)!;
     }
 
-    // Create new adapter
-    let adapter: BaseModelAdapter;
-
-    switch (normalizedVendor) {
-      case 'anthropic':
-        adapter = new AnthropicAdapter();
-        break;
-      
-      case 'cohere':
-        adapter = new CohereAdapter();
-        break;
-      
-      case 'amazon':
-        adapter = new AmazonAdapter();
-        break;
-      
-      default:
-        throw new Error(`No adapter found for vendor: ${vendor}`);
-    }
+    // Create new adapter using legacy method
+    const adapter = this.createLegacyAdapter(normalizedVendor);
 
     // Cache and return
     this.adapters.set(normalizedVendor, adapter);
@@ -66,6 +172,19 @@ export class AdapterFactory {
    * @throws Error if no adapter supports the model
    */
   static getAdapterForModel(modelId: string): BaseModelAdapter {
+    // Detectar inference type e vendor
+    const inferenceType = this.detectInferenceType(modelId);
+    const vendor = this.detectVendor(modelId);
+
+    if (vendor) {
+      try {
+        return this.createAdapter(vendor, inferenceType);
+      } catch (error) {
+        logger.warn(`Failed to create adapter for ${vendor}/${inferenceType}, falling back to search`, { error });
+      }
+    }
+
+    // Fallback: buscar em todos os adapters (comportamento legado)
     // Initialize all adapters if not done yet
     if (!this.allAdapters) {
       this.allAdapters = [
@@ -92,6 +211,13 @@ export class AdapterFactory {
    * @returns Vendor name or null if not detected
    */
   static detectVendor(modelId: string): string | null {
+    // Inference Profile format: {region}.{vendor}.{model}
+    const inferenceProfileMatch = modelId.match(/^(us|eu|apac)\.([a-z]+)\./i);
+    if (inferenceProfileMatch) {
+      return inferenceProfileMatch[2].toLowerCase();
+    }
+
+    // Standard format: {vendor}.{model}
     const prefix = modelId.split('.')[0].toLowerCase();
     
     // Check if prefix matches a known vendor

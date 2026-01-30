@@ -5,7 +5,7 @@ import { useState, useMemo, memo, useEffect, useCallback } from 'react';
 import {
   Box, TextField, Button, Alert, CircularProgress,
   FormGroup, FormControlLabel, Checkbox, Typography, Divider,
-  LinearProgress, Chip, Select, MenuItem, ListSubheader,
+  LinearProgress, Select, MenuItem, ListSubheader,
   Accordion, AccordionSummary, AccordionDetails, InputAdornment,
   IconButton
 } from '@mui/material';
@@ -22,12 +22,12 @@ import { useTheme } from '@mui/material/styles';
 import { useAWSConfig } from '../../hooks/useAWSConfig';
 import { EnrichedAWSModel } from '../../../../types/ai';
 import { certificationService } from '../../../../services/certificationService';
+import { StatusBadge, CounterBadge } from '@/components/Badges';
 import { OptimizedTooltip } from '../../../../components/OptimizedTooltip';
 import { ModelInfoDrawer } from '../../../../components/ModelInfoDrawer';
 import { CertificationProgressDialog, ModelCertificationProgress } from '../../../../components/CertificationProgressDialog';
 import { logger } from '../../../../utils/logger';
-import { useModelRating } from '../../../../hooks/useModelRating';
-import { ModelBadge } from '../../../../components/ModelRating';
+import { ModelBadgeGroup } from '../../../../components/ModelBadges';
 
 // Regiões AWS atualizadas conforme padrão Amazon
 const REGION_GROUPS = [
@@ -82,8 +82,6 @@ const ModelCheckboxItem = memo(({
   isSelected,
   onToggle,
   disabled,
-  isCertified,
-  hasQualityWarning,
   isUnavailable,
   onShowInfo
 }: {
@@ -91,17 +89,10 @@ const ModelCheckboxItem = memo(({
   isSelected: boolean;
   onToggle: (id: string) => void;
   disabled: boolean;
-  isCertified: boolean;
-  hasQualityWarning: boolean;
   isUnavailable: boolean;
   onShowInfo: (model: EnrichedAWSModel) => void;
 }) => {
   const hasCostInfo = model.costPer1kInput > 0 || model.costPer1kOutput > 0;
-  
-  // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
-  const { getModelById } = useModelRating();
-  const modelWithRating = getModelById(model.apiModelId);
-  const hasBadge = !!modelWithRating?.badge;
   
   return (
     <FormControlLabel
@@ -124,46 +115,13 @@ const ModelCheckboxItem = memo(({
           <Box sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2">{model.name}</Typography>
-              {modelWithRating?.badge && (
-                <ModelBadge badge={modelWithRating.badge} size="sm" showIcon />
-              )}
-              {isCertified && (
-                <Chip
-                  label="✅ Certificado"
-                  size="small"
-                  color="success"
-                  sx={{ height: 18, fontSize: '0.65rem' }}
-                />
-              )}
-              {hasQualityWarning && (
-                <Chip
-                  label="⚠️ Qualidade"
-                  size="small"
-                  color="warning"
-                  sx={{ height: 18, fontSize: '0.65rem' }}
-                />
-              )}
-              {/* ✅ CORREÇÃO: Só mostrar "Indisponível" se o modelo NÃO tiver badge de rating
-                  Modelos com badge FUNCIONAL/BOM/EXCELENTE não devem mostrar "Indisponível"
-                  mesmo que tenham status 'failed', pois o rating indica que são utilizáveis */}
-              {isUnavailable && !hasBadge && (
-                <Chip
-                  label="❌ Indisponível"
-                  size="small"
-                  color="error"
-                  sx={{ height: 18, fontSize: '0.65rem' }}
-                />
-              )}
-              {/* ✅ CORREÇÃO: Mostrar "Não Testado" apenas se o modelo não tem badge de rating
-                  e não tem outros badges (certificado, qualidade, indisponível) */}
-              {!hasBadge && !isCertified && !hasQualityWarning && !isUnavailable && (
-                <Chip
-                  label="Não Testado"
-                  size="small"
-                  color="default"
-                  sx={{ height: 18, fontSize: '0.65rem' }}
-                />
-              )}
+              {/* MIGRATED: Usando novo sistema centralizado de badges (ModelBadgeGroup) */}
+              {/* Ver: plans/badge-system-centralization.md - Fase 3 */}
+              <ModelBadgeGroup
+                model={{ apiModelId: model.apiModelId }}
+                size="sm"
+                spacing={0.5}
+              />
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
               {model.apiModelId}
@@ -582,7 +540,13 @@ export default function AWSProviderPanel() {
                 >
                   Alterar Credenciais
                 </Button>
-                <Chip icon={<CheckCircleIcon />} label="Credenciais Válidas" color="success" />
+                {/* MIGRATED: Fase 3 - Padronização Visual */}
+                <StatusBadge
+                  label="Credenciais Válidas"
+                  status="success"
+                  icon={<CheckCircleIcon />}
+                  size="small"
+                />
               </Box>
             ) : (
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -617,11 +581,22 @@ export default function AWSProviderPanel() {
                     Cancelar
                   </Button>
                 )}
+                {/* MIGRATED: Fase 3 - Padronização Visual */}
                 {validationStatus === 'valid' && (
-                  <Chip icon={<CheckCircleIcon />} label="Válido" color="success" />
+                  <StatusBadge
+                    label="Válido"
+                    status="success"
+                    icon={<CheckCircleIcon />}
+                    size="small"
+                  />
                 )}
                 {validationStatus === 'invalid' && (
-                  <Chip icon={<ErrorIcon />} label="Inválido" color="error" />
+                  <StatusBadge
+                    label="Inválido"
+                    status="error"
+                    icon={<ErrorIcon />}
+                    size="small"
+                  />
                 )}
               </Box>
             )}
@@ -655,20 +630,24 @@ export default function AWSProviderPanel() {
 
           {availableModels.length > 0 && (
             <>
+              {/* MIGRATED: Fase 3 - Padronização Visual */}
               <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Chip
-                  label={`${availableModels.length} modelos disponíveis`}
+                <CounterBadge
+                  count={availableModels.length}
+                  label="modelos disponíveis"
                   color="primary"
                   size="small"
                 />
-                <Chip
-                  label={`${selectedModels.length} selecionados`}
-                  color="success"
+                <CounterBadge
+                  count={selectedModels.length}
+                  label="selecionados"
+                  color="primary"
                   size="small"
                 />
-                <Chip
-                  label={`${groupedModels.length} provedores`}
-                  color="info"
+                <CounterBadge
+                  count={groupedModels.length}
+                  label="provedores"
+                  color="primary"
                   size="small"
                 />
               </Box>
@@ -706,16 +685,18 @@ export default function AWSProviderPanel() {
                         <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                           {providerName}
                         </Typography>
-                        <Chip
-                          label={`${models.length} modelos`}
+                        {/* MIGRATED: Fase 3 - Padronização Visual */}
+                        <CounterBadge
+                          count={models.length}
+                          label="modelos"
                           size="small"
-                          color="default"
                         />
                         {selectedInGroup > 0 && (
-                          <Chip
-                            label={`${selectedInGroup} selecionados`}
+                          <CounterBadge
+                            count={selectedInGroup}
+                            label="selecionados"
+                            color="primary"
                             size="small"
-                            color="success"
                           />
                         )}
                       </Box>
@@ -729,8 +710,6 @@ export default function AWSProviderPanel() {
                             isSelected={selectedModels.includes(model.apiModelId)}
                             onToggle={toggleModel}
                             disabled={!canSelectModels}
-                            isCertified={certifiedModels.includes(model.apiModelId)}
-                            hasQualityWarning={qualityWarningModels.includes(model.apiModelId)}
                             isUnavailable={unavailableModels.includes(model.apiModelId)}
                             onShowInfo={handleShowModelInfo}
                           />

@@ -92,10 +92,14 @@
   border: 1px solid;
   font-weight: 600;
   font-size: 0.75rem;
+  line-height: 1;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   transition: all 0.2s ease;
   cursor: default;
+  vertical-align: middle;
+  box-sizing: border-box;
+  min-height: 20px;
 }
 
 .model-badge:hover {
@@ -105,9 +109,12 @@
 
 /* Tamanhos */
 .model-badge--sm {
+  height: 20px;           /* ← Força altura exata igual ao MUI Chip */
+  min-height: 20px;       /* ← Garante altura mínima */
   padding: 2px 8px;
   font-size: 0.625rem;
   gap: 2px;
+  box-sizing: border-box; /* ← Garante que padding não adicione à altura */
 }
 
 .model-badge--md {
@@ -129,6 +136,7 @@
 
 .model-badge__text {
   line-height: 1;
+  text-transform: uppercase;
 }
 
 /* Cores específicas por badge (aplicadas via inline styles + classes para hover) */

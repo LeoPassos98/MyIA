@@ -1,13 +1,14 @@
 // frontend/src/features/chat/components/ControlPanel/ManualContextTab.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// MIGRATED: Fase 3 - Padronização Visual
 
 import {
   Box, Typography, FormControlLabel, Switch, Divider,
   List, ListItemButton, ListItemIcon, Checkbox, ListItemText,
-  Alert, Chip, Button, Tooltip
+  Alert, Button, Tooltip
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { CounterBadge, StatusBadge } from '@/components/Badges';
 import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useControlPanelLogic } from './useControlPanelLogic';
@@ -75,12 +76,10 @@ export const ManualContextTab = () => {
           />
         </Box>
         <Tooltip title={selectedCount > 0 ? `${selectedCount} mensagens serão enviadas para a IA` : 'Nenhuma mensagem selecionada'}>
-          <Chip
-            icon={selectedCount > 0 ? <CheckCircleIcon /> : undefined}
-            label={`${selectedCount} selecionadas`}
-            size="small"
-            color={selectedCount > 0 ? 'warning' : 'default'}
-            variant="outlined"
+          <CounterBadge
+            count={selectedCount}
+            label="selecionadas"
+            color={selectedCount > 0 ? 'secondary' : 'default'}
           />
         </Tooltip>
       </Box>
@@ -159,10 +158,9 @@ export const ManualContextTab = () => {
                   <ListItemText
                     primary={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Chip 
-                          label={msg.role === 'user' ? '👤' : '🤖'} 
-                          size="small" 
-                          sx={{ height: 20, fontSize: '0.7rem' }}
+                        <StatusBadge
+                          label={msg.role === 'user' ? '👤' : '🤖'}
+                          status="default"
                         />
                         <Typography variant="body2" noWrap sx={{ fontWeight: isSelected ? 600 : 400, flex: 1 }}>
                           {msg.content.substring(0, 50)}...

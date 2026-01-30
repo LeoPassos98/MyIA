@@ -8,7 +8,6 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Button,
-  Chip,
   CircularProgress,
   Alert,
   AlertTitle,
@@ -27,8 +26,10 @@ import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { StatusBadge } from '@/components/Badges';
 import { SettingsSection } from './SettingsSection';
-import { ModelRatingStars, ModelBadge } from '../../../components/ModelRating';
+import { ModelRatingStars } from '../../../components/ModelRating';
+import { ModelBadgeGroup } from '../../../components/ModelBadges';
 import { useModelRating } from '../../../hooks/useModelRating';
 import { certificationService } from '../../../services/certificationService';
 import { aiProvidersService } from '../../../services/aiProvidersService';
@@ -381,7 +382,6 @@ export default function ModelsManagementTab() {
                 const isCertified = certifiedModels.includes(model.apiModelId);
                 const isCurrentlyCertifying = isCertifying === model.apiModelId;
                 const isSelected = selectedModels.includes(model.apiModelId);
-                const modelWithRating = getModelById(model.apiModelId);
                 
                 logger.debug(`[ModelsManagementTab] 🎨 Renderizando badge para ${model.apiModelId}:`, {
                   isCertified,
@@ -409,45 +409,54 @@ export default function ModelsManagementTab() {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Chip
+                      {/* MIGRATED: Fase 3 - Padronização Visual */}
+                      <StatusBadge
                         label={model.providerName}
+                        status="default"
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.7rem' }}
                       />
                     </TableCell>
                     <TableCell align="center">
+                      {/* MIGRATED: Fase 3 - Padronização Visual */}
                       {isCertified ? (
-                        <Chip
-                          icon={<CheckCircleIcon />}
+                        <StatusBadge
                           label="Certificado"
-                          color="success"
+                          status="success"
+                          icon={<CheckCircleIcon />}
                           size="small"
                         />
                       ) : (
-                        <Chip
-                          icon={<HelpOutlineIcon />}
+                        <StatusBadge
                           label="Não Testado"
-                          color="default"
+                          status="default"
+                          icon={<HelpOutlineIcon />}
                           size="small"
                         />
                       )}
                     </TableCell>
                     <TableCell align="center">
-                      {modelWithRating?.rating ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
-                          <ModelRatingStars
-                            rating={modelWithRating.rating}
-                            size="sm"
-                            showValue={false}
-                          />
-                          {modelWithRating.badge && (
-                            <ModelBadge badge={modelWithRating.badge} size="sm" showIcon={false} />
-                          )}
-                        </Box>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">N/A</Typography>
-                      )}
+                      {/* MIGRATED: Usando novo sistema centralizado de badges (ModelBadgeGroup) */}
+                      {/* Ver: plans/badge-system-centralization.md - Fase 3 */}
+                      {(() => {
+                        const modelWithRating = getModelById(model.apiModelId);
+                        return modelWithRating?.rating ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <ModelRatingStars
+                              rating={modelWithRating.rating}
+                              size="sm"
+                              showValue={false}
+                            />
+                            <ModelBadgeGroup
+                              model={{ apiModelId: model.apiModelId }}
+                              size="sm"
+                              spacing={0.5}
+                            />
+                          </Box>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">N/A</Typography>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell align="center">
                       <Typography variant="body2">

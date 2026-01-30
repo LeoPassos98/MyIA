@@ -8,11 +8,12 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
+import { InferenceType } from '../types';
 import { ModelRegistry } from '../registry/model-registry';
 import logger from '../../../utils/logger';
 
 /**
- * Adapter for Amazon Titan and Nova models
+ * Adapter for Amazon Titan and Nova models (Legacy - ON_DEMAND)
  *
  * Supports Amazon models on AWS Bedrock:
  * - Amazon Titan (amazon.titan-*) - Uses inputText + textGenerationConfig
@@ -21,9 +22,12 @@ import logger from '../../../utils/logger';
  * IMPORTANT: Different Amazon model families use different formats:
  * - Titan: 'inputText' with formatted conversation + 'textGenerationConfig'
  * - Nova: 'messages' array + 'inferenceConfig' (Converse API format)
+ *
+ * @deprecated Use AmazonOnDemandAdapter or AmazonProfileAdapter instead
  */
 export class AmazonAdapter extends BaseModelAdapter {
   readonly vendor = 'amazon';
+  readonly inferenceType: InferenceType = 'ON_DEMAND';
   
   readonly supportedModels = [
     // Titan models

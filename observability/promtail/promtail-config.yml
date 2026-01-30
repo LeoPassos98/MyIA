@@ -48,12 +48,11 @@ scrape_configs:
           format: RFC3339
 
       # Add labels from parsed fields
+      # IMPORTANTE: Não usar campos com alta cardinalidade como labels (ex: requestId)
+      # Isso cria muitos streams e excede o limite do Loki
       - labels:
           level:
           service:
-          requestId:
-          method:
-          statusCode:
 
       # Add static labels
       - static_labels:
@@ -92,7 +91,6 @@ scrape_configs:
       - labels:
           level:
           service:
-          requestId:
 
       - static_labels:
           app: myia
@@ -167,7 +165,6 @@ scrape_configs:
       - labels:
           method:
           statusCode:
-          requestId:
 
       - static_labels:
           app: myia

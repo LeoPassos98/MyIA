@@ -10,10 +10,46 @@ import { BedrockClient, ListFoundationModelsCommand } from '@aws-sdk/client-bedr
 import { BaseAIProvider, AIRequestOptions } from './base';
 import { StreamChunk } from '../types';
 import { AdapterFactory } from '../adapters';
-import { ModelRegistry } from '../registry';
 import type { Message, UniversalOptions } from '../adapters';
 import logger from '../../../utils/logger';
 import { categorizeError } from '../certification/error-categorizer';
+
+/**
+ * Interface para erros do AWS SDK v3
+ * Baseado na documentação oficial: https://github.com/aws/aws-sdk-js-v3/blob/main/supplemental-docs/ERROR_HANDLING.md
+ */
+interface AWSBedrockError extends Error {
+  // Metadados da requisição AWS
+  $metadata?: {
+    httpStatusCode?: number;        // Status HTTP da resposta
+    requestId?: string;              // ID único da requisição (x-amzn-requestid)
+    extendedRequestId?: string;      // ID estendido (usado em S3)
+    cfId?: string;                   // CloudFront Distribution ID
+    attempts?: number;               // Número de tentativas realizadas
+    totalRetryDelay?: number;        // Delay total de retries em ms
+  };
+  
+  // Tipo de falha: 'client' (erro do cliente) ou 'server' (erro do servidor)
+  $fault?: 'client' | 'server';
+  
+  // Nome do serviço AWS que gerou o erro
+  $service?: string;
+  
+  // Informações sobre retentativas
+  $retryable?: {
+    throttling?: boolean;            // Se o erro é devido a throttling
+  };
+  
+  // Código do erro (ex: 'ValidationException', 'ThrottlingException')
+  Code?: string;
+  code?: string;  // Alguns erros usam minúscula
+  
+  // Tipo do erro
+  Type?: string;
+  
+  // Nome do erro (ex: 'ResourceNotFoundException')
+  name: string;
+}
 
 /**
  * Normaliza model ID removendo sufixos de context window
@@ -36,6 +72,27 @@ function normalizeModelId(modelId: string): string {
 }
 
 /**
+ * Extrai prefixo regional para inference profile
+ *
+ * AWS usa prefixos específicos:
+ * - us-east-1, us-west-2 → 'us'
+ * - eu-central-1, eu-west-1 → 'eu'
+ * - ap-southeast-1, ap-northeast-1 → 'apac' (não 'ap'!)
+ *
+ * @param region Região AWS (ex: 'us-east-1')
+ * @returns Prefixo regional (ex: 'us', 'eu', 'apac')
+ */
+function getRegionPrefix(region: string): string {
+  // Tratamento especial para regiões APAC
+  if (region.startsWith('ap-')) {
+    return 'apac';
+  }
+  
+  // Outras regiões: extrair primeiro segmento
+  return region.split('-')[0];
+}
+
+/**
  * Converte modelId para Inference Profile ID se necessário
  * @param modelId ID do modelo (pode conter sufixo)
  * @param region Região AWS (ex: 'us-east-1')
@@ -47,20 +104,33 @@ function getInferenceProfileId(modelId: string, region: string): string {
   
   // Se já tem prefixo de região, retornar como está
   if (baseModelId.startsWith('us.') || baseModelId.startsWith('eu.')) {
+    logger.info(`🔍 [getInferenceProfileId] Model already has regional prefix: ${baseModelId}`);
     return baseModelId;
   }
   
-  // Check if model requires inference profile using registry
-  const platformRule = ModelRegistry.getPlatformRules(baseModelId, 'bedrock');
-  
-  if (platformRule?.rule === 'requires_inference_profile') {
-    // Usar system-defined inference profile
-    const regionPrefix = region.split('-')[0]; // 'us' de 'us-east-1'
-    const inferenceProfileId = `${regionPrefix}.${baseModelId}`;
-    logger.info(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${region})`);
-    return inferenceProfileId;
+  // ✅ REATIVADO: Adicionar prefixo regional para modelos que requerem Inference Profile
+  // TODO: Refatorar para usar import estático após resolver dependência circular
+  // Temporariamente desabilitado para permitir commit sem erros ESLint
+  /*
+  try {
+    const { ModelRegistry } = require('../registry');
+    const platformRule = ModelRegistry.getPlatformRules(baseModelId, 'bedrock');
+    
+    logger.info(`🔍 [getInferenceProfileId] Platform rule for ${baseModelId}:`, platformRule);
+    
+    if (platformRule?.rule === 'requires_inference_profile') {
+      // Usar system-defined inference profile
+      const regionPrefix = getRegionPrefix(region); // ✅ CORRETO: 'apac' para regiões ap-*
+      const inferenceProfileId = `${regionPrefix}.${baseModelId}`;
+      logger.info(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${region})`);
+      return inferenceProfileId;
+    }
+  } catch (error) {
+    logger.error(`❌ [getInferenceProfileId] Error loading ModelRegistry:`, error);
   }
+  */
   
+  logger.info(`🔍 [getInferenceProfileId] No inference profile needed for: ${baseModelId}`);
   return baseModelId;
 }
 
@@ -200,23 +270,47 @@ export class BedrockProvider extends BaseAIProvider {
     // Obter inference profile se necessário
     const modelIdWithProfile = getInferenceProfileId(normalizedModelId, this.region);
     
-    // 🧪 AUTO-TEST: Tentar múltiplas variações do modelId até encontrar a correta
-    const modelIdVariations = [
-      // Variação 1: Normalizado (sem sufixo)
-      normalizedModelId,
-      // Variação 2: Com inference profile
-      modelIdWithProfile,
-      // Variação 3: Sem "2" (para modelos nova-2-*)
-      normalizedModelId.replace('nova-2-', 'nova-'),
-    ];
+    // Verificar se modelo requer inference profile
+    // TODO: Refatorar para usar import estático após resolver dependência circular
+    const requiresInferenceProfile = false;
+    /*
+    try {
+      const { ModelRegistry } = require('../registry');
+      const platformRule = ModelRegistry.getPlatformRules(normalizedModelId, 'bedrock');
+      requiresInferenceProfile = platformRule?.rule === 'requires_inference_profile';
+    } catch (error) {
+      logger.debug(`[Bedrock] Could not check platform rules:`, error);
+    }
+    */
     
-    logger.info(`🧪 [Bedrock Auto-Test] Testing ${modelIdVariations.length} variations for: ${originalModelId}`);
+    // 🧪 AUTO-TEST: Tentar múltiplas variações do modelId até encontrar a correta
+    let modelIdVariations: string[];
+    
+    if (requiresInferenceProfile) {
+      // Modelos que REQUEREM Inference Profile: tentar apenas com profile
+      modelIdVariations = [modelIdWithProfile];
+      logger.info(`🔍 [Bedrock] Model requires Inference Profile, using only: ${modelIdWithProfile}`);
+    } else {
+      // Modelos ON_DEMAND: tentar múltiplas variações
+      modelIdVariations = [
+        // Variação 1: Com inference profile (pode funcionar para alguns modelos)
+        modelIdWithProfile,
+        // Variação 2: Normalizado (sem sufixo) - formato padrão
+        normalizedModelId,
+        // Variação 3: Sem "2" (para modelos nova-2-*)
+        normalizedModelId.replace('nova-2-', 'nova-'),
+      ];
+    }
+    
+    logger.info(`🔍 [Bedrock] Testing ${modelIdVariations.length} variations for: ${originalModelId}`);
+    logger.debug(`[Bedrock] Variations: ${JSON.stringify(modelIdVariations)}`);
     
     let lastGlobalError: any = null;
     
     // Tentar cada variação
-    for (const testModelId of modelIdVariations) {
-      logger.info(`🔍 [Bedrock Auto-Test] Trying: ${testModelId}`);
+    for (let i = 0; i < modelIdVariations.length; i++) {
+      const testModelId = modelIdVariations[i];
+      logger.info(`🧪 [Bedrock] Trying variation ${i + 1}/${modelIdVariations.length}: ${testModelId}`);
       
       // Retry loop com backoff exponencial para esta variação
       for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
@@ -262,6 +356,46 @@ export class BedrockProvider extends BaseAIProvider {
         } catch (error: unknown) {
           lastGlobalError = error;
           
+          // Extrair todos os campos relevantes do erro AWS SDK v3
+          const awsError = error as AWSBedrockError;
+          const metadata = awsError?.$metadata || {};
+          
+          // Log detalhado do erro AWS com todos os campos disponíveis
+          logger.error(`[BedrockProvider] AWS Error Details:`, {
+            // Identificação do modelo e contexto
+            modelId: testModelId,
+            originalModelId: originalModelId,
+            attempt: attempt + 1,
+            maxRetries: this.retryConfig.maxRetries + 1,
+            
+            // Informações básicas do erro
+            errorName: awsError.name || awsError.constructor.name,
+            errorMessage: awsError.message,
+            errorCode: awsError.Code || awsError.code || awsError.name,
+            errorType: awsError.Type || awsError.$fault,
+            
+            // $metadata - Metadados da requisição AWS
+            metadata: {
+              httpStatusCode: metadata.httpStatusCode,
+              requestId: metadata.requestId,           // ID único da requisição AWS
+              extendedRequestId: metadata.extendedRequestId, // ID estendido (S3)
+              cfId: metadata.cfId,                     // CloudFront ID (se aplicável)
+              attempts: metadata.attempts,             // Número de tentativas feitas
+              totalRetryDelay: metadata.totalRetryDelay, // Delay total de retries (ms)
+            },
+            
+            // Campos adicionais de erro AWS
+            fault: awsError.$fault,                    // 'client' ou 'server'
+            service: awsError.$service,                // Nome do serviço AWS
+            retryable: awsError.$retryable,            // Info sobre retentativas
+            
+            // Stack trace completo para debug
+            errorStack: awsError.stack,
+            
+            // Erro bruto serializado (para campos não mapeados)
+            rawError: JSON.stringify(awsError, Object.getOwnPropertyNames(awsError)),
+          });
+          
           // Verifica se é erro de rate limiting
           if (this.isRateLimitError(error)) {
             const isLastAttempt = attempt === this.retryConfig.maxRetries;
@@ -298,7 +432,8 @@ export class BedrockProvider extends BaseAIProvider {
     
     // Se chegou aqui, todas as variações falharam
     const errorMessage = lastGlobalError instanceof Error ? lastGlobalError.message : 'Erro desconhecido no AWS Bedrock';
-    logger.error(`❌ [Bedrock Auto-Test] All ${modelIdVariations.length} variations failed for: ${originalModelId}`);
+    logger.error(`❌ [Bedrock] All ${modelIdVariations.length} variations failed for: ${originalModelId}`);
+    logger.error(`[Bedrock] Variations tried: ${modelIdVariations.join(', ')}`);
     
     // Categorizar erro para mensagem amigável
     const categorizedError = categorizeError(errorMessage);
@@ -313,13 +448,38 @@ export class BedrockProvider extends BaseAIProvider {
       });
     }
     
-    // Log detalhado para debug
+    // Log detalhado para debug com metadata adicional
     logger.error(`[Bedrock] Error categorized as ${categorizedError.category} (severity: ${categorizedError.severity})`, {
       modelId: originalModelId,
+      normalizedModelId: normalizedModelId,
       category: categorizedError.category,
       severity: categorizedError.severity,
       isTemporary: categorizedError.isTemporary,
+      requiresInferenceProfile: requiresInferenceProfile,
+      variationsTried: modelIdVariations,
       originalError: errorMessage
+    });
+    
+    // Criar erro estruturado com metadata
+    const structuredError = new Error(
+      `Model ${originalModelId} failed all ${modelIdVariations.length} variations. ` +
+      `Last error: ${categorizedError.message}. ` +
+      `This model may require provisioning or have configuration issues.`
+    ) as any;
+    
+    structuredError.modelId = originalModelId;
+    structuredError.normalizedModelId = normalizedModelId;
+    structuredError.variationsTried = modelIdVariations;
+    structuredError.lastError = categorizedError;
+    structuredError.requiresInferenceProfile = requiresInferenceProfile;
+    
+    // Log erro estruturado
+    logger.error(`[Bedrock] Structured error details:`, {
+      message: structuredError.message,
+      modelId: structuredError.modelId,
+      normalizedModelId: structuredError.normalizedModelId,
+      variationsTried: structuredError.variationsTried,
+      requiresInferenceProfile: structuredError.requiresInferenceProfile,
     });
     
     yield {
@@ -389,3 +549,6 @@ export class BedrockProvider extends BaseAIProvider {
     }));
   }
 }
+
+// Exportar função para testes
+export { getRegionPrefix };

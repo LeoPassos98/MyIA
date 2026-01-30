@@ -3,7 +3,7 @@
 
 import {
   Box, Typography, Switch, FormControlLabel, Slider, TextField,
-  Divider, Chip, Tooltip, IconButton, Alert
+  Divider, Tooltip, IconButton, Alert
 } from '@mui/material';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import PushPinIcon from '@mui/icons-material/PushPin';
@@ -12,6 +12,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import TokenIcon from '@mui/icons-material/Token';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import WarningIcon from '@mui/icons-material/Warning';
+import { CounterBadge, MetricBadge, StatusBadge } from '@/components/Badges';
 import { PanelSection } from './PanelSection';
 import { HelpTooltip } from './HelpTooltip';
 import { useLayout } from '../../../../contexts/LayoutContext';
@@ -144,11 +145,12 @@ export const ContextConfigTab = () => {
               description="Mensagens que você fixou com o ícone 📌 no chat. São SEMPRE enviadas para a IA com prioridade máxima, independente do limite de tokens."
               examples={['Fixar instruções importantes', 'Manter contexto de projeto', 'Preservar decisões tomadas']}
             />
-            <Chip 
-              label={`${pinnedCount} pinned`} 
-              size="small" 
-              color={pinnedCount > 0 && !isManualMode ? 'warning' : 'default'}
-              variant="outlined"
+            {/* MIGRATED: Fase 3 - Padronização Visual */}
+            <CounterBadge
+              count={pinnedCount}
+              label="pinned"
+              size="small"
+              color={pinnedCount > 0 && !isManualMode ? 'primary' : 'default'}
             />
           </Box>
           <Switch
@@ -184,11 +186,12 @@ export const ContextConfigTab = () => {
               description="As últimas N mensagens da conversa são sempre incluídas. Isso mantém o contexto imediato da conversa para a IA entender o fluxo."
               examples={['5 msgs: Conversação curta', '10 msgs: Contexto médio', '25 msgs: Conversa longa']}
             />
-            <Chip 
-              label={`${Math.min(contextConfig.recentCount, totalMessages)}/${totalMessages}`} 
-              size="small" 
-              color={isManualMode ? 'default' : 'success'}
-              variant="outlined"
+            {/* MIGRATED: Fase 3 - Padronização Visual */}
+            <CounterBadge
+              count={Math.min(contextConfig.recentCount, totalMessages)}
+              label={`/ ${totalMessages}`}
+              size="small"
+              color={isManualMode ? 'default' : 'primary'}
             />
           </Box>
           <Switch
@@ -299,11 +302,12 @@ export const ContextConfigTab = () => {
             description="Tokens são pedaços de palavras (~4 caracteres). Este limite define quanto do histórico pode ser enviado. Mensagens fixadas TÊM prioridade e podem exceder este limite."
             examples={['2K: Contexto curto, respostas rápidas', '4K: Equilíbrio (recomendado Groq)', '8K: Contexto extenso, mais lento']}
           />
-          <Chip 
-            label={`${contextConfig.maxContextTokens.toLocaleString()} max`} 
-            size="small" 
-            color="error"
-            variant="outlined"
+          {/* MIGRATED: Fase 3 - Padronização Visual */}
+          <MetricBadge
+            label="Max"
+            value={contextConfig.maxContextTokens.toLocaleString()}
+            size="small"
+            color="secondary"
           />
         </Box>
         
@@ -385,20 +389,21 @@ export const ContextConfigTab = () => {
             />
           )}
         </Box>
+        {/* MIGRATED: Fase 3 - Padronização Visual */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
           {isManualMode ? (
-            <Chip label="Seleção Manual" size="small" color="warning" variant="filled" />
+            <StatusBadge label="Seleção Manual" status="warning" size="small" />
           ) : (
             <>
-              <Chip label="1. System" size="small" color="info" variant="filled" />
+              <StatusBadge label="1. System" status="info" size="small" />
               {contextConfig.pinnedEnabled && (
-                <Chip label={`2. Pinned (${pinnedCount})`} size="small" color="warning" variant="filled" />
+                <StatusBadge label={`2. Pinned (${pinnedCount})`} status="warning" size="small" />
               )}
               {contextConfig.recentEnabled && (
-                <Chip label={`3. Recentes (${contextConfig.recentCount})`} size="small" color="success" variant="filled" />
+                <StatusBadge label={`3. Recentes (${contextConfig.recentCount})`} status="success" size="small" />
               )}
               {contextConfig.ragEnabled && (
-                <Chip label={`4. RAG (top ${contextConfig.ragTopK})`} size="small" color="secondary" variant="filled" />
+                <StatusBadge label={`4. RAG (top ${contextConfig.ragTopK})`} status="info" size="small" />
               )}
             </>
           )}

@@ -1,25 +1,37 @@
 // frontend/src/utils/rating-helpers.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
+import { Theme } from '@mui/material/styles';
 import { ModelBadge, ModelWithRating, ModelFilters } from '../types/model-rating';
+import React from 'react';
+
+// Ícones MUI para badges
+import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import CancelIcon from '@mui/icons-material/Cancel';
 
 /**
- * Retorna a cor associada a cada badge
+ * Retorna a cor associada a cada badge usando tokens do theme
+ * @param badge - Tipo do badge
+ * @param theme - Tema do Material-UI
  */
-export function getBadgeColor(badge: ModelBadge): string {
+export function getBadgeColor(badge: ModelBadge, theme: Theme): string {
   const colors: Record<ModelBadge, string> = {
-    PREMIUM: '#FFD700',           // Dourado
-    RECOMENDADO: '#10B981',       // Verde
-    FUNCIONAL: '#F59E0B',         // Amarelo
-    LIMITADO: '#F97316',          // Laranja
-    NAO_RECOMENDADO: '#EF4444',   // Vermelho
-    INDISPONIVEL: '#6B7280'       // Cinza
+    PREMIUM: theme.palette.badges.premium,
+    RECOMENDADO: theme.palette.badges.recommended,
+    FUNCIONAL: theme.palette.badges.functional,
+    LIMITADO: theme.palette.badges.limited,
+    NAO_RECOMENDADO: theme.palette.badges.notRecommended,
+    INDISPONIVEL: theme.palette.badges.unavailable
   };
-  return colors[badge] || colors.INDISPONIVEL;
+  return colors[badge] || theme.palette.badges.unavailable;
 }
 
 /**
  * Retorna o emoji associado a cada badge
+ * @deprecated Use getBadgeIcon() para ícones MUI ao invés de emojis
  */
 export function getBadgeEmoji(badge: ModelBadge): string {
   const emojis: Record<ModelBadge, string> = {
@@ -31,6 +43,22 @@ export function getBadgeEmoji(badge: ModelBadge): string {
     INDISPONIVEL: '❌'
   };
   return emojis[badge] || '❓';
+}
+
+/**
+ * Retorna o ícone MUI associado a cada badge
+ * Ícones se adaptam automaticamente à cor do badge
+ */
+export function getBadgeIcon(badge: ModelBadge): React.ComponentType<any> {
+  const icons: Record<ModelBadge, React.ComponentType<any>> = {
+    PREMIUM: WorkspacePremiumIcon,        // 🏆 → WorkspacePremiumIcon
+    RECOMENDADO: CheckCircleIcon,         // ✅ → CheckCircleIcon
+    FUNCIONAL: WarningIcon,               // ⚠️ → WarningIcon
+    LIMITADO: WarningIcon,                // 🔶 → WarningIcon
+    NAO_RECOMENDADO: ErrorIcon,           // ⚠️ → ErrorIcon
+    INDISPONIVEL: CancelIcon              // ❌ → CancelIcon
+  };
+  return icons[badge] || ErrorIcon;
 }
 
 /**

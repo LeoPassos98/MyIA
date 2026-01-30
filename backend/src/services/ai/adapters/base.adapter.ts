@@ -1,6 +1,8 @@
 // backend/src/services/ai/adapters/base.adapter.ts
 // Standards: docs/STANDARDS.md
 
+import { InferenceType } from '../types';
+
 /**
  * Universal message format (provider-agnostic)
  */
@@ -53,6 +55,12 @@ export abstract class BaseModelAdapter {
   abstract readonly vendor: string;
 
   /**
+   * Inference Type (e.g., 'ON_DEMAND', 'INFERENCE_PROFILE')
+   * Identifica o tipo de invocação do modelo
+   */
+  abstract readonly inferenceType: InferenceType;
+
+  /**
    * Supported model IDs for this adapter
    * Supports wildcards (e.g., 'cohere.command-*')
    */
@@ -98,6 +106,6 @@ export abstract class BaseModelAdapter {
    * Get display name for this adapter
    */
   get displayName(): string {
-    return `${this.vendor.charAt(0).toUpperCase() + this.vendor.slice(1)} Adapter`;
+    return `${this.vendor.charAt(0).toUpperCase() + this.vendor.slice(1)} ${this.inferenceType} Adapter`;
   }
 }

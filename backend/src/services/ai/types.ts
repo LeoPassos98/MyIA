@@ -26,6 +26,29 @@ export interface TestResult {
   responseTime?: number;
 }
 
+/**
+ * Inference Type - Método de acesso que um modelo suporta
+ * 
+ * - ON_DEMAND: Acesso direto ao modelo (ex: Claude 3.x, Titan)
+ * - INFERENCE_PROFILE: Acesso via perfil regional (ex: Claude 4.x, Nova)
+ * - PROVISIONED: Throughput provisionado (futuro)
+ * - CROSS_REGION: Cross-region inference (futuro)
+ */
+export type InferenceType = 
+  | 'ON_DEMAND'
+  | 'INFERENCE_PROFILE'
+  | 'PROVISIONED'
+  | 'CROSS_REGION';
+
+/**
+ * Configuração de Inference Type para um modelo
+ */
+export interface InferenceTypeConfig {
+  type: InferenceType;
+  preferredRegions?: string[];  // Para INFERENCE_PROFILE
+  throughput?: number;          // Para PROVISIONED
+}
+
 // O "pacote" final de telemetria
 export interface TelemetryMetrics {
   tokensIn: number;

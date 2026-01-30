@@ -33,6 +33,14 @@ declare module '@mui/material/styles' {
       infoSubtle: string;
       whiteSubtle: string;
     };
+    badges: {
+      premium: string;
+      recommended: string;
+      functional: string;
+      limited: string;
+      notRecommended: string;
+      unavailable: string;
+    };
   }
   interface PaletteOptions {
     custom?: {
@@ -59,6 +67,14 @@ declare module '@mui/material/styles' {
       warningSubtle?: string;
       infoSubtle?: string;
       whiteSubtle?: string;
+    };
+    badges?: {
+      premium?: string;
+      recommended?: string;
+      functional?: string;
+      limited?: string;
+      notRecommended?: string;
+      unavailable?: string;
     };
   }
 
@@ -144,6 +160,14 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
         infoSubtle: mode === 'dark' ? 'rgba(33, 150, 243, 0.3)' : 'rgba(33, 150, 243, 0.4)',
         whiteSubtle: mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
       },
+      badges: {
+        premium: '#FFD700',           // Dourado
+        recommended: '#10B981',       // Verde
+        functional: '#F59E0B',        // Amarelo
+        limited: '#F97316',           // Laranja
+        notRecommended: '#EF4444',    // Vermelho
+        unavailable: '#6B7280',       // Cinza
+      },
     },
     
     // --- TIPOGRAFIA REFINADA (RECOMENDAÇÃO PRO) ---
@@ -218,6 +242,123 @@ const getDesignTokens = (mode: 'light' | 'dark') => {
             borderRadius: '8px', // Botões levemente arredondados combinam com Montserrat
           },
         },
+      },
+      // ========================================
+      // MUI CHIP - PADRONIZAÇÃO COM MODELBADGE
+      // ========================================
+      // Objetivo: Garantir que MUI Chips (usados para status como "✅ Certificado")
+      // tenham a mesma aparência visual que ModelBadge (usado para ratings)
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            // ========================================
+            // CUSTOMIZAÇÕES VISUAIS (mantidas)
+            // ========================================
+            borderRadius: '12px',
+            fontWeight: 600,
+            letterSpacing: '0.5px',
+            transition: 'all 0.2s ease',
+            border: '1px solid',
+            textTransform: 'uppercase' as const,
+            '&:hover': {
+              transform: 'translateY(-1px)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+            },
+          },
+          // ========================================
+          // TAMANHOS PADRONIZADOS COM MODELBADGE
+          // ========================================
+          sizeSmall: {
+            height: '20px !important' as any,           // ← Igual ao ModelBadge --sm
+            minHeight: '20px !important' as any,
+            padding: '2px 8px !important' as any,       // ← Igual ao ModelBadge --sm
+            fontSize: '0.625rem !important' as any,     // ← Igual ao ModelBadge --sm
+            boxSizing: 'border-box' as const,
+            '& .MuiChip-label': {
+              padding: '0 !important' as any,           // Remove padding extra do label
+              lineHeight: '1 !important' as any,
+            },
+            '& .MuiChip-icon': {
+              fontSize: '14px !important' as any,       // Ícone proporcional
+              marginLeft: '0 !important' as any,
+              marginRight: '2px !important' as any,
+            },
+          },
+          sizeMedium: {
+            height: '24px !important' as any,           // ← Igual ao ModelBadge --md
+            minHeight: '24px !important' as any,
+            padding: '4px 12px !important' as any,      // ← Igual ao ModelBadge --md
+            fontSize: '0.75rem !important' as any,      // ← Igual ao ModelBadge --md
+            boxSizing: 'border-box' as const,
+            '& .MuiChip-label': {
+              padding: '0 !important' as any,           // Remove padding extra do label
+              lineHeight: '1 !important' as any,
+            },
+            '& .MuiChip-icon': {
+              fontSize: '16px !important' as any,       // Ícone proporcional
+              marginLeft: '0 !important' as any,
+              marginRight: '4px !important' as any,
+            },
+          },
+          // ========================================
+          // REMOVIDOS: display, alignItems, justifyContent, lineHeight
+          // MOTIVO: Conflitam com o layout padrão do MUI que já funciona perfeitamente
+          // O MUI Chip já tem alinhamento vertical correto por padrão
+          // ========================================
+          // Cores específicas para cada variante
+          colorSuccess: {
+            backgroundColor: mode === 'dark'
+              ? 'rgba(16, 185, 129, 0.15)'
+              : 'rgba(16, 185, 129, 0.15)',
+            borderColor: '#10B981',
+            color: '#10B981',
+          },
+          colorWarning: {
+            backgroundColor: mode === 'dark'
+              ? 'rgba(245, 158, 11, 0.15)'
+              : 'rgba(245, 158, 11, 0.15)',
+            borderColor: '#F59E0B',
+            color: '#F59E0B',
+          },
+          colorError: {
+            backgroundColor: mode === 'dark'
+              ? 'rgba(239, 68, 68, 0.15)'
+              : 'rgba(239, 68, 68, 0.15)',
+            borderColor: '#EF4444',
+            color: '#EF4444',
+          },
+          colorDefault: {
+            backgroundColor: mode === 'dark'
+              ? 'rgba(107, 114, 128, 0.15)'
+              : 'rgba(107, 114, 128, 0.15)',
+            borderColor: '#6B7280',
+            color: '#6B7280',
+          },
+        },
+      },
+      // Configurações de badges (rating e MUI)
+      badge: {
+        sizes: {
+          sm: {
+            height: 18,
+            fontSize: '0.65rem',
+            padding: '2px 8px',
+            gap: 2,
+          },
+          md: {
+            height: 20,
+            fontSize: '0.7rem',
+            padding: '4px 12px',
+            gap: 4,
+          },
+          lg: {
+            height: 24,
+            fontSize: '0.875rem',
+            padding: '6px 16px',
+            gap: 6,
+          },
+        },
+        opacity: 0.15, // Opacidade para background dos badges de rating
       },
     },
   };

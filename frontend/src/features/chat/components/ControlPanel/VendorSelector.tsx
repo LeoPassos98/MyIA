@@ -1,9 +1,11 @@
 // frontend/src/features/chat/components/ControlPanel/VendorSelector.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// MIGRATED: Fase 3 - Padronização Visual
 
 import React from 'react';
-import { Box, Card, CardActionArea, Typography, Chip, Grid, Skeleton } from '@mui/material';
+import { Box, Card, CardActionArea, Typography, Grid, Skeleton } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
+import { CounterBadge } from '@/components/Badges';
 import type { VendorGroup } from '../../../../types/ai';
 
 // Import logos
@@ -176,24 +178,11 @@ export const VendorSelector = React.memo(function VendorSelector({
                     {vendor.name}
                   </Typography>
                   
-                  {/* Contador de modelos - Badge sem truncamento */}
-                  <Chip
-                    label={`${modelCount} ${modelCount === 1 ? 'modelo' : 'modelos'}`}
-                    size="small"
+                  {/* Contador de modelos */}
+                  <CounterBadge
+                    count={modelCount}
+                    label={modelCount === 1 ? 'modelo' : 'modelos'}
                     color={isSelected ? 'primary' : 'default'}
-                    variant={isSelected ? 'filled' : 'outlined'}
-                    sx={{
-                      fontSize: '0.65rem',
-                      height: 18,
-                      minWidth: 'fit-content',
-                      '& .MuiChip-label': {
-                        px: 0.75,
-                        py: 0,
-                        whiteSpace: 'nowrap',
-                        overflow: 'visible',
-                        textOverflow: 'clip'
-                      }
-                    }}
                   />
                 </CardActionArea>
               </Card>

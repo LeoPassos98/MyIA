@@ -79,6 +79,21 @@ export function categorizeError(error: Error | string): CategorizedError {
   ) {
     category = ErrorCategory.TIMEOUT;
   }
+  // CONFIGURATION_ERROR - Erro de configuração (ex: inference profile necessário)
+  else if (
+    /with on-demand throughput isn't supported.*inference profile/i.test(errorMessage) ||
+    /retry.*with.*inference profile/i.test(errorLower) ||
+    /requires.*inference profile/i.test(errorLower) ||
+    /inference profile.*required/i.test(errorLower) ||
+    /region.*not supported/i.test(errorLower) ||
+    /invalid region/i.test(errorLower) ||
+    /configuration.*invalid/i.test(errorLower) ||
+    /ValidationException/i.test(errorMessage) ||
+    /InvalidParameterException/i.test(errorMessage) ||
+    /model.*requires.*cross-region/i.test(errorLower)
+  ) {
+    category = ErrorCategory.CONFIGURATION_ERROR;
+  }
   // PROVISIONING_REQUIRED - Modelo requer provisionamento prévio
   else if (
     /on-demand throughput/i.test(errorLower) ||
@@ -90,19 +105,6 @@ export function categorizeError(error: Error | string): CategorizedError {
     /provisioning.*required/i.test(errorLower)
   ) {
     category = ErrorCategory.PROVISIONING_REQUIRED;
-  }
-  // CONFIGURATION_ERROR - Problema de configuração
-  else if (
-    /requires.*inference profile/i.test(errorLower) ||
-    /inference profile.*required/i.test(errorLower) ||
-    /region.*not supported/i.test(errorLower) ||
-    /invalid region/i.test(errorLower) ||
-    /configuration.*invalid/i.test(errorLower) ||
-    /ValidationException/i.test(errorMessage) ||
-    /InvalidParameterException/i.test(errorMessage) ||
-    /model.*requires.*cross-region/i.test(errorLower)
-  ) {
-    category = ErrorCategory.CONFIGURATION_ERROR;
   }
   // QUALITY_ISSUE - Problema de qualidade (modelo funciona mas não passa em testes)
   else if (
@@ -232,10 +234,11 @@ function getSuggestedActions(category: ErrorCategory): string[] {
       'Modelo pode estar sobrecarregado'
     ],
     [ErrorCategory.CONFIGURATION_ERROR]: [
+      'Use prefixo regional no modelId: us.{modelId} ou eu.{modelId}',
+      'Exemplo: us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+      'Documentação: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles.html',
       'Verificar se modelo requer Inference Profile',
-      'Confirmar região suportada para o modelo',
-      'Consultar registry de modelos para regras específicas',
-      'Verificar documentação AWS do modelo'
+      'Confirmar região suportada para o modelo'
     ],
     [ErrorCategory.QUALITY_ISSUE]: [
       '✅ Modelo pode ser usado normalmente',

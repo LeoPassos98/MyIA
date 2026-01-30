@@ -1,5 +1,6 @@
 // frontend/src/components/ModelInfoDrawer.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// MIGRATED: Fase 3 - Padronização Visual
 
 import { memo, useState, useEffect } from 'react';
 import {
@@ -8,23 +9,24 @@ import {
   Typography,
   IconButton,
   Divider,
-  Chip,
   Stack,
   useTheme,
   alpha,
   CircularProgress,
+  Chip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
 import SpeedIcon from '@mui/icons-material/Speed';
 import TokenIcon from '@mui/icons-material/Token';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import EventIcon from '@mui/icons-material/Event';
+import { StatusBadge } from '@/components/Badges';
 import { EnrichedAWSModel, CertificationDetails } from '../types/ai';
 import { certificationService } from '../services/certificationService';
-import { useModelRating } from '../hooks/useModelRating';
+import { ModelBadgeGroup } from './ModelBadges';
 import Alert from '@mui/material/Alert';
 
 export interface ModelInfoDrawerProps {
@@ -61,11 +63,6 @@ export const ModelInfoDrawer = memo(({
   const theme = useTheme();
   const [certDetails, setCertDetails] = useState<CertificationDetails | null>(null);
   const [loadingCertDetails, setLoadingCertDetails] = useState(false);
-
-  // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
-  const { getModelById } = useModelRating();
-  const modelWithRating = model ? getModelById(model.apiModelId) : null;
-  const hasBadge = !!modelWithRating?.badge;
 
   // Buscar detalhes da certificação quando o drawer abrir
   useEffect(() => {
@@ -142,51 +139,27 @@ export const ModelInfoDrawer = memo(({
           </Box>
 
           {/* Status Badges */}
+          {/* MIGRATED: Usando novo sistema centralizado de badges (ModelBadgeGroup) */}
+          {/* Ver: plans/badge-system-centralization.md - Fase 3 */}
           <Stack direction="row" spacing={1} sx={{ mb: 3, flexWrap: 'wrap', gap: 1 }}>
-            {isCertified && (
-              <Chip
-                icon={<CheckCircleIcon />}
-                label="✅ Certificado"
-                color="success"
-                size="small"
-                sx={{ fontWeight: 'bold' }}
-              />
-            )}
-            {hasQualityWarning && (
-              <Chip
-                icon={<WarningIcon />}
-                label="⚠️ Qualidade"
-                color="warning"
-                size="small"
-                sx={{ fontWeight: 'bold' }}
-              />
-            )}
-            {/* ✅ CORREÇÃO: Só mostrar "Indisponível" se o modelo NÃO tiver badge de rating
-                Modelos com badge FUNCIONAL/BOM/EXCELENTE não devem mostrar "Indisponível"
-                mesmo que tenham status 'failed', pois o rating indica que são utilizáveis */}
-            {isUnavailable && !hasBadge && (
-              <Chip
-                icon={<ErrorIcon />}
-                label="❌ Indisponível"
-                color="error"
-                size="small"
-                sx={{ fontWeight: 'bold' }}
-              />
-            )}
+            <ModelBadgeGroup
+              model={{ apiModelId: model.apiModelId }}
+              size="sm"
+              spacing={1}
+            />
+            {/* Manter badges que NÃO são de status */}
             {!hasDbInfo && (
-              <Chip
-                icon={<WarningIcon />}
+              <StatusBadge
                 label="Novo"
-                color="info"
-                size="small"
+                status="info"
+                icon={<WarningIcon />}
               />
             )}
             {model.responseStreamingSupported && (
-              <Chip
-                icon={<SpeedIcon />}
+              <StatusBadge
                 label="Streaming"
-                color="info"
-                size="small"
+                status="info"
+                icon={<SpeedIcon />}
               />
             )}
           </Stack>
@@ -412,19 +385,17 @@ export const ModelInfoDrawer = memo(({
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                         Status
                       </Typography>
-                      <Chip
+                      <StatusBadge
                         label={
                           certDetails.status === 'certified' ? 'Certificado' :
                           certDetails.status === 'quality_warning' ? 'Disponível com Limitações' :
                           'Indisponível'
                         }
-                        color={
+                        status={
                           certDetails.status === 'certified' ? 'success' :
                           certDetails.status === 'quality_warning' ? 'warning' :
                           'error'
                         }
-                        size="small"
-                        sx={{ mt: 0.5 }}
                       />
                     </Box>
                     
@@ -462,15 +433,13 @@ export const ModelInfoDrawer = memo(({
                         <Typography variant="caption" color="text.secondary">
                           Severidade
                         </Typography>
-                        <Chip
+                        <StatusBadge
                           label={certDetails.errorSeverity}
-                          color={
+                          status={
                             certDetails.errorSeverity === 'CRITICAL' ? 'error' :
                             certDetails.errorSeverity === 'HIGH' ? 'warning' :
                             'info'
                           }
-                          size="small"
-                          sx={{ mt: 0.5 }}
                         />
                       </Box>
                     )}

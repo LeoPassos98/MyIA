@@ -7,13 +7,18 @@
  * Badge visual que indica em qual provider um modelo está disponível.
  * Exibe ícone do provider, nome e status de configuração.
  *
+ * ✅ FASE 2 - PADRONIZAÇÃO VISUAL DE BADGES
+ * - Tamanhos de ícones padronizados: 14px (small), 16px (medium)
+ * - Uso de cores do theme.palette (via MUI color props)
+ * - Mantém funcionalidade existente 100% compatível
+ *
  * @module features/chat/components/ControlPanel/ProviderBadge
  */
 
 import { Chip, Tooltip, Box, type ChipProps } from '@mui/material';
 import { getProviderIcon } from '../../../../constants/providerIcons';
 import { CertificationBadge } from './CertificationBadge';
-import { useModelRating } from '../../../../hooks/useModelRating';
+import { useModelBadges } from '../../../../hooks/useModelBadges';
 import type { ProviderAvailability } from '../../../../types/ai';
 
 /**
@@ -63,20 +68,25 @@ export interface ProviderBadgeProps {
  * />
  * ```
  */
-export function ProviderBadge({ 
+export function ProviderBadge({
   provider,
   modelId,
   size = 'small',
-  showCertification = false 
+  showCertification = false
 }: ProviderBadgeProps) {
   
-  // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
-  const { getModelById } = useModelRating();
-  const modelWithRating = modelId ? getModelById(modelId) : null;
-  const hasBadge = !!modelWithRating?.badge;
+  // MIGRATED: Usando novo sistema centralizado de badges (useModelBadges)
+  // Ver: plans/badge-system-centralization.md - Fase 3
+  // ✅ FIX: Hook sempre chamado incondicionalmente (regra do React)
+  const badges = useModelBadges(modelId ? { apiModelId: modelId } : { apiModelId: '' });
+  const hasBadge = modelId ? !!badges?.badge : false;
+  
+  // ✅ PADRONIZAÇÃO: Tamanhos de ícones baseados no size prop
+  // small = 14px, medium = 16px (conforme especificação do plano)
+  const iconSize = size === 'small' ? 14 : 16;
   
   // ✅ CORREÇÃO: Não mostrar CertificationBadge "Indisponível" se o modelo tiver badge de rating
-  const shouldShowCertification = showCertification && provider.certification && 
+  const shouldShowCertification = showCertification && provider.certification &&
     !(provider.certification.status === 'failed' && hasBadge);
   
   /**
@@ -106,18 +116,20 @@ export function ProviderBadge({
               component="img"
               src={getProviderIcon(provider.providerSlug)}
               alt={provider.providerName}
-              sx={{ 
-                width: 16, 
-                height: 16,
+              sx={{
+                // ✅ PADRONIZAÇÃO: Tamanho de ícone dinâmico baseado no size prop
+                width: iconSize,
+                height: iconSize,
                 opacity: provider.isConfigured ? 1 : 0.5
               }}
             />
           }
           label={provider.providerName}
           size={size}
+          // ✅ PADRONIZAÇÃO: Cores via theme.palette (usando MUI color props)
           color={provider.isConfigured ? 'primary' : 'default'}
           variant={provider.isConfigured ? 'filled' : 'outlined'}
-          sx={{ 
+          sx={{
             opacity: provider.isConfigured ? 1 : 0.6,
             cursor: 'help',
             transition: 'all 0.2s ease-in-out',

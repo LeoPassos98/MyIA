@@ -8,24 +8,28 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
+import { InferenceType } from '../types';
 import { ModelRegistry } from '../registry/model-registry';
 
 /**
- * Adapter for Cohere Command models
- * 
+ * Adapter for Cohere Command models (Legacy - ON_DEMAND)
+ *
  * Supports Cohere models across different platforms:
  * - AWS Bedrock (cohere.*)
  * - Direct API (command-*)
- * 
+ *
  * IMPORTANT: Cohere uses a different message format:
  * - 'message' (singular) for the last user message
  * - 'chat_history' for previous messages
  * - 'preamble' instead of 'system'
  * - 'p' instead of 'top_p'
  * - Does NOT support 'stream' in payload (controlled by platform)
+ *
+ * @deprecated Use CohereOnDemandAdapter instead
  */
 export class CohereAdapter extends BaseModelAdapter {
   readonly vendor = 'cohere';
+  readonly inferenceType: InferenceType = 'ON_DEMAND';
   
   readonly supportedModels = [
     // AWS Bedrock format (only format currently supported)

@@ -305,27 +305,28 @@
 }
 
 /**
- * REGRA 12: Force hardware acceleration em elementos críticos
+ * REGRA 12: Force hardware acceleration APENAS em elementos que animam
+ * IMPORTANTE: Use apenas para modals, tooltips, drawers - não para elementos estáticos
  */
 
 .critical-performance {
-  transform: translateZ(0);
-  will-change: transform;
-  backface-visibility: hidden;
-  perspective: 1000px;
+  /* Removido will-change permanente - deve ser adicionado apenas durante animações */
+  /* Removido transform: translateZ(0) - causa uso excessivo de GPU */
+  /* Removido backface-visibility - pode causar artefatos visuais */
+  /* Removido perspective - desnecessário para a maioria dos casos */
 }
 
 /**
  * REGRA 13: Otimizações para scroll containers
+ * IMPORTANTE: Remover transform: translateZ(0) para evitar uso excessivo de GPU
  */
 
 .optimized-scroll {
-  /* Usar GPU para scroll */
-  transform: translateZ(0);
   /* Melhorar performance de scroll em iOS */
   -webkit-overflow-scrolling: touch;
   /* Conter layout dentro do scroll */
   contain: layout style paint;
+  /* Removido transform: translateZ(0) - causa uso excessivo de GPU */
 }
 
 /**
@@ -368,10 +369,11 @@
 
 /**
  * REGRA 17: Otimizações para modais e overlays
+ * MANTIDO: GPU acceleration para elementos que realmente animam
  */
 
 .modal-overlay {
-  /* GPU acceleration */
+  /* GPU acceleration - OK para overlays que animam */
   transform: translateZ(0);
   /* Isolar do resto da página */
   contain: strict;
@@ -380,7 +382,7 @@
 }
 
 .modal-content {
-  /* GPU acceleration */
+  /* GPU acceleration - OK para modals que animam */
   transform: translateZ(0);
   /* Transição suave */
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -388,10 +390,11 @@
 
 /**
  * REGRA 18: Otimizações para tooltips
+ * MANTIDO: GPU acceleration para tooltips que animam
  */
 
 .tooltip {
-  /* GPU acceleration */
+  /* GPU acceleration - OK para tooltips que animam */
   transform: translateZ(0);
   /* Transição rápida */
   transition: opacity 0.15s ease, transform 0.15s ease;
@@ -401,10 +404,11 @@
 
 /**
  * REGRA 19: Otimizações para dropdowns
+ * MANTIDO: GPU acceleration para dropdowns que animam
  */
 
 .dropdown {
-  /* GPU acceleration */
+  /* GPU acceleration - OK para dropdowns que animam */
   transform: translateZ(0);
   /* Transição suave */
   transition: opacity 0.2s ease, transform 0.2s ease;

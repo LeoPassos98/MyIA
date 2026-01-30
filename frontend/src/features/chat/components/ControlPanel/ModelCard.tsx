@@ -22,16 +22,22 @@ import {
   MenuItem,
   Collapse,
   Divider,
-  Chip,
   Grid
 } from '@mui/material';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
-import ImageIcon from '@mui/icons-material/Image';
-import CachedIcon from '@mui/icons-material/Cached';
-import FunctionsIcon from '@mui/icons-material/Functions';
+import DescriptionIcon from '@mui/icons-material/Description';
+import OutputIcon from '@mui/icons-material/Output';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import PaidIcon from '@mui/icons-material/Paid';
+import StorageIcon from '@mui/icons-material/Storage';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import WarningIcon from '@mui/icons-material/Warning';
 import { formatTokens } from '../../../../utils/formatters';
+import { MetricBadge } from '@/components/Badges';
 import { ProviderBadgeGroup } from './ProviderBadge';
-import { ModelRatingStars, ModelBadge, ModelMetricsTooltip } from '../../../../components/ModelRating';
+import { CapabilityBadge } from './CapabilityBadge';
+import { ModelRatingStars, ModelMetricsTooltip } from '../../../../components/ModelRating';
+import { ModelBadgeGroup } from '../../../../components/ModelBadges';
 import { useModelRating } from '../../../../hooks/useModelRating';
 import type { ModelWithProviders } from '../../../../types/ai';
 
@@ -175,8 +181,9 @@ export const ModelCard = React.memo(function ModelCard({
             {model.name}
           </Typography>
         </Box>
-        <Typography variant="caption" color="warning.main">
-          ⚠️ Este modelo não possui providers configurados. Configure AWS Bedrock ou Azure nas configurações.
+        <Typography variant="caption" color="warning.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <WarningIcon sx={{ fontSize: 14 }} />
+          Este modelo não possui providers configurados. Configure AWS Bedrock ou Azure nas configurações.
         </Typography>
       </Card>
     );
@@ -242,12 +249,12 @@ export const ModelCard = React.memo(function ModelCard({
             {getShortName(model.name)}
           </Typography>
           
-          <Chip
-            label={`Context: ${formatTokens(model.contextWindow)}`}
+          {/* MIGRATED: Fase 3 - Padronização Visual */}
+          <MetricBadge
+            label="Context"
+            value={formatTokens(model.contextWindow)}
             size="small"
-            sx={{ flexShrink: 0, font: 'button', fontSize: '0.7rem' }}
             color={isSelected ? 'primary' : 'default'}
-            variant={isSelected ? 'filled' : 'outlined'}
           />
         </Box>
       )}
@@ -297,9 +304,13 @@ export const ModelCard = React.memo(function ModelCard({
                     v{model.version}
                   </Typography>
                 )}
-                {modelWithRating?.badge && (
-                  <ModelBadge badge={modelWithRating.badge} size="sm" showIcon />
-                )}
+                {/* MIGRATED: Usando novo sistema centralizado de badges (ModelBadgeGroup) */}
+                {/* Ver: plans/badge-system-centralization.md - Fase 2 */}
+                <ModelBadgeGroup
+                  model={{ apiModelId: model.apiModelId }}
+                  size="sm"
+                  spacing={0.5}
+                />
               </Box>
               
               {/* Rating com Tooltip */}
@@ -332,12 +343,14 @@ export const ModelCard = React.memo(function ModelCard({
               <Grid container spacing={1.5} sx={{ mb: 1 }}>
                 {/* Coluna 1: Context & Output */}
                 <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem', mb: 0.5 }}>
-                    📝 Context: {formatTokens(model.contextWindow)}
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.7rem', mb: 0.5 }}>
+                    <DescriptionIcon sx={{ fontSize: 12 }} />
+                    Context: {formatTokens(model.contextWindow)}
                   </Typography>
                   {model.maxOutputTokens && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
-                      📤 Output: {formatTokens(model.maxOutputTokens)}
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.7rem' }}>
+                      <OutputIcon sx={{ fontSize: 12 }} />
+                      Output: {formatTokens(model.maxOutputTokens)}
                     </Typography>
                   )}
                 </Grid>
@@ -347,13 +360,15 @@ export const ModelCard = React.memo(function ModelCard({
                   {model.pricing && (
                     <>
                       {model.pricing.inputPer1M !== undefined && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem', mb: 0.5 }}>
-                          💵 In: ${model.pricing.inputPer1M.toFixed(2)}/1M
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.7rem', mb: 0.5 }}>
+                          <AttachMoneyIcon sx={{ fontSize: 12 }} />
+                          In: ${model.pricing.inputPer1M.toFixed(2)}/1M
                         </Typography>
                       )}
                       {model.pricing.outputPer1M !== undefined && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
-                          💸 Out: ${model.pricing.outputPer1M.toFixed(2)}/1M
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.7rem' }}>
+                          <PaidIcon sx={{ fontSize: 12 }} />
+                          Out: ${model.pricing.outputPer1M.toFixed(2)}/1M
                         </Typography>
                       )}
                     </>
@@ -362,36 +377,31 @@ export const ModelCard = React.memo(function ModelCard({
               </Grid>
               
               {/* Capabilities Badges */}
+              {/* MIGRATED: Fase 3 - Padronização Visual */}
               {model.capabilities && (
                 <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
                   {model.capabilities.supportsVision && (
-                    <Chip
-                      icon={<ImageIcon sx={{ fontSize: 12 }} />}
+                    <CapabilityBadge
                       label="Vision"
+                      enabled={true}
+                      icon="vision"
                       size="small"
-                      sx={{ height: 20, fontSize: '0.65rem', '& .MuiChip-icon': { ml: 0.5 } }}
-                      color="info"
-                      variant="outlined"
                     />
                   )}
                   {model.capabilities.supportsPromptCache && (
-                    <Chip
-                      icon={<CachedIcon sx={{ fontSize: 12 }} />}
+                    <CapabilityBadge
                       label="Cache"
+                      enabled={true}
+                      icon="check"
                       size="small"
-                      sx={{ height: 20, fontSize: '0.65rem', '& .MuiChip-icon': { ml: 0.5 } }}
-                      color="success"
-                      variant="outlined"
                     />
                   )}
                   {model.capabilities.supportsFunctionCalling && (
-                    <Chip
-                      icon={<FunctionsIcon sx={{ fontSize: 12 }} />}
+                    <CapabilityBadge
                       label="Functions"
+                      enabled={true}
+                      icon="function"
                       size="small"
-                      sx={{ height: 20, fontSize: '0.65rem', '& .MuiChip-icon': { ml: 0.5 } }}
-                      color="secondary"
-                      variant="outlined"
                     />
                   )}
                 </Box>
@@ -399,8 +409,9 @@ export const ModelCard = React.memo(function ModelCard({
               
               {/* Cache Pricing (se disponível) */}
               {model.pricing?.cacheReadPer1M !== undefined && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, fontSize: '0.65rem' }}>
-                  💾 Cache: ${model.pricing.cacheReadPer1M.toFixed(2)}/1M read, ${model.pricing.cacheWritePer1M?.toFixed(2) || '0.00'}/1M write
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1, fontSize: '0.65rem' }}>
+                  <StorageIcon sx={{ fontSize: 12 }} />
+                  Cache: ${model.pricing.cacheReadPer1M.toFixed(2)}/1M read, ${model.pricing.cacheWritePer1M?.toFixed(2) || '0.00'}/1M write
                 </Typography>
               )}
             </Box>
@@ -445,8 +456,9 @@ export const ModelCard = React.memo(function ModelCard({
             </Select>
           </FormControl>
           
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, fontSize: '0.7rem' }}>
-            💡 Este modelo está disponível em múltiplos providers. Selecione qual usar.
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1, fontSize: '0.7rem' }}>
+            <LightbulbIcon sx={{ fontSize: 12 }} />
+            Este modelo está disponível em múltiplos providers. Selecione qual usar.
           </Typography>
         </Box>
       </Collapse>

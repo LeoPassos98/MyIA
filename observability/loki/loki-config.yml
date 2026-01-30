@@ -48,7 +48,7 @@ limits_config:
   retention_period: 720h
   ingestion_rate_mb: 10
   ingestion_burst_size_mb: 20
-  max_streams_per_user: 10000
+  max_streams_per_user: 50000  # Aumentado de 10000 para 50000
   max_query_length: 721h
   max_entries_limit_per_query: 10000
   reject_old_samples: true

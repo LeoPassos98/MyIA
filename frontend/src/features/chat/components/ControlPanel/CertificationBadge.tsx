@@ -7,6 +7,11 @@
  * Badge visual para mostrar o status de certificação de um modelo.
  * Exibe cores diferentes baseadas no status e fornece tooltips informativos.
  *
+ * ✅ FASE 2 - PADRONIZAÇÃO VISUAL DE BADGES
+ * - Tamanhos de ícones padronizados: 14px (small), 16px (medium)
+ * - Uso de cores do theme.palette (via MUI color props)
+ * - Mantém funcionalidade existente 100% compatível
+ *
  * @module features/chat/components/ControlPanel/CertificationBadge
  */
 
@@ -85,15 +90,21 @@ export function CertificationBadge({
   size = 'small'
 }: CertificationBadgeProps) {
   
+  // ✅ PADRONIZAÇÃO: Tamanhos de ícones baseados no size prop
+  // small = 14px, medium = 16px (conforme especificação do plano)
+  const iconSize = size === 'small' ? 14 : 16;
+  
   /**
    * Obtém a configuração visual baseada no status
+   * ✅ PADRONIZAÇÃO: Cores via theme.palette (usando MUI color props)
    */
   const getBadgeConfig = (): BadgeConfig => {
     switch (status) {
       case 'certified':
         return {
           color: 'success',
-          icon: <CheckCircle sx={{ fontSize: 16 }} />,
+          // ✅ PADRONIZAÇÃO: Tamanho de ícone dinâmico baseado no size prop
+          icon: <CheckCircle sx={{ fontSize: iconSize }} />,
           label: successRate !== undefined ? `Certificado (${successRate}%)` : 'Certificado',
           tooltip: lastChecked
             ? `Testado em ${formatRelativeDate(lastChecked)}. Taxa de sucesso: ${successRate || 100}%`
@@ -103,9 +114,10 @@ export function CertificationBadge({
       case 'quality_warning':
         return {
           color: 'warning',
-          icon: <Warning sx={{ fontSize: 16 }} />,
+          // ✅ PADRONIZAÇÃO: Tamanho de ícone dinâmico baseado no size prop
+          icon: <Warning sx={{ fontSize: iconSize }} />,
           label: 'Aviso de Qualidade',
-          tooltip: errorCategory 
+          tooltip: errorCategory
             ? `${formatErrorCategory(errorCategory)} - Taxa de sucesso: ${successRate || 0}%`
             : `Taxa de sucesso abaixo do esperado: ${successRate || 0}%`
         };
@@ -115,11 +127,12 @@ export function CertificationBadge({
       case 'permission_required':
         return {
           color: 'error',
-          icon: <ErrorIcon sx={{ fontSize: 16 }} />,
+          // ✅ PADRONIZAÇÃO: Tamanho de ícone dinâmico baseado no size prop
+          icon: <ErrorIcon sx={{ fontSize: iconSize }} />,
           label: status === 'configuration_required' ? 'Configuração Necessária' :
                  status === 'permission_required' ? 'Permissão Necessária' :
                  'Indisponível',
-          tooltip: errorCategory 
+          tooltip: errorCategory
             ? `Modelo não está respondendo. Erro: ${formatErrorCategory(errorCategory)}`
             : 'Modelo não está disponível no momento'
         };
@@ -127,7 +140,8 @@ export function CertificationBadge({
       default:
         return {
           color: 'default',
-          icon: <HelpOutline sx={{ fontSize: 16 }} />,
+          // ✅ PADRONIZAÇÃO: Tamanho de ícone dinâmico baseado no size prop
+          icon: <HelpOutline sx={{ fontSize: iconSize }} />,
           label: 'Não Testado',
           tooltip: 'Este modelo ainda não foi certificado. Clique para certificar.'
         };

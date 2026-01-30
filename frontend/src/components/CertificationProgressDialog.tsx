@@ -1,5 +1,6 @@
 // frontend/src/components/CertificationProgressDialog.tsx
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// MIGRATED: Fase 3 - Padronização Visual
 
 import { memo } from 'react';
 import {
@@ -15,7 +16,6 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Chip,
   Alert,
   Divider
 } from '@mui/material';
@@ -25,10 +25,11 @@ import WarningIcon from '@mui/icons-material/Warning';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PauseCircleIcon from '@mui/icons-material/PauseCircle';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { useTheme } from '@mui/material/styles';
+import { CounterBadge } from '@/components/Badges';
 import { CertificationDetails } from '../types/ai';
-import { useModelRating } from '../hooks/useModelRating';
-import { ModelBadge } from './ModelRating';
+import { ModelBadgeGroup } from './ModelBadges';
 
 export interface ModelCertificationProgress {
   modelId: string;
@@ -56,7 +57,6 @@ export const CertificationProgressDialog = memo(({
   canCancel
 }: CertificationProgressDialogProps) => {
   const theme = useTheme();
-  const { getModelById } = useModelRating();
   
   const totalModels = models.length;
   const completedModels = models.filter(m => m.status === 'success' || m.status === 'error').length;
@@ -108,25 +108,23 @@ export const CertificationProgressDialog = memo(({
             Certificação de Modelos
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Chip
-              label={`${completedModels}/${totalModels}`}
-              color={isComplete ? 'success' : 'primary'}
-              size="small"
+            <CounterBadge
+              count={completedModels}
+              label={`/${totalModels}`}
+              color={isComplete ? 'primary' : 'default'}
             />
             {successModels > 0 && (
-              <Chip
-                icon={<CheckCircleIcon />}
-                label={`${successModels} OK`}
-                color="success"
-                size="small"
+              <CounterBadge
+                count={successModels}
+                label="OK"
+                color="primary"
               />
             )}
             {errorModels > 0 && (
-              <Chip
-                icon={<ErrorIcon />}
-                label={`${errorModels} Erros`}
-                color="error"
-                size="small"
+              <CounterBadge
+                count={errorModels}
+                label="Erros"
+                color="secondary"
               />
             )}
           </Box>
@@ -151,8 +149,9 @@ export const CertificationProgressDialog = memo(({
           />
           
           {!isComplete && avgTimeMs > 0 && (
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              ⏱️ Tempo estimado restante: ~{estimatedTimeSec}s
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <AccessTimeIcon sx={{ fontSize: 14 }} />
+              Tempo estimado restante: ~{estimatedTimeSec}s
               {avgTimeMs > 0 && ` (média: ${Math.round(avgTimeMs / 1000)}s por modelo)`}
             </Typography>
           )}
@@ -179,7 +178,7 @@ export const CertificationProgressDialog = memo(({
           <Alert severity="success" sx={{ mb: 2 }}>
             <strong>Certificação concluída!</strong>
             <br />
-            Modelos certificados (✅) e disponíveis com limitações (⚠️) podem ser usados. Os badges aparecerão na lista de modelos.
+            Modelos certificados (<CheckCircleIcon sx={{ fontSize: 14, verticalAlign: 'middle' }} />) e disponíveis com limitações (<WarningIcon sx={{ fontSize: 14, verticalAlign: 'middle' }} />) podem ser usados. Os badges aparecerão na lista de modelos.
           </Alert>
         )}
         
@@ -188,12 +187,6 @@ export const CertificationProgressDialog = memo(({
         {/* Lista de modelos */}
         <List sx={{ maxHeight: 400, overflow: 'auto' }}>
           {models.map((model, _index) => {
-            // ✅ CORREÇÃO: Buscar rating do modelo para verificar se tem badge
-            const modelWithRating = getModelById(model.modelId);
-            const hasBadge = !!modelWithRating?.badge;
-            const isCertified = model.status === 'success' && model.result?.status === 'certified';
-            const isUnavailable = model.status === 'error';
-            
             // ✅ NOVO: Verificar se é rate limit
             const isRateLimited = model.error?.includes('Limite de certificações excedido');
             
@@ -214,38 +207,18 @@ export const CertificationProgressDialog = memo(({
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2">{model.modelName}</Typography>
-                      {/* ✅ CORREÇÃO: Mostrar badge de rating se existir */}
-                      {modelWithRating?.badge && (
-                        <ModelBadge badge={modelWithRating.badge} size="sm" showIcon />
-                      )}
-                      {/* ✅ Badge de certificado */}
-                      {isCertified && (
-                        <Chip
-                          label="✅ Certificado"
-                          size="small"
-                          color="success"
-                          sx={{ height: 20, fontSize: '0.65rem' }}
-                        />
-                      )}
-                      {/* ✅ NOVO: Badge de "Não Testado" para rate limit */}
-                      {isUnavailable && !hasBadge && isRateLimited && (
-                        <Chip
-                          label="⏸️ Não Testado"
-                          size="small"
-                          color="default"
-                          sx={{ height: 20, fontSize: '0.65rem' }}
-                        />
-                      )}
-                      {/* ✅ CORREÇÃO: Badge "Indisponível" apenas para erros reais (não rate limit)
-                          Só mostrar se o modelo NÃO tiver badge de rating e NÃO for rate limit */}
-                      {isUnavailable && !hasBadge && !isRateLimited && (
-                        <Chip
-                          label="❌ Indisponível"
-                          size="small"
-                          color="error"
-                          sx={{ height: 20, fontSize: '0.65rem' }}
-                        />
-                      )}
+                      {/* MIGRATED: Usando novo sistema centralizado de badges (ModelBadgeGroup) */}
+                      {/* Ver: plans/badge-system-centralization.md - Fase 3 */}
+                      {/* ✅ FIX: Passar model.result para atualização em tempo real dos badges */}
+                      <ModelBadgeGroup
+                        model={{
+                          apiModelId: model.modelId,
+                          error: model.error,
+                          certificationResult: model.result
+                        }}
+                        size="sm"
+                        spacing={0.5}
+                      />
                     </Box>
                   }
                   secondary={
@@ -259,17 +232,27 @@ export const CertificationProgressDialog = memo(({
                           color={isRateLimited ? "text.secondary" : "error"}
                           sx={{ display: 'block', mt: 0.5 }}
                         >
-                          {isRateLimited ? '⏸️' : '❌'} {model.error}
+                          {isRateLimited ? (
+                            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                              <PauseCircleIcon sx={{ fontSize: 14 }} /> {model.error}
+                            </Box>
+                          ) : (
+                            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                              <CancelIcon sx={{ fontSize: 14 }} /> {model.error}
+                            </Box>
+                          )}
                         </Typography>
                       )}
                       {model.status === 'success' && model.result?.status === 'quality_warning' && model.startTime && model.endTime && (
-                        <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
-                          ⚠️ Disponível com limitações em {Math.round((model.endTime - model.startTime) / 1000)}s
+                        <Typography variant="caption" color="warning.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                          <WarningIcon sx={{ fontSize: 14 }} />
+                          Disponível com limitações em {Math.round((model.endTime - model.startTime) / 1000)}s
                         </Typography>
                       )}
                       {model.status === 'success' && model.result?.status === 'certified' && model.startTime && model.endTime && (
-                        <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>
-                          ✅ Certificado em {Math.round((model.endTime - model.startTime) / 1000)}s
+                        <Typography variant="caption" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                          <CheckCircleIcon sx={{ fontSize: 14 }} />
+                          Certificado em {Math.round((model.endTime - model.startTime) / 1000)}s
                         </Typography>
                       )}
                     </>
