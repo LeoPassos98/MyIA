@@ -59,13 +59,16 @@ export enum ModelCertificationStatus {
   CERTIFIED = 'CERTIFIED',
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
-  QUALITY_WARNING = 'QUALITY_WARNING',
-  // Valores legados (mapeamento)
-  UNTESTED = 'PENDING',
-  TESTING = 'PROCESSING',
-  DEPRECATED = 'FAILED',
-  MONITORING = 'CERTIFIED'
+  QUALITY_WARNING = 'QUALITY_WARNING'
 }
+
+// Mapeamento de valores legados para novos status
+export const LegacyStatusMapping = {
+  UNTESTED: ModelCertificationStatus.PENDING,
+  TESTING: ModelCertificationStatus.PROCESSING,
+  DEPRECATED: ModelCertificationStatus.FAILED,
+  MONITORING: ModelCertificationStatus.CERTIFIED
+} as const;
 
 /**
  * Erro categorizado de certificação

@@ -3,7 +3,7 @@
 
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
-import { ModelCertificationService, ProgressEvent } from '../services/ai/certification';
+import { ModelCertificationService, ProgressEvent, ModelCertificationStatus } from '../services/ai/certification';
 import { AWSCredentialsService } from '../services/awsCredentialsService';
 import { prisma } from '../lib/prisma';
 import { jsend } from '../utils/jsend';
@@ -177,7 +177,7 @@ export const certifyModel = async (req: AuthRequest, res: Response) => {
     }
     
     // Se modelo está disponível mas com warning de qualidade, retornar 200 com aviso
-    if (result.status === 'quality_warning') {
+    if (result.status === ModelCertificationStatus.QUALITY_WARNING) {
       logger.warn('Modelo disponível mas com limitações de qualidade', {
         requestId: req.id,
         userId,
@@ -668,9 +668,9 @@ export const deleteCertification = async (req: AuthRequest, res: Response): Prom
       );
     }
     
-    // Deletar certificação do banco
-    logger.info(`[CertificationController] 🗑️ Deletando certificação para ${modelId}`);
-    await prisma.modelCertification.delete({
+    // Deletar certificação do banco (todas as regiões)
+    logger.info(`[CertificationController] 🗑️ Deletando certificações para ${modelId} (todas as regiões)`);
+    await prisma.modelCertification.deleteMany({
       where: { modelId }
     });
     

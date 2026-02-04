@@ -11,7 +11,7 @@ const PORT = process.env.WORKER_HEALTH_PORT || 3004;
 /**
  * Health check endpoint
  */
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   try {
     const status = certificationWorker.getStatus();
     
@@ -41,7 +41,7 @@ app.get('/health', (req, res) => {
 /**
  * Metrics endpoint
  */
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', async (_req, res) => {
   try {
     const workerStatus = certificationWorker.getStatus();
     const queueStats = await certificationWorker.getQueueStats();
@@ -63,7 +63,7 @@ app.get('/metrics', async (req, res) => {
 /**
  * Readiness probe endpoint
  */
-app.get('/ready', async (req, res) => {
+app.get('/ready', async (_req, res) => {
   try {
     const status = certificationWorker.getStatus();
     
@@ -91,7 +91,7 @@ app.get('/ready', async (req, res) => {
 /**
  * Liveness probe endpoint
  */
-app.get('/live', (req, res) => {
+app.get('/live', (_req, res) => {
   res.status(200).json({
     alive: true,
     timestamp: new Date().toISOString()

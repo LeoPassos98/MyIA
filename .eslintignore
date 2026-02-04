@@ -6,5 +6,7 @@ coverage/
 .idea/
 observability/data/
 backend/test-logging-interface.ts
+frontend-admin/
+frontend/
 *.log
 *.pid

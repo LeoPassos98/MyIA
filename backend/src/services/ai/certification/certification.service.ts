@@ -84,8 +84,8 @@ export class ModelCertificationService {
       testsFailed: cached.testsFailed,
       successRate: cached.successRate,
       avgLatencyMs: cached.avgLatencyMs || 0,
-      isCertified: cached.status === 'certified',
-      isAvailable: cached.status === 'certified' || cached.status === 'quality_warning',
+      isCertified: cached.status === ModelCertificationStatus.CERTIFIED,
+      isAvailable: cached.status === ModelCertificationStatus.CERTIFIED || cached.status === ModelCertificationStatus.QUALITY_WARNING,
       results: [], // Não retornamos resultados detalhados do cache
       categorizedError,
       overallSeverity: cached.errorSeverity as ErrorSeverity | undefined
@@ -555,7 +555,7 @@ export class ModelCertificationService {
     
     const certifications = await prisma.modelCertification.findMany({
       where: {
-        status: 'certified',
+        status: ModelCertificationStatus.CERTIFIED,
         OR: [
           { expiresAt: null },
           { expiresAt: { gt: now } }
@@ -583,7 +583,7 @@ export class ModelCertificationService {
     
     const certifications = await prisma.modelCertification.findMany({
       where: {
-        status: { not: 'certified' }
+        status: { not: ModelCertificationStatus.CERTIFIED }
       },
       select: {
         modelId: true
@@ -608,7 +608,7 @@ export class ModelCertificationService {
     
     const certs = await prisma.modelCertification.findMany({
       where: {
-        status: { in: ['failed'] },
+        status: { in: [ModelCertificationStatus.FAILED] },
         errorCategory: {
           in: ['UNAVAILABLE', 'PERMISSION_ERROR', 'AUTHENTICATION_ERROR', 'CONFIGURATION_ERROR', 'PROVISIONING_REQUIRED']
         }
@@ -634,7 +634,7 @@ export class ModelCertificationService {
     
     const certs = await prisma.modelCertification.findMany({
       where: {
-        status: 'failed'
+        status: ModelCertificationStatus.FAILED
       },
       select: { modelId: true },
       distinct: ['modelId']
@@ -656,7 +656,7 @@ export class ModelCertificationService {
     
     const certs = await prisma.modelCertification.findMany({
       where: {
-        status: 'quality_warning'
+        status: ModelCertificationStatus.QUALITY_WARNING
       },
       select: { modelId: true },
       distinct: ['modelId']
@@ -687,7 +687,7 @@ export class ModelCertificationService {
       return false;
     }
     
-    if (certification.status !== 'certified') {
+    if (certification.status !== ModelCertificationStatus.CERTIFIED) {
       return false;
     }
     
@@ -733,7 +733,7 @@ export class ModelCertificationService {
     }
     
     const now = new Date();
-    const isValid = cert.status === 'certified' &&
+    const isValid = cert.status === ModelCertificationStatus.CERTIFIED &&
                     (!cert.expiresAt || cert.expiresAt > now);
     
     const daysUntilExpiration = cert.expiresAt

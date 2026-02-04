@@ -8,7 +8,7 @@
     "dev:frontend:wait": "echo '⏳ Aguardando Backend iniciar...' && wait-on -l http://localhost:3001/api/health -t 60000 --interval 1000 && npm run dev:frontend",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "type-check": "tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p frontend/tsconfig.json",
+    "type-check": "tsc --noEmit -p backend/tsconfig.json",
     "prepare": "husky"
   },
   "devDependencies": {

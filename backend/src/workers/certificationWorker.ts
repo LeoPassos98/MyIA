@@ -204,7 +204,7 @@ class CertificationWorker {
   /**
    * Atualiza CertificationJob quando job completa (hook: completed)
    */
-  private async updateJobOnCompleted(job: Job, result: any): Promise<void> {
+  private async updateJobOnCompleted(job: Job, _result: any): Promise<void> {
     try {
       const { jobId } = job.data;
       

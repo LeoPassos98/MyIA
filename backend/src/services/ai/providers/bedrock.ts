@@ -98,7 +98,7 @@ function getRegionPrefix(region: string): string {
  * @param _region Região AWS (ex: 'us-east-1')
  * @returns Inference Profile ID ou modelId original
  */
-function getInferenceProfileId(modelId: string, _region: string): string {
+async function getInferenceProfileId(modelId: string, _region: string): Promise<string> {
   // Normalizar antes de processar
   const baseModelId = normalizeModelId(modelId);
   
@@ -109,9 +109,9 @@ function getInferenceProfileId(modelId: string, _region: string): string {
   }
   
   // ✅ REATIVADO: Adicionar prefixo regional para modelos que requerem Inference Profile
-  // Usando require() dinâmico para evitar dependência circular
+  // Usando import() dinâmico para evitar dependência circular
   try {
-    const { ModelRegistry } = require('../registry');
+    const { ModelRegistry } = await import('../registry');
     const platformRule = ModelRegistry.getPlatformRules(baseModelId, 'bedrock');
     
     logger.info(`🔍 [getInferenceProfileId] Platform rule for ${baseModelId}:`, platformRule);
@@ -265,13 +265,13 @@ export class BedrockProvider extends BaseAIProvider {
     }
     
     // Obter inference profile se necessário
-    const modelIdWithProfile = getInferenceProfileId(normalizedModelId, this.region);
+    const modelIdWithProfile = await getInferenceProfileId(normalizedModelId, this.region);
     
     // Verificar se modelo requer inference profile
-    // Usando require() dinâmico para evitar dependência circular
+    // Usando import() dinâmico para evitar dependência circular
     let requiresInferenceProfile = false;
     try {
-      const { ModelRegistry } = require('../registry');
+      const { ModelRegistry } = await import('../registry');
       const platformRule = ModelRegistry.getPlatformRules(normalizedModelId, 'bedrock');
       requiresInferenceProfile = platformRule?.rule === 'requires_inference_profile';
       
