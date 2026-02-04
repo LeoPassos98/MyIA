@@ -19,7 +19,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { logger } from '../src/utils/logger';
+import { logger } from '../../src/utils/logger';
 
 // ============================================================================
 // TIPOS E INTERFACES
@@ -64,7 +64,7 @@ interface Statistics {
 // ============================================================================
 
 const CONFIG = {
-  directories: ['backend/src', 'frontend/src'],
+  directories: ['src', '../frontend/src'],
   extensions: ['.ts', '.tsx', '.js', '.jsx'],
   excludePatterns: [
     'node_modules',
@@ -486,7 +486,7 @@ async function main() {
   const report = generateMarkdownReport(stats);
 
   // Salvar relatório
-  const reportPath = 'docs/FILE_SIZE_ANALYSIS_REPORT.md';
+  const reportPath = '../docs/FILE_SIZE_ANALYSIS_REPORT.md';
   await fs.writeFile(reportPath, report, 'utf-8');
 
   logger.info(`✅ Relatório salvo em: ${reportPath}`);
