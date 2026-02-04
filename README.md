@@ -176,9 +176,60 @@ Isso criará todas as tabelas necessárias no PostgreSQL.
 
 ### 5️⃣ Rodando os Servidores
 
-**Método Recomendado** (usando o script `start.sh`):
+O MyIA oferece **3 formas de inicializar** os serviços, escolha a que melhor se adapta ao seu caso:
 
-O projeto inclui um script de gerenciamento na raiz:
+#### 🚀 Opção 1: Inicialização Completa Automática (Recomendado)
+
+Inicia **TODOS os 7 serviços** automaticamente (Redis, PostgreSQL, Backend, Frontend, Worker, Frontend Admin, Grafana):
+
+```bash
+./start_full.sh
+```
+
+**Serviços iniciados:**
+- ✅ Redis (porta 6379) - Banco de dados em memória
+- ✅ PostgreSQL (porta 5432) - Banco de dados principal
+- ✅ Backend API (porta 3001) - Servidor REST
+- ✅ Worker (porta 3004) - Processador de tarefas
+- ✅ Frontend (porta 3000) - Interface do usuário
+- ✅ Frontend Admin (porta 3003) - Painel de administração
+- ✅ Grafana (porta 3002) - Sistema de observabilidade
+
+#### 🎮 Opção 2: Menu Interativo (Controle Total) ⭐ RECOMENDADO
+
+Menu interativo com **seleção de serviços** e **barras de progresso visuais**:
+
+```bash
+./start_interactive.sh
+
+# Com modo debug para troubleshooting
+./start_interactive.sh --debug
+```
+
+**Features Principais:**
+- ✅ Selecione apenas os serviços que precisa
+- ✅ Barras de progresso em tempo real
+- ✅ Descrições em linguagem humana
+- ✅ Ver status de todos os serviços
+- ✅ Parar serviços individualmente
+
+**Funcionalidades Avançadas (v2.0):**
+- 🔄 **Reiniciar serviço específico** (opção `r`)
+- 📋 **Ver logs em tempo real** (opção `l`)
+- 💾 **Salvar/carregar perfis** (opções `s` e `p`)
+- 🗑️ **Limpar logs antigos** (opção `c`)
+- 🐛 **Modo debug** (`--debug` ou `-d`)
+- ✅ **Validações automáticas** (pré-requisitos, dependências, .env)
+- 🏥 **Health checks robustos** (detecta falhas reais)
+- 🚨 **Tratamento de erros** (diagnóstico claro com sugestões)
+- 🔄 **Rotação automática de logs** (>50MB, mantém 5 versões)
+- 🔗 **Validação de dependências** (habilita serviços necessários automaticamente)
+
+> 📚 **Documentação completa:** [`docs/guides/start-interactive-guide.md`](docs/guides/start-interactive-guide.md:1) - Guia abrangente com 23 melhorias implementadas
+
+#### ⚡ Opção 3: Inicialização Básica (Desenvolvimento Rápido)
+
+Inicia apenas **Backend + Frontend Principal** com Quality Gates:
 
 ```bash
 # Iniciar backend e frontend juntos
@@ -198,8 +249,6 @@ O projeto inclui um script de gerenciamento na raiz:
 ./start.sh restart both
 ```
 
-> 📚 **Documentação completa:** [START-SH-DOCS.md](START-SH-DOCS.md)
-
 **Features do start.sh:**
 - ✅ Quality Gates automáticos (ESLint + TypeScript)
 - ✅ Gerenciamento de processos em background
@@ -207,7 +256,9 @@ O projeto inclui um script de gerenciamento na raiz:
 - ✅ Limpeza automática de portas
 - ✅ Health check com timeout
 
-**Método Manual**:
+> 📚 **Documentação completa dos scripts:** [docs/STARTUP-SCRIPTS-GUIDE.md](docs/STARTUP-SCRIPTS-GUIDE.md)
+
+#### 🔧 Método Manual (Não Recomendado)
 
 ```bash
 # Terminal 1 - Backend
@@ -274,9 +325,9 @@ backend/src/services/ai/adapters/
 - [Guia de Migração](backend/docs/ADAPTER_MIGRATION_GUIDE.md) - Como usar e adicionar novos adapters
 - [Arquitetura Detalhada](plans/ADAPTER_INFERENCE_TYPE_ARCHITECTURE.md) - Planejamento completo
 - [Análise de Modelos](backend/scripts/CHAT_MODELS_INFERENCE_ANALYSIS.md) - Análise de 108 modelos
-- [Quick Start](QUICK_START_NEW_ADAPTERS.md) - Início rápido (5 minutos)
+- [Quick Start](docs/guides/quick-start-new-adapters.md) - Início rápido (5 minutos)
 - [Changelog](ADAPTER_MIGRATION_CHANGELOG.md) - Histórico de mudanças
-- [Recomendações](PRODUCTION_RECOMMENDATIONS.md) - Checklist para produção
+- [Recomendações](docs/guides/production-recommendations.md) - Checklist para produção
 
 ### Métricas
 
@@ -312,9 +363,12 @@ backend/src/services/ai/adapters/
 
 ### 📚 Scripts & Ferramentas
 
+- **[START_INTERACTIVE_GUIDE.md](docs/guides/start-interactive-guide.md)** - 🚀 **NOVO** Guia completo do gerenciador interativo (v2.0 com 23 melhorias)
+- **[DOCS_INDEX.md](DOCS_INDEX.md)** - 📚 Índice de toda documentação do start_interactive.sh
 - **[START-SH-DOCS.md](START-SH-DOCS.md)** - Documentação completa do `start.sh`
 - **[QUALITY-GATES-SETUP.md](QUALITY-GATES-SETUP.md)** - Git Hooks e Quality Gates
 - **[.husky/README.md](.husky/README.md)** - Documentação dos Git Hooks
+- **[SCRIPT_ORGANIZATION_STANDARD.md](docs/guides/script-organization-standard.md)** - Padrão de organização de scripts
 
 ### 🔐 Segurança (LEITURA OBRIGATÓRIA)
 
