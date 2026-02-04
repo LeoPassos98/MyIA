@@ -8,7 +8,7 @@
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module",
-    "project": ["./tsconfig.json", "./backend/tsconfig.json", "./frontend/tsconfig.json"]
+    "project": ["./tsconfig.json", "./backend/tsconfig.json", "./frontend/tsconfig.json", "./frontend-admin/tsconfig.json"]
   },
   "plugins": ["@typescript-eslint", "import", "react", "react-hooks", "jsx-a11y"],
   "extends": [
@@ -24,7 +24,8 @@
   "overrides": [
     { "files": ["*.ts", "*.tsx"] },
     { "files": ["backend/**"], "env": { "node": true, "browser": false } },
-    { "files": ["frontend/**"], "env": { "browser": true, "node": false } }
+    { "files": ["frontend/**"], "env": { "browser": true, "node": false } },
+    { "files": ["frontend-admin/**"], "env": { "browser": true, "node": false } }
   ],
   "rules": { "import/order": "warn" }
 }

@@ -20,6 +20,13 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# File Size Check
+echo "📏 Verificando tamanho de arquivos..."
+.husky/check-file-size.sh
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
 # Console.log Check (FASE 1 - Avisos apenas, não bloqueia)
 echo "📊 Verificando uso de console.log/error/warn..."
 CONSOLE_USAGE=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx)$' | xargs grep -n "console\.\(log\|error\|warn\)" 2>/dev/null || true)

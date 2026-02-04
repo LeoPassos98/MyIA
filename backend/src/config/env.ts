@@ -22,6 +22,24 @@ export const config = {
     .split(',')
     .map(s => s.trim())
     .filter(Boolean),
+  
+  // Redis
+  redisHost: process.env.REDIS_HOST || 'localhost',
+  redisPort: process.env.REDIS_PORT || '6379',
+  redisPassword: process.env.REDIS_PASSWORD,
+  redisDb: process.env.REDIS_DB || '0',
+  
+  // Bull Queue
+  bullQueuePrefix: process.env.BULL_QUEUE_PREFIX || 'myia',
+  bullBoardPath: process.env.BULL_BOARD_PATH || '/admin/queues',
+  bullBoardUsername: process.env.BULL_BOARD_USERNAME || 'admin',
+  bullBoardPassword: process.env.BULL_BOARD_PASSWORD || 'admin123',
+  
+  // Certification Queue
+  certificationQueueName: process.env.CERTIFICATION_QUEUE_NAME || 'model-certification',
+  certificationConcurrency: process.env.CERTIFICATION_CONCURRENCY || '3',
+  certificationTimeout: process.env.CERTIFICATION_TIMEOUT || '300000',
+  certificationMaxRetries: process.env.CERTIFICATION_MAX_RETRIES || '3',
 };
 
 // Validar variáveis críticas

@@ -278,6 +278,33 @@ npm run dev
 
 ---
 
+## 📂 Estrutura de Scripts
+
+O projeto possui scripts organizados por categoria para facilitar manutenção e descoberta:
+
+### Scripts Principais (Raiz)
+- **[`start.sh`](start.sh)** - Gerenciador principal de processos (backend + frontend)
+- **[`start_interactive.sh`](start_interactive.sh)** - Menu interativo para iniciar serviços
+- **[`start_full.sh`](start_full.sh)** - Inicialização completa de todos os serviços
+- **[`manage-certifications.sh`](manage-certifications.sh)** - Sistema de gerenciamento de certificações
+
+### Scripts Organizados
+- **[`scripts/`](scripts/README.md)** - Scripts shell organizados por categoria
+  - [`certification/`](scripts/certification/README.md) - Certificação de modelos
+  - [`testing/`](scripts/testing/README.md) - Testes e validação
+  - [`analysis/`](scripts/analysis/README.md) - Análise e diagnóstico
+  
+- **[`backend/scripts/`](backend/scripts/)** - Scripts TypeScript do backend
+  - [`certification/`](backend/scripts/certification/README.md) - Certificação (13 scripts)
+  - [`testing/`](backend/scripts/testing/README.md) - Testes (13 scripts)
+  - [`maintenance/`](backend/scripts/maintenance/README.md) - Manutenção (9 scripts)
+  - [`analysis/`](backend/scripts/analysis/README.md) - Análise (16 scripts)
+  - [`database/`](backend/scripts/database/README.md) - Banco de dados (12 scripts)
+
+📖 **Ver:** [`docs/guides/script-organization-standard.md`](docs/guides/script-organization-standard.md) para detalhes completos
+
+---
+
 ## 🏗️ Nova Arquitetura de Adapters (v2.0)
 
 O MyIA agora utiliza uma arquitetura de adapters especializada por **Inference Type**, resultando em:

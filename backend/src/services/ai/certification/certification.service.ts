@@ -30,6 +30,9 @@ interface AWSCredentials {
   region: string;
 }
 
+// Região padrão para queries sem região especificada
+const DEFAULT_REGION = 'us-east-1';
+
 export class ModelCertificationService {
   /**
    * Busca certificação apenas do cache (sem executar testes)
@@ -39,13 +42,16 @@ export class ModelCertificationService {
    * desnecessário de quota quando o resultado já está em cache.
    *
    * @param modelId - ID do modelo a verificar
+   * @param region - Região AWS (padrão: us-east-1)
    * @returns Resultado da certificação em cache ou null se não encontrado/expirado
    */
-  async getCachedCertification(modelId: string): Promise<CertificationResult | null> {
-    logger.info(`[CertificationService] Verificando cache para ${modelId}`);
+  async getCachedCertification(modelId: string, region: string = DEFAULT_REGION): Promise<CertificationResult | null> {
+    logger.info(`[CertificationService] Verificando cache para ${modelId} (região: ${region})`);
     
     const cached = await prisma.modelCertification.findUnique({
-      where: { modelId }
+      where: { 
+        modelId_region: { modelId, region } 
+      }
     });
     
     if (!cached) {
@@ -128,7 +134,7 @@ export class ModelCertificationService {
     
     // 1. Verificar cache PRIMEIRO (a menos que force=true)
     if (!force) {
-      const cached = await this.getCachedCertification(modelId);
+      const cached = await this.getCachedCertification(modelId, credentials.region);
       if (cached) {
         logger.info(`[CertificationService] ✅ Cache hit para ${modelId}, retornando sem executar testes`);
         
@@ -424,10 +430,16 @@ export class ModelCertificationService {
     };
     
     const savedCertification = await prisma.modelCertification.upsert({
-      where: { modelId },
+      where: { 
+        modelId_region: { 
+          modelId, 
+          region: credentials.region 
+        } 
+      },
       update: updateData,
       create: {
         modelId,
+        region: credentials.region,
         ...updateData
       }
     });
@@ -662,11 +674,13 @@ export class ModelCertificationService {
    * @param modelId - ID do modelo a verificar
    * @returns true se certificado e válido
    */
-  async isCertified(modelId: string): Promise<boolean> {
+  async isCertified(modelId: string, region: string = DEFAULT_REGION): Promise<boolean> {
     const now = new Date();
     
     const certification = await prisma.modelCertification.findUnique({
-      where: { modelId }
+      where: { 
+        modelId_region: { modelId, region } 
+      }
     });
     
     if (!certification) {
@@ -688,9 +702,10 @@ export class ModelCertificationService {
    * Obtém detalhes completos da certificação de um modelo
    *
    * @param modelId - ID do modelo
+   * @param region - Região AWS (padrão: us-east-1)
    * @returns Detalhes da certificação ou null se não encontrado
    */
-  async getCertificationDetails(modelId: string): Promise<{
+  async getCertificationDetails(modelId: string, region: string = DEFAULT_REGION): Promise<{
     modelId: string;
     status: string;
     certifiedAt: Date | null;
@@ -708,7 +723,9 @@ export class ModelCertificationService {
     categorizedError?: CategorizedError;
   } | null> {
     const cert = await prisma.modelCertification.findUnique({
-      where: { modelId }
+      where: { 
+        modelId_region: { modelId, region } 
+      }
     });
     
     if (!cert) {

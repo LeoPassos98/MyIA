@@ -41,6 +41,8 @@ export interface CertificationBadgeProps {
   onClick?: () => void;
   /** Tamanho do badge */
   size?: ChipProps['size'];
+  /** Região AWS (opcional - para certificação regional) */
+  region?: string;
 }
 
 /**
@@ -87,7 +89,8 @@ export function CertificationBadge({
   successRate,
   errorCategory,
   onClick,
-  size = 'small'
+  size = 'small',
+  region
 }: CertificationBadgeProps) {
   
   // ✅ PADRONIZAÇÃO: Tamanhos de ícones baseados no size prop
@@ -107,8 +110,8 @@ export function CertificationBadge({
           icon: <CheckCircle sx={{ fontSize: iconSize }} />,
           label: successRate !== undefined ? `Certificado (${successRate}%)` : 'Certificado',
           tooltip: lastChecked
-            ? `Testado em ${formatRelativeDate(lastChecked)}. Taxa de sucesso: ${successRate || 100}%`
-            : 'Modelo certificado e funcionando corretamente'
+            ? `${region ? `Região: ${region}\n` : ''}Testado em ${formatRelativeDate(lastChecked)}. Taxa de sucesso: ${successRate || 100}%`
+            : `${region ? `Região: ${region}\n` : ''}Modelo certificado e funcionando corretamente`
         };
       
       case 'quality_warning':
@@ -118,8 +121,8 @@ export function CertificationBadge({
           icon: <Warning sx={{ fontSize: iconSize }} />,
           label: 'Aviso de Qualidade',
           tooltip: errorCategory
-            ? `${formatErrorCategory(errorCategory)} - Taxa de sucesso: ${successRate || 0}%`
-            : `Taxa de sucesso abaixo do esperado: ${successRate || 0}%`
+            ? `${region ? `Região: ${region}\n` : ''}${formatErrorCategory(errorCategory)} - Taxa de sucesso: ${successRate || 0}%`
+            : `${region ? `Região: ${region}\n` : ''}Taxa de sucesso abaixo do esperado: ${successRate || 0}%`
         };
       
       case 'failed':
@@ -133,8 +136,8 @@ export function CertificationBadge({
                  status === 'permission_required' ? 'Permissão Necessária' :
                  'Indisponível',
           tooltip: errorCategory
-            ? `Modelo não está respondendo. Erro: ${formatErrorCategory(errorCategory)}`
-            : 'Modelo não está disponível no momento'
+            ? `${region ? `Região: ${region}\n` : ''}Modelo não está respondendo. Erro: ${formatErrorCategory(errorCategory)}`
+            : `${region ? `Região: ${region}\n` : ''}Modelo não está disponível no momento`
         };
       
       default:
@@ -143,7 +146,7 @@ export function CertificationBadge({
           // ✅ PADRONIZAÇÃO: Tamanho de ícone dinâmico baseado no size prop
           icon: <HelpOutline sx={{ fontSize: iconSize }} />,
           label: 'Não Testado',
-          tooltip: 'Este modelo ainda não foi certificado. Clique para certificar.'
+          tooltip: `${region ? `Região: ${region}\n` : ''}Este modelo ainda não foi certificado. Clique para certificar.`
         };
     }
   };

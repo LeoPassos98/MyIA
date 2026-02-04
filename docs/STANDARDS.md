@@ -7,7 +7,7 @@
 
 # Padrões de Desenvolvimento – MyIA
 
-> **NOTA SOBRE NUMERAÇÃO:** As seções têm gaps intencionais (ex: Seção 8 não existe) para permitir futuras adições sem renumerar todo o documento. Isso preserva referências existentes em código e documentação.
+> **NOTA SOBRE NUMERAÇÃO:** As seções têm gaps intencionais para permitir futuras adições sem renumerar todo o documento. Isso preserva referências existentes em código e documentação.
 
 Este documento define regras **estritas e imutáveis** de arquitetura e codificação para o projeto MyIA.
 **ESCOPO:** Estas regras aplicam-se a **TODOS** os diretórios (Frontend, Backend, Scripts e Docs).
@@ -19,6 +19,7 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
 ### 🎯 Fundamentos
 - 1. [Convenções de Arquivos](#1-convenções-de-arquivos-header-obrigatório)
 - 2. [Convenção de Nomes](#2-convenção-de-nomes-naming-convention)
+- 8. [Código Simulado e Transparência](#8-código-simulado-e-modo-de-desenvolvimento-regra-de-transparência)
 - 13. [Sistema de Logging Estruturado](#13-sistema-de-logging-estruturado)
 
 ### 🎨 Frontend
@@ -38,6 +39,7 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
 
 ### 📋 Desenvolvimento
 - 14. [Commits e Versionamento](#14-commits-e-versionamento)
+- 15. [Tamanho de Arquivos e Manutenibilidade](#15-tamanho-de-arquivos-e-manutenibilidade)
 
 ---
 
@@ -235,7 +237,98 @@ const messages = await prisma.message.findMany({
 });
 ```
 
-<!-- Seção 8: RESERVADA para futuras adições -->
+---
+
+## 8. Código Simulado e Modo de Desenvolvimento (Regra de Transparência)
+
+### 8.1 Princípio Fundamental
+
+**Todo código que executa comportamento simulado (mock/fake/stub) DEVE ser explicitamente identificável.**
+
+Esta regra existe para evitar situações onde código de simulação é confundido com código de produção, causando comportamentos inesperados.
+
+### 8.2 Regras Obrigatórias
+
+#### 8.2.1 Marcação Explícita no Código
+
+Todo bloco de código simulado **DEVE** incluir:
+
+```typescript
+// ⚠️ SIMULAÇÃO: Este bloco NÃO executa lógica real
+// TODO: Substituir por implementação real usando [serviço/API específica]
+const passed = Math.random() > 0.3; // Resultado aleatório para testes
+```
+
+#### 8.2.2 Flag de Controle Obrigatória
+
+Simulações **DEVEM** ser controladas por variável de ambiente:
+
+```typescript
+// ✅ CORRETO - Simulação controlada por flag
+const USE_SIMULATION = process.env.CERTIFICATION_SIMULATION === 'true';
+
+if (USE_SIMULATION) {
+  // ⚠️ SIMULAÇÃO ATIVA
+  logger.warn('🎭 MODO SIMULAÇÃO: Usando dados fake para certificação');
+  return { passed: Math.random() > 0.3, simulated: true };
+}
+
+// Código real aqui
+return await realCertificationService.certify(modelId);
+```
+
+#### 8.2.3 Logging de Alerta
+
+Quando simulação está ativa, **DEVE** haver log de warning:
+
+```typescript
+// ✅ OBRIGATÓRIO - Log visível quando simulação está ativa
+logger.warn('🎭 SIMULAÇÃO ATIVA: [nome do serviço/funcionalidade]');
+```
+
+#### 8.2.4 Retorno Identificável
+
+Respostas de código simulado **DEVEM** incluir flag `simulated: true`:
+
+```typescript
+// ✅ CORRETO - Resposta marcada como simulada
+return {
+  result: 'success',
+  data: mockData,
+  simulated: true,  // ← OBRIGATÓRIO
+  simulatedAt: new Date().toISOString()
+};
+```
+
+### 8.3 Checklist Pré-Commit (Simulações)
+
+Antes de commitar código com simulações:
+
+- [ ] Bloco tem comentário `⚠️ SIMULAÇÃO` visível
+- [ ] Controlado por variável de ambiente (não hardcoded `true`)
+- [ ] Log de warning quando simulação está ativa
+- [ ] Resposta inclui `simulated: true`
+- [ ] TODO documentado para implementação real
+- [ ] Padrão por default é **NÃO simular** (produção segura)
+
+### 8.4 Anti-Padrões (PROIBIDO)
+
+```typescript
+// ❌ PROIBIDO - Simulação silenciosa sem marcação
+const passed = Math.random() > 0.3;
+return { passed, score: 75 };
+
+// ❌ PROIBIDO - Simulação sem flag de controle
+const result = generateFakeData(); // Sempre fake
+return result;
+
+// ❌ PROIBIDO - Simulação ativa por padrão
+const USE_REAL = process.env.USE_REAL_API === 'true'; // Default é simulação!
+```
+
+### 8.5 Justificativa
+
+Esta regra foi criada após incidente onde certificações de modelos executaram em modo simulado sem que a equipe percebesse, resultando em resultados aleatórios sendo tratados como reais. A transparência é essencial para evitar confusão entre ambientes de desenvolvimento e produção.
 
 ---
 
@@ -616,7 +709,7 @@ interface LogEntry {
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 ```
 
-> **Detalhes de implementação:** Veja [LOGGING-SYSTEM-PROPOSAL.md](./LOGGING-SYSTEM-PROPOSAL.md)
+> **Detalhes de implementação:** Veja [logging/LOGGING-SYSTEM.md](./logging/LOGGING-SYSTEM.md)
 
 ---
 
@@ -820,7 +913,7 @@ logger.debug('Context service state', {
 });
 ```
 
-> **Guia completo de uso:** Veja [`LOGGING-USAGE-GUIDE.md`](./LOGGING-USAGE-GUIDE.md:1)
+> **Guia completo de uso:** Veja [`logging/README.md`](./logging/README.md:1)
 
 ---
 
@@ -903,7 +996,7 @@ logger.info('Operation', {
 });
 ```
 
-> **Implementação completa:** Veja [LOGGING-SYSTEM-PROPOSAL.md](./LOGGING-SYSTEM-PROPOSAL.md#2-middleware-de-request-id)
+> **Implementação completa:** Veja [logging/LOGGING-SYSTEM.md](./logging/LOGGING-SYSTEM.md#2-middleware-de-request-id)
 
 ---
 
@@ -948,7 +1041,7 @@ Antes de commitar código que usa logging:
 
 ### 13.10 Referências
 
-- **Proposta Completa:** [LOGGING-SYSTEM-PROPOSAL.md](./LOGGING-SYSTEM-PROPOSAL.md)
+- **Proposta Completa:** [logging/LOGGING-SYSTEM.md](./logging/LOGGING-SYSTEM.md)
 - **ADR:** [ADR-005-LOGGING-SYSTEM.md](./architecture/ADR-005-LOGGING-SYSTEM.md)
 
 ---
@@ -1043,12 +1136,14 @@ Antes de cada commit, verificar:
 
 - [ ] **ESLint passa sem erros** (`npm run lint` - 0 errors obrigatório)
 - [ ] **TypeScript compila** (`npm run type-check` - 0 errors obrigatório)
+- [ ] **Tamanho de arquivos** (Pre-commit hook verifica automaticamente)
 - [ ] Código compila sem erros (`npm run build`)
 - [ ] Testes passam (`npm test` se aplicável)
 - [ ] Headers obrigatórios em novos arquivos (Seção 1)
 - [ ] Sem cores hardcoded (Seção 3.2)
 - [ ] JSend em novas rotas (Seção 12)
 - [ ] Segurança validada se modificou rotas (Seção 9.3)
+- [ ] Arquivos não excedem 400 linhas (Seção 15)
 
 **Quality Gates (Portões de Qualidade):**
 ```bash
@@ -1098,3 +1193,293 @@ Manter arquivo `CHANGELOG.md` na raiz:
 - Analytics dashboard with 3 charts
 - Telemetry tracking per message
 ```
+
+---
+
+## 15. Tamanho de Arquivos e Manutenibilidade
+
+### 15.1 Princípios Fundamentais
+
+**Arquivos menores são mais fáceis de entender, testar e manter.**
+
+- ❌ **PROIBIDO:** Arquivos com mais de 400 linhas de código
+- ⚠️ **ATENÇÃO:** Arquivos entre 300-400 linhas (permitido mas desencorajado)
+- ✅ **RECOMENDADO:** Arquivos com até 250 linhas de código
+
+> **Nota:** Contam apenas linhas de código efetivo (excluindo comentários e linhas vazias)
+
+---
+
+### 15.2 Limites por Tipo de Arquivo
+
+| Tipo de Arquivo | Recomendado | Warning | Bloqueado | Justificativa |
+|-----------------|-------------|---------|-----------|---------------|
+| **Controllers** | ≤200 linhas | >250 | >400 | Devem apenas orquestrar, não implementar lógica |
+| **Services** | ≤250 linhas | >300 | >400 | Lógica complexa deve ser dividida em sub-services |
+| **Components (React)** | ≤200 linhas | >250 | >400 | Extrair sub-componentes e custom hooks |
+| **Hooks** | ≤150 linhas | >200 | >300 | Dividir em hooks menores e mais focados |
+| **Utilities** | ≤150 linhas | >200 | >300 | Funções utilitárias devem ser atômicas |
+| **Types/Interfaces** | ≤100 linhas | >150 | >200 | Dividir em múltiplos arquivos por domínio |
+| **Config** | ≤200 linhas | >250 | >400 | Separar por ambiente ou feature |
+
+---
+
+### 15.3 Pre-Commit Hook (Verificação Automática)
+
+O projeto possui um **pre-commit hook** que verifica automaticamente o tamanho dos arquivos staged:
+
+**Localização:** [`.husky/check-file-size.sh`](../.husky/check-file-size.sh)
+
+**Comportamento:**
+
+1. **⚠️ WARNING (300-400 linhas):**
+   - Mostra aviso mas **permite commit**
+   - Sugere refatoração
+   - Não bloqueia o desenvolvimento
+
+2. **🚨 ERROR (>400 linhas):**
+   - **Bloqueia commit**
+   - Exige refatoração antes de commitar
+   - Garante que código crítico não entre no repositório
+
+**Exemplo de Output (Warning):**
+
+```bash
+⚠️  FILE SIZE WARNING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The following files exceed recommended size:
+
+  ⚠ backend/src/controllers/chatController.ts (350 lines) - Consider refactoring
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 RECOMMENDATIONS:
+  • Extract complex logic into separate functions
+  • Split large components into smaller ones
+  • Move reusable code to utility files
+  • Consider using composition patterns
+
+📏 Size Guidelines:
+  • Recommended: ≤250 lines
+  • Warning: >300 lines (current)
+  • Blocked: >400 lines
+
+✓ Commit allowed (warning only)
+```
+
+---
+
+### 15.4 Estratégias de Refatoração
+
+#### 15.4.1 Controllers Grandes
+
+**Problema:** Controller com muitas rotas ou lógica complexa
+
+**Solução:**
+```typescript
+// ❌ ANTES (400+ linhas)
+// backend/src/controllers/chatController.ts
+export async function sendMessage(req, res) {
+  // 50 linhas de validação
+  // 100 linhas de lógica de contexto
+  // 80 linhas de chamada à IA
+  // 50 linhas de processamento de resposta
+  // 40 linhas de salvamento no banco
+}
+
+// ✅ DEPOIS (150 linhas)
+// backend/src/controllers/chatController.ts
+export async function sendMessage(req, res) {
+  const context = await contextService.buildContext(req.body);
+  const response = await aiService.generate(context);
+  const saved = await chatService.saveMessage(response);
+  return res.json(jsend.success(saved));
+}
+
+// backend/src/services/chat/contextService.ts (100 linhas)
+// backend/src/services/ai/aiService.ts (120 linhas)
+// backend/src/services/chat/chatService.ts (80 linhas)
+```
+
+#### 15.4.2 Services Grandes
+
+**Problema:** Service com múltiplas responsabilidades
+
+**Solução:**
+```typescript
+// ❌ ANTES (500+ linhas)
+// backend/src/services/ai/certificationService.ts
+class CertificationService {
+  async certifyModel() { /* 100 linhas */ }
+  async runTests() { /* 150 linhas */ }
+  async categorizeErrors() { /* 80 linhas */ }
+  async calculateRating() { /* 100 linhas */ }
+  async saveResults() { /* 70 linhas */ }
+}
+
+// ✅ DEPOIS
+// backend/src/services/ai/certification/certification.service.ts (150 linhas)
+// backend/src/services/ai/certification/test-runner.ts (180 linhas)
+// backend/src/services/ai/certification/error-categorizer.ts (100 linhas)
+// backend/src/services/ai/rating/rating-calculator.ts (120 linhas)
+```
+
+#### 15.4.3 Components React Grandes
+
+**Problema:** Component com muita lógica e JSX
+
+**Solução:**
+```typescript
+// ❌ ANTES (600+ linhas)
+// frontend/src/features/settings/AWSProviderPanel.tsx
+export function AWSProviderPanel() {
+  // 100 linhas de useState/useEffect
+  // 200 linhas de handlers
+  // 300 linhas de JSX
+}
+
+// ✅ DEPOIS (180 linhas)
+// frontend/src/features/settings/AWSProviderPanel.tsx
+export function AWSProviderPanel() {
+  const logic = useAWSProviderLogic(); // Custom hook
+  return (
+    <>
+      <CredentialsSection {...logic.credentials} />
+      <RegionsSection {...logic.regions} />
+      <ModelsSection {...logic.models} />
+    </>
+  );
+}
+
+// frontend/src/features/settings/hooks/useAWSProviderLogic.ts (150 linhas)
+// frontend/src/features/settings/components/CredentialsSection.tsx (100 linhas)
+// frontend/src/features/settings/components/RegionsSection.tsx (120 linhas)
+// frontend/src/features/settings/components/ModelsSection.tsx (140 linhas)
+```
+
+---
+
+### 15.5 Análise Automatizada
+
+O projeto possui um script de análise que gera relatórios detalhados:
+
+**Executar Análise:**
+```bash
+cd backend
+npx tsx scripts/analyze-file-sizes.ts
+```
+
+**Output:**
+- Relatório completo em [`docs/FILE_SIZE_ANALYSIS_REPORT.md`](./FILE_SIZE_ANALYSIS_REPORT.md)
+- Estatísticas por tipo de arquivo
+- Top 10 maiores arquivos
+- Recomendações de refatoração priorizadas
+
+**Quando Executar:**
+- Antes de iniciar refatorações grandes
+- Após merge de features significativas
+- Mensalmente (para monitoramento)
+- Antes de releases
+
+---
+
+### 15.6 Processo de Code Review
+
+#### 15.6.1 Checklist para Reviewer
+
+Ao revisar PRs, verificar:
+
+- [ ] Nenhum arquivo novo excede 400 linhas
+- [ ] Arquivos modificados não cresceram significativamente (>50 linhas)
+- [ ] Se arquivo está entre 300-400 linhas, há justificativa no PR
+- [ ] Lógica complexa foi extraída para funções/services separados
+- [ ] Components grandes foram divididos em sub-components
+- [ ] Hooks grandes foram divididos em hooks menores
+
+#### 15.6.2 Justificativas Aceitáveis
+
+Arquivos entre 300-400 linhas são aceitáveis SE:
+
+1. **Arquivo de Configuração Complexo:**
+   - Exemplo: Registro de modelos com múltiplos providers
+   - Justificativa: Centralização necessária para manutenção
+
+2. **Component de Formulário Extenso:**
+   - Exemplo: Formulário com 20+ campos e validações
+   - Justificativa: Coesão de UX (usuário vê como uma única tela)
+
+3. **Service com Lógica de Domínio Coesa:**
+   - Exemplo: Service de certificação com múltiplos testes relacionados
+   - Justificativa: Lógica fortemente acoplada ao domínio
+
+**❌ Justificativas NÃO Aceitáveis:**
+- "Não tive tempo de refatorar"
+- "É mais fácil manter tudo junto"
+- "Vou refatorar depois" (sem issue criada)
+
+---
+
+### 15.7 Métricas de Qualidade
+
+**Objetivo do Projeto:** Manter **>90%** dos arquivos abaixo de 250 linhas
+
+**Status Atual (2026-02-02):**
+- ✅ **93.1%** dos arquivos estão saudáveis (≤250 linhas)
+- ⚠️ **4.1%** precisam de atenção (251-400 linhas)
+- 🚨 **2.8%** são críticos (>400 linhas)
+
+**Meta para Q1 2026:**
+- ✅ **95%** dos arquivos abaixo de 250 linhas
+- ⚠️ **5%** entre 251-400 linhas
+- 🚨 **0%** acima de 400 linhas
+
+---
+
+### 15.8 Exceções e Casos Especiais
+
+#### 15.8.1 Arquivos de Teste
+
+Arquivos de teste (`*.test.ts`, `*.spec.ts`) têm limites mais flexíveis:
+
+- Recomendado: ≤400 linhas
+- Warning: >500 linhas
+- Bloqueado: >600 linhas
+
+**Justificativa:** Testes podem ter múltiplos casos e fixtures, mas ainda devem ser organizados.
+
+#### 15.8.2 Arquivos Gerados
+
+Arquivos gerados automaticamente (ex: Prisma Client, GraphQL types) são **isentos** da verificação.
+
+**Identificação:**
+- Comentário `@generated` no topo do arquivo
+- Localização em diretórios `generated/` ou `.generated/`
+
+---
+
+### 15.9 Checklist de Conformidade
+
+Antes de commitar código:
+
+- [ ] Nenhum arquivo novo excede 400 linhas
+- [ ] Arquivos modificados não cresceram >50 linhas sem justificativa
+- [ ] Pre-commit hook passou sem erros
+- [ ] Se warning apareceu, considerei refatoração
+- [ ] Lógica complexa foi extraída para módulos separados
+- [ ] Components grandes foram divididos
+- [ ] Hooks grandes foram divididos
+- [ ] Issue de refatoração criada para arquivos legados (se aplicável)
+
+---
+
+### 15.10 Referências
+
+- **Relatório de Análise:** [`docs/FILE_SIZE_ANALYSIS_REPORT.md`](./FILE_SIZE_ANALYSIS_REPORT.md)
+- **Script de Análise:** [`backend/scripts/analyze-file-sizes.ts`](../backend/scripts/analyze-file-sizes.ts)
+- **Pre-Commit Hook:** [`.husky/check-file-size.sh`](../.husky/check-file-size.sh)
+
+**Estudos e Boas Práticas:**
+- Clean Code (Robert C. Martin) - Recomenda funções/classes pequenas
+- Google Style Guides - Limita arquivos a ~500 linhas
+- Airbnb JavaScript Style Guide - Recomenda componentes pequenos
+- Microsoft TypeScript Guidelines - Sugere módulos coesos e pequenos
+

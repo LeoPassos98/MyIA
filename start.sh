@@ -2,13 +2,14 @@
 # start.sh - Gerenciador de Processos MyIA
 # Documentação completa: START-SH-DOCS.md
 #
-# Uso: ./start.sh [start|stop|restart|status] [backend|frontend|both]
+# Uso: ./start.sh [start|stop|restart|status|studio] [backend|frontend|both]
 #
 # Exemplos:
 #   ./start.sh start both      # Inicia backend + frontend
 #   ./start.sh stop backend    # Para apenas backend
 #   ./start.sh restart both    # Reinicia ambos
 #   ./start.sh status          # Mostra status
+#   ./start.sh studio          # Abre Prisma Studio
 #
 # Features:
 #   - Quality Gates automáticos (ESLint + TypeScript)
@@ -40,10 +41,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
+DIM='\033[2m'
 NC='\033[0m' # No Color
 
 usage() {
-  echo "Usage: $0 {start|stop|restart|status} {backend|frontend|both}" >&2
+  echo "Usage: $0 {start|stop|restart|status|studio} {backend|frontend|both}" >&2
   exit 1
 }
 
@@ -103,13 +105,30 @@ wait_for_server() {
   echo -e "${BLUE}⏳${NC} Aguardando $name iniciar na porta $port..."
   
   while [ $waited -lt $max_wait ]; do
+    # Primeiro verifica se porta está aberta
     if lsof -ti:$port >/dev/null 2>&1; then
-      echo -e "${GREEN}✓${NC} $name está respondendo na porta $port"
-      return 0
+      # Se for backend, tenta health check
+      if [ "$name" = "Backend" ]; then
+        if curl -s -f "http://localhost:$port/api/health" >/dev/null 2>&1; then
+          echo -e "\n${GREEN}✓${NC} $name está respondendo na porta $port (health check OK em ${waited}s)"
+          return 0
+        fi
+      else
+        # Frontend não tem health check, apenas porta é suficiente
+        echo -e "\n${GREEN}✓${NC} $name está respondendo na porta $port (em ${waited}s)"
+        return 0
+      fi
     fi
+    
     sleep 1
     waited=$((waited + 1))
-    printf "."
+    
+    # Feedback visual a cada 5 segundos
+    if [ $((waited % 5)) -eq 0 ]; then
+      echo -e "   ${DIM}Ainda aguardando... (${waited}s/${max_wait}s)${NC}"
+    else
+      printf "."
+    fi
   done
   
   echo -e "\n${RED}✗${NC} $name não respondeu após ${max_wait}s. Verifique os logs:"
@@ -131,9 +150,22 @@ kill_process_tree() {
   done
   
   if kill -0 "$pid" >/dev/null 2>&1; then
+    # Envia SIGTERM para parada graceful
     kill "$pid" >/dev/null 2>&1 || true
-    sleep 0.5
+    
+    # Aguarda até 10 segundos para processo terminar
+    local count=0
+    while [ $count -lt 10 ]; do
+      if ! kill -0 "$pid" >/dev/null 2>&1; then
+        return 0
+      fi
+      sleep 1
+      count=$((count + 1))
+    done
+    
+    # Se ainda estiver rodando após 10s, força parada
     if kill -0 "$pid" >/dev/null 2>&1; then
+      echo -e "${YELLOW}⚠${NC}  Processo $pid não terminou gracefully, forçando parada..."
       kill -9 "$pid" >/dev/null 2>&1 || true
     fi
   fi
@@ -306,6 +338,53 @@ status() {
   echo ""
 }
 
+# --- BEGIN: Prisma Studio helper (adicionado) ---
+get_database_url_from_env_file() {
+  local env_file="$BACKEND_DIR/.env"
+  # 1) Tentar extrair de backend/.env
+  if [ -f "$env_file" ]; then
+    local url
+    url=$(grep -E '^DATABASE_URL=' "$env_file" | sed -E 's/^DATABASE_URL=(.*)$/\1/' | sed -E 's/^"(.*)"$/\1/')
+    if [ -n "$url" ]; then
+      echo "$url"
+      return 0
+    fi
+  fi
+
+  # 2) Tentar variável de ambiente no processo atual
+  if [ -n "${DATABASE_URL:-}" ]; then
+    echo "$DATABASE_URL"
+    return 0
+  fi
+
+  return 1
+}
+
+start_prisma_studio() {
+  echo -e "\n${BLUE}▶${NC} Abrindo Prisma Studio..."
+  local url
+
+  if url=$(get_database_url_from_env_file); then
+    echo -e "${GREEN}✓${NC} DATABASE_URL detectada (usando backend/.env ou variável de ambiente)"
+  else
+    # Prompt interativo como fallback
+    read -r -p "DATABASE_URL não encontrada. Cole a connection string ou pressione ENTER para cancelar: " url
+    if [ -z "$url" ]; then
+      echo -e "${YELLOW}Cancelado.${NC}"
+      return 1
+    fi
+  fi
+
+  # Executar Prisma Studio dentro da pasta backend com a URL fornecida
+  (cd "$BACKEND_DIR" && npx prisma studio --url "$url")
+  local rc=$?
+  if [ $rc -ne 0 ]; then
+    echo -e "${RED}✗ Falha ao iniciar Prisma Studio. Verifique a connection string e dependências.${NC}"
+    return $rc
+  fi
+}
+# --- END: Prisma Studio helper (adicionado) ---
+
 # Parse args
 if [ $# -lt 1 ]; then
   usage
@@ -368,6 +447,10 @@ case "$ACTION" in
     ;;
   status)
     status
+    ;;
+  studio)
+    # Abre Prisma Studio (tenta detectar DATABASE_URL automaticamente)
+    start_prisma_studio
     ;;
   *) usage ;;
 esac

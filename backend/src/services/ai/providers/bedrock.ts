@@ -95,10 +95,10 @@ function getRegionPrefix(region: string): string {
 /**
  * Converte modelId para Inference Profile ID se necessário
  * @param modelId ID do modelo (pode conter sufixo)
- * @param region Região AWS (ex: 'us-east-1')
+ * @param _region Região AWS (ex: 'us-east-1')
  * @returns Inference Profile ID ou modelId original
  */
-function getInferenceProfileId(modelId: string, region: string): string {
+function getInferenceProfileId(modelId: string, _region: string): string {
   // Normalizar antes de processar
   const baseModelId = normalizeModelId(modelId);
   
@@ -109,9 +109,7 @@ function getInferenceProfileId(modelId: string, region: string): string {
   }
   
   // ✅ REATIVADO: Adicionar prefixo regional para modelos que requerem Inference Profile
-  // TODO: Refatorar para usar import estático após resolver dependência circular
-  // Temporariamente desabilitado para permitir commit sem erros ESLint
-  /*
+  // Usando require() dinâmico para evitar dependência circular
   try {
     const { ModelRegistry } = require('../registry');
     const platformRule = ModelRegistry.getPlatformRules(baseModelId, 'bedrock');
@@ -120,15 +118,14 @@ function getInferenceProfileId(modelId: string, region: string): string {
     
     if (platformRule?.rule === 'requires_inference_profile') {
       // Usar system-defined inference profile
-      const regionPrefix = getRegionPrefix(region); // ✅ CORRETO: 'apac' para regiões ap-*
+      const regionPrefix = getRegionPrefix(_region); // ✅ CORRETO: 'apac' para regiões ap-*
       const inferenceProfileId = `${regionPrefix}.${baseModelId}`;
-      logger.info(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${region})`);
+      logger.info(`🔄 [Bedrock] Using Inference Profile: ${inferenceProfileId} (region: ${_region})`);
       return inferenceProfileId;
     }
   } catch (error) {
     logger.error(`❌ [getInferenceProfileId] Error loading ModelRegistry:`, error);
   }
-  */
   
   logger.info(`🔍 [getInferenceProfileId] No inference profile needed for: ${baseModelId}`);
   return baseModelId;
@@ -271,17 +268,19 @@ export class BedrockProvider extends BaseAIProvider {
     const modelIdWithProfile = getInferenceProfileId(normalizedModelId, this.region);
     
     // Verificar se modelo requer inference profile
-    // TODO: Refatorar para usar import estático após resolver dependência circular
-    const requiresInferenceProfile = false;
-    /*
+    // Usando require() dinâmico para evitar dependência circular
+    let requiresInferenceProfile = false;
     try {
       const { ModelRegistry } = require('../registry');
       const platformRule = ModelRegistry.getPlatformRules(normalizedModelId, 'bedrock');
       requiresInferenceProfile = platformRule?.rule === 'requires_inference_profile';
+      
+      if (requiresInferenceProfile) {
+        logger.info(`🔍 [Bedrock] Model ${normalizedModelId} requires Inference Profile`);
+      }
     } catch (error) {
       logger.debug(`[Bedrock] Could not check platform rules:`, error);
     }
-    */
     
     // 🧪 AUTO-TEST: Tentar múltiplas variações do modelId até encontrar a correta
     let modelIdVariations: string[];

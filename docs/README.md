@@ -4,6 +4,23 @@
 
 ---
 
+## 📌 Fontes de Verdade (Single Source of Truth)
+
+| Tema | Documento Principal | Descrição |
+|------|-------------------|-----------|
+| 🔐 **Padrões** | [STANDARDS.md](STANDARDS.md) | Regras imutáveis do projeto |
+| 📝 **Logging** | [logging/LOGGING-SYSTEM.md](logging/LOGGING-SYSTEM.md) | Sistema completo de logs |
+| 🔧 **Correções** | [fixes/README.md](fixes/README.md) | Índice de todas as correções |
+| ☁️ **AWS Bedrock** | [aws/AWS-BEDROCK-SETUP.md](aws/AWS-BEDROCK-SETUP.md) | Setup e troubleshooting |
+| 🏗️ **Arquitetura** | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | Visão geral da arquitetura |
+| 🔒 **Segurança** | [security/SECURITY-STANDARDS.md](security/SECURITY-STANDARDS.md) | Padrões de segurança |
+| 📡 **API** | [api/api-endpoints.md](api/api-endpoints.md) | Endpoints REST |
+| 🔍 **Auditoria** | [audit/audit-v1.4.md](audit/audit-v1.4.md) | Sistema de auditoria |
+
+**Regra:** Se você precisa de informação sobre um tema, consulte APENAS o documento principal listado acima.
+
+---
+
 ## 🎯 Documentos Essenciais (Leia Primeiro)
 
 ### 1. [STANDARDS.md](STANDARDS.md) ⭐ **OBRIGATÓRIO**
@@ -23,6 +40,7 @@
 docs/
 ├── README.md                          # Este arquivo (índice central)
 ├── STANDARDS.md                       # ⭐ Regras imutáveis
+├── REFACTORING-PLAN.md                # 📋 Plano de refatoração da documentação
 │
 ├── architecture/                      # 🏗️ Arquitetura e Design
 │   ├── ARCHITECTURE.md
@@ -30,6 +48,17 @@ docs/
 │   ├── ARCHITECTURE-MODEL-ADAPTERS.md
 │   ├── IMPLEMENTATION-ANALYSIS-ADAPTERS.md
 │   └── ADR-004.md
+│
+├── logging/                           # 📝 Sistema de Logging
+│   ├── README.md                      # Guia rápido de logging
+│   ├── LOGGING-SYSTEM.md              # Sistema completo de logs
+│   └── LOGS-API.md                    # API de logs
+│
+├── fixes/                             # 🔧 Correções e Hotfixes
+│   ├── README.md                      # Índice de correções
+│   ├── CORRECOES-GERAIS.md            # Correções gerais
+│   ├── BADGES-FIXES.md                # Correções de badges
+│   └── GRAFANA-FIXES.md               # Correções do Grafana
 │
 ├── performance/                       # ⚡ Otimizações de Performance
 │   ├── README.md                      # Índice de performance
@@ -113,12 +142,15 @@ docs/
 │   ├── TEST-PLAN-MANUAL.md
 │   └── testing.md
 │
-├── archive/                           # 📦 Relatórios Históricos
-│   ├── JSEND-COMPLETE.md
-│   ├── JSEND-MIGRATION-DONE.md
-│   ├── SECURITY-PHASE1-DONE.md
-│   ├── SECURITY-PHASE2-DONE.md
-│   └── (outros relatórios de migrações concluídas)
+├── archive/                           # 📦 Documentos Arquivados
+│   ├── MOVED-FILES-LOG.md             # Log de arquivos movidos
+│   ├── logging/                       # Docs de logging consolidados
+│   ├── fixes/                         # Correções consolidadas
+│   ├── certification/                 # Certificação arquivada
+│   ├── reports/                       # Relatórios históricos
+│   ├── guides/                        # Guias obsoletos
+│   ├── frontend/                      # Docs de frontend arquivados
+│   └── standards/                     # Análises de padrões antigas
 │
 └── obsolete/                          # 🗑️ Documentação Obsoleta
     ├── progress.md
@@ -136,6 +168,19 @@ Documentação sobre design, padrões e decisões arquiteturais
 - **[ARCHITECTURE-DIAGRAMS.md](architecture/ARCHITECTURE-DIAGRAMS.md)** - Diagramas visuais do sistema
 - **[ARCHITECTURE-MODEL-ADAPTERS.md](architecture/ARCHITECTURE-MODEL-ADAPTERS.md)** - Sistema de adapters
 - **[ADR-004.md](architecture/ADR-004.md)** - Architecture Decision Record
+
+### 📝 [Logging](logging/)
+Sistema completo de logging e monitoramento
+- **[README.md](logging/README.md)** - Guia rápido de logging
+- **[LOGGING-SYSTEM.md](logging/LOGGING-SYSTEM.md)** - Sistema completo de logs
+- **[LOGS-API.md](logging/LOGS-API.md)** - API de logs
+
+### 🔧 [Correções](fixes/)
+Hotfixes e correções documentadas
+- **[README.md](fixes/README.md)** - Índice de todas as correções
+- **[CORRECOES-GERAIS.md](fixes/CORRECOES-GERAIS.md)** - Correções gerais
+- **[BADGES-FIXES.md](fixes/BADGES-FIXES.md)** - Correções de badges
+- **[GRAFANA-FIXES.md](fixes/GRAFANA-FIXES.md)** - Correções do Grafana
 
 ### ⚡ [Performance](performance/)
 Otimizações, análises e melhores práticas de performance
@@ -238,26 +283,34 @@ TOKEN=$(./get-test-token.sh | tail -n1)
 
 | Métrica | Valor |
 |---------|-------|
-| **Categorias** | 10 |
-| **Documentos principais** | 45+ |
+| **Categorias** | 12 |
+| **Documentos principais** | ~110 |
+| **Documentos arquivados** | 44 |
 | **Linhas de documentação** | ~6.000+ |
 | **Cobertura** | 100% |
-| **Última reorganização** | 2026-01-20 |
+| **Última refatoração** | 2026-02-04 |
 
 ---
 
 ## 🔄 Manutenção
 
-**Última atualização:** 2026-01-21  
-**Versão:** 1.12.0  
-**Status:** ✅ Reorganizado e centralizado
+**Última atualização:** 2026-02-04  
+**Versão:** 2.0.0  
+**Status:** ✅ Refatoração Fase 4 concluída
 
 **Mudanças recentes:**
-- ✅ Consolidação de documentação espalhada pelo projeto
-- ✅ Movimentação de arquivos da raiz para docs/
-- ✅ Criação de pasta obsolete/ (substituindo deprecated/)
-- ✅ Atualização completa do índice com novos arquivos
-- ✅ Organização de relatórios e guias em categorias apropriadas
+- ✅ **Fase 1:** Estrutura de pastas criada (logging/, fixes/)
+- ✅ **Fase 2:** Documentos consolidados criados
+- ✅ **Fase 3:** 44 arquivos movidos para archive/
+- ✅ **Fase 4:** Links e índices atualizados
+- ✅ Seção "Fontes de Verdade" adicionada
+- ✅ Estrutura de documentação reorganizada
+- ✅ Links para documentos de logging atualizados
+- ✅ Links para documentos de fixes atualizados
+
+**Documentos de referência:**
+- 📋 [Plano de Refatoração](REFACTORING-PLAN.md) - Plano completo da refatoração
+- 📦 [Log de Arquivos Movidos](archive/MOVED-FILES-LOG.md) - Histórico de movimentações
 
 ---
 

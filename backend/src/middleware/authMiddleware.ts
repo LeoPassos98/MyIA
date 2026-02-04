@@ -23,10 +23,6 @@ export const authMiddleware = async (
   _res: Response,
   next: NextFunction
 ) => {
-  // 👇 ADICIONE ESSES LOGS DE DEBUG
-  logger.info(`[AuthMiddleware] Método: ${req.method} | URL: ${req.originalUrl}`);
-  logger.info('[AuthMiddleware] Headers recebidos:', req.headers.authorization ? 'Com Token' : 'SEM TOKEN');
-
   // Se for uma requisição de pré-verificação (OPTIONS), deixa passar sem checar token
   if (req.method === 'OPTIONS') {
     return next();
@@ -35,7 +31,6 @@ export const authMiddleware = async (
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    // Vamos logar o erro antes de retornar
     logger.error('[AuthMiddleware] ❌ Bloqueado: Header Authorization ausente');
     return next(new AppError('No token provided', 401));
   }

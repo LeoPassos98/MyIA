@@ -322,4 +322,4 @@ logger.info('Inference completed', {
 * [ADR-004 — Auditoria como Objeto Rico](./ADR-004.md)
 * [Winston Documentation](https://github.com/winstonjs/winston)
 * [Grafana Loki](https://grafana.com/oss/loki/)
-* [LOGGING-SYSTEM-PROPOSAL.md](../LOGGING-SYSTEM-PROPOSAL.md)
+* [logging/LOGGING-SYSTEM.md](../logging/LOGGING-SYSTEM.md)

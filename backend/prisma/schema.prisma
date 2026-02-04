@@ -185,6 +185,9 @@ model AIModel {
   providerId String
   provider   AIProvider @relation(fields: [providerId], references: [id])
 
+  // Relacionamento com certificações de jobs
+  jobCertifications JobCertification[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -208,7 +211,8 @@ model UserProviderCredential {
 }
 
 // 4. Certificação de Modelos (Sistema de Validação Automática)
-model ModelCertification {
+// LEGACY: Mantido para compatibilidade - será migrado para ModelCertification regional
+model ModelCertificationLegacy {
   id      String @id @default(cuid())
   modelId String @unique
   vendor  String // anthropic, cohere, amazon
@@ -256,7 +260,178 @@ model ModelCertification {
   @@index([rating]) // Para ordenação por rating
   @@index([badge]) // Para filtros por badge
   @@index([ratingUpdatedAt]) // Para cache de rating
+  @@map("model_certifications_legacy")
+}
+
+// 4.1. Certificação Regional de Modelos (Fase 3: Certificação por Região AWS)
+model ModelCertification {
+  id        String   @id @default(uuid())
+  modelId   String
+  region    String   // AWS region: us-east-1, us-west-2, etc.
+  vendor    String?  // anthropic, cohere, amazon, meta, etc.
+  
+  // Status
+  status    CertificationStatus @default(PENDING)
+  
+  // Certificação
+  certifiedAt DateTime?
+  expiresAt   DateTime?
+  certifiedBy String? // 'system' ou userId
+  
+  // Testes
+  lastTestedAt DateTime?
+  testsPassed  Int       @default(0)
+  testsFailed  Int       @default(0)
+  successRate  Float     @default(0)
+  
+  // Performance
+  avgLatencyMs   Int?
+  lastError      String?
+  failureReasons Json? // Array de erros
+  
+  // Resultados detalhados
+  passed    Boolean?
+  score     Float?
+  testResults Json?   // Resultados detalhados dos testes
+  errorMessage String?
+  errorCategory String? // UNAVAILABLE, PERMISSION_ERROR, etc
+  errorSeverity String? // CRITICAL, HIGH, MEDIUM, LOW
+  
+  // Sistema de Rating (Fase 2)
+  rating           Float?    // 0-5.0
+  badge            String?   // PREMIUM, RECOMENDADO, FUNCIONAL, etc
+  metrics          Json?     // ModelMetrics (successRate, averageRetries, etc.)
+  scores           Json?     // ModelScores (success, resilience, performance, stability)
+  ratingUpdatedAt  DateTime? // Timestamp da última atualização do rating
+  
+  // Metadados
+  jobId     String?  // Bull Queue job ID
+  startedAt DateTime?
+  completedAt DateTime?
+  duration  Int?     // Duração em ms
+  
+  // Auditoria
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  // User ID que iniciou
+  
+  // Relacionamentos - REMOVIDO: FK para ai_models causava conflito
+  // O modelId aqui é o apiModelId do registry (ex: "anthropic.claude-3-sonnet")
+  // não o UUID do banco. Certificações podem existir para modelos não cadastrados.
+  
+  // Índices
+  @@unique([modelId, region])
+  @@index([status])
+  @@index([region])
+  @@index([jobId])
+  @@index([createdAt])
+  @@index([vendor])
+  @@index([badge])
+  @@index([rating])
+  @@index([errorCategory])
+  @@index([modelId]) // Adicionado para buscas por modelo
   @@map("model_certifications")
+}
+
+// 4.2. Jobs de Certificação (Fase 3: Processamento Assíncrono)
+model CertificationJob {
+  id        String   @id @default(uuid())
+  
+  // Configuração do job
+  type      CertificationJobType
+  regions   String[] // Regiões a certificar
+  modelIds  String[] // IDs dos modelos (vazio = todos)
+  
+  // Status
+  status    JobStatus @default(PENDING)
+  
+  // Progresso
+  totalModels     Int @default(0)
+  processedModels Int @default(0)
+  successCount    Int @default(0)
+  failureCount    Int @default(0)
+  
+  // Metadados
+  bullJobId String?  // Bull Queue job ID
+  startedAt DateTime?
+  completedAt DateTime?
+  duration  Int?     // Duração em ms
+  
+  // Configurações
+  config    Json?    // Configurações adicionais
+  
+  // Auditoria
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  // User ID que iniciou
+  
+  // Relação com certificações individuais
+  certifications JobCertification[]
+  
+  // Índices
+  @@index([status])
+  @@index([type])
+  @@index([bullJobId])
+  @@index([createdAt])
+  @@map("certification_jobs")
+}
+
+// Certificações individuais por job
+model JobCertification {
+  id            String   @id @default(uuid())
+  jobId         String
+  job           CertificationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  modelId       String
+  model         AIModel  @relation(fields: [modelId], references: [id])
+  
+  region        String
+  status        String   // PASSED, FAILED, WARNING, PENDING, PROCESSING
+  
+  startedAt     DateTime?
+  completedAt   DateTime?
+  duration      Int?     // Duração em ms
+  
+  error         String?  @db.Text
+  details       Json?    // Detalhes adicionais (testes, métricas, etc)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([jobId])
+  @@index([modelId])
+  @@index([status])
+  @@unique([jobId, modelId, region])
+  @@map("job_certifications")
+}
+
+// Enums para Certificação Regional
+enum CertificationStatus {
+  PENDING         // Aguardando processamento
+  QUEUED          // Na fila Bull
+  PROCESSING      // Sendo processado
+  COMPLETED       // Concluído com sucesso
+  FAILED          // Falhou
+  CANCELLED       // Cancelado
+  CERTIFIED       // Certificado (modelo aprovado)
+  QUALITY_WARNING // Funcional mas com problemas de qualidade
+}
+
+enum CertificationJobType {
+  SINGLE_MODEL    // Certificar um modelo específico
+  MULTIPLE_MODELS // Certificar múltiplos modelos
+  ALL_MODELS      // Certificar todos os modelos
+  RECERTIFY       // Re-certificar modelos existentes
+}
+
+enum JobStatus {
+  PENDING      // Aguardando processamento
+  QUEUED       // Na fila Bull
+  PROCESSING   // Sendo processado
+  COMPLETED    // Concluído
+  FAILED       // Falhou
+  CANCELLED    // Cancelado
+  PAUSED       // Pausado
 }
 
 // 5. Sistema de Logging Estruturado (Fase 2: PostgreSQL)

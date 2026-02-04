@@ -24,6 +24,7 @@ import providersRoutes from './routes/providers';
 import certificationRoutes from './routes/certificationRoutes';
 import modelsRoutes from './routes/modelsRoutes';
 import logsRoutes from './routes/logsRoutes';
+import certificationQueueRoutes from './routes/certificationQueueRoutes';
 import passport from './config/passport';
 
 
@@ -108,6 +109,7 @@ app.use('/api/audit', apiLimiter, auditRoutes);
 app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
 app.use('/api/providers', apiLimiter, providersRoutes);
 app.use('/api/certification', certificationRoutes);
+app.use('/api/certification-queue', apiLimiter, certificationQueueRoutes);
 app.use('/api/models', apiLimiter, modelsRoutes);
 app.use('/api/logs', apiLimiter, logsRoutes);
 

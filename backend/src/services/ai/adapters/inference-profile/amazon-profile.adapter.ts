@@ -107,6 +107,14 @@ export class AmazonProfileAdapter extends BaseModelAdapter {
   }
 
   parseChunk(chunk: any): AdapterChunk {
+    // Handle null/undefined chunks
+    if (!chunk) {
+      return {
+        type: 'chunk',
+        content: '',
+      };
+    }
+
     // Nova format (Converse API) - content block delta
     if (chunk.contentBlockDelta?.delta?.text) {
       return {

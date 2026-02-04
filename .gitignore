@@ -45,3 +45,6 @@ temp/
 # Observability data
 observability/data/
 observability/*.pid
+
+# Backups de reorganização
+backups/scripts-backup-*/

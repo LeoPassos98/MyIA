@@ -99,6 +99,14 @@ export class AnthropicOnDemandAdapter extends BaseModelAdapter {
   }
 
   parseChunk(chunk: any): AdapterChunk {
+    // Handle null/undefined chunks
+    if (!chunk) {
+      return {
+        type: 'chunk',
+        content: '',
+      };
+    }
+
     // Content block delta (text streaming)
     if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
       return {
@@ -118,7 +126,7 @@ export class AnthropicOnDemandAdapter extends BaseModelAdapter {
     if (chunk.type === 'error' || chunk.error) {
       return {
         type: 'error',
-        error: chunk.error?.message || chunk.message || 'Unknown error',
+        error: typeof chunk.error === 'string' ? chunk.error : chunk.error?.message || chunk.message || 'Unknown error',
       };
     }
 

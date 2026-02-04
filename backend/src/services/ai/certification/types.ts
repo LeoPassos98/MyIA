@@ -49,15 +49,22 @@ export enum ErrorSeverity {
 
 /**
  * Status de certificação expandido
+ * NOTA: Valores devem corresponder ao enum CertificationStatus do Prisma
  */
 export enum ModelCertificationStatus {
-  UNTESTED = 'untested',
-  TESTING = 'testing',
-  CERTIFIED = 'certified',
-  FAILED = 'failed',
-  QUALITY_WARNING = 'quality_warning',  // Novo: funciona mas com avisos
-  DEPRECATED = 'deprecated',
-  MONITORING = 'monitoring'
+  PENDING = 'PENDING',
+  QUEUED = 'QUEUED',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  CERTIFIED = 'CERTIFIED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  QUALITY_WARNING = 'QUALITY_WARNING',
+  // Valores legados (mapeamento)
+  UNTESTED = 'PENDING',
+  TESTING = 'PROCESSING',
+  DEPRECATED = 'FAILED',
+  MONITORING = 'CERTIFIED'
 }
 
 /**

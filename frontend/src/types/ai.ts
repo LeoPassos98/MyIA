@@ -152,3 +152,36 @@ export interface CertificationInfo {
   successRate?: number;
   lastChecked?: string;
 }
+
+/**
+ * Regiões AWS suportadas para certificação
+ */
+export type AWSRegion = 'us-east-1' | 'us-west-2' | 'eu-west-1' | 'ap-southeast-1';
+
+/**
+ * Mapeamento de regiões AWS para nomes amigáveis
+ */
+export const AWS_REGION_NAMES: Record<AWSRegion, string> = {
+  'us-east-1': 'US East (N. Virginia)',
+  'us-west-2': 'US West (Oregon)',
+  'eu-west-1': 'EU West (Ireland)',
+  'ap-southeast-1': 'Asia Pacific (Singapore)'
+};
+
+/**
+ * Lista de todas as regiões AWS suportadas
+ */
+export const AWS_REGIONS: AWSRegion[] = ['us-east-1', 'us-west-2', 'eu-west-1', 'ap-southeast-1'];
+
+/**
+ * Certificação regional de um modelo
+ */
+export interface RegionalCertification {
+  region: AWSRegion;
+  status: CertificationStatus | 'not_tested';
+  lastTestedAt?: string;
+  attempts?: number;
+  error?: string;
+  errorCategory?: ErrorCategory;
+  successRate?: number;
+}

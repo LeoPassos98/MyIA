@@ -7,6 +7,34 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **BREAKING**: Reorganização completa de scripts (83 scripts movidos)
+  - Scripts shell agora em `scripts/` organizados por categoria
+  - Scripts TypeScript em `backend/scripts/` com subdiretórios
+  - 4 scripts críticos permanecem na raiz
+  - Ver [`docs/guides/script-organization-standard.md`](docs/guides/script-organization-standard.md)
+
+### Removed
+- 6 scripts obsoletos removidos (bugs corrigidos, scripts temporários)
+  - Ver [`scripts/deprecated/REMOVED_SCRIPTS.md`](scripts/deprecated/REMOVED_SCRIPTS.md)
+
+### Added
+- 9 READMEs em diretórios de scripts
+- Script de backup: `scripts/backup-before-reorganization.sh`
+- Script de validação: `scripts/validate-script-references.sh`
+- Guia de organização: `docs/guides/script-organization-standard.md`
+- Seção de estrutura de scripts no README.md principal
+
+### Documentation
+- Estrutura de scripts 95% mais limpa (89 → 4 scripts na raiz)
+- Documentação completa de cada diretório de scripts
+- Backup completo em `backups/scripts-backup-20260204-105832/`
+- Plano detalhado em [`plans/PLANO-ORGANIZACAO-SCRIPTS.md`](plans/PLANO-ORGANIZACAO-SCRIPTS.md)
+
+---
+
 ## [2.0.0] - 2026-01-21
 
 ### 🎯 Sistema de Habilitação Dinâmica do Painel de Controle

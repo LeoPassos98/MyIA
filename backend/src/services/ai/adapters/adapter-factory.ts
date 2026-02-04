@@ -63,10 +63,18 @@ export class AdapterFactory {
    */
   static createAdapter(vendor: string, inferenceType: InferenceType = 'ON_DEMAND'): BaseModelAdapter {
     const useNewAdapters = isUseNewAdapters();
-    logger.debug('Creating adapter', { vendor, inferenceType, useNewAdapters });
+    logger.info('🏭 [AdapterFactory] Creating adapter', { 
+      vendor, 
+      inferenceType, 
+      useNewAdapters,
+      env_USE_NEW_ADAPTERS: process.env.USE_NEW_ADAPTERS 
+    });
 
     // Se feature flag desabilitada, usar adapters antigos
     if (!useNewAdapters) {
+      logger.warn('⚠️ [AdapterFactory] USE_NEW_ADAPTERS is not enabled, using legacy adapters. ' +
+        'This may cause issues with Claude 4.x models that require Inference Profiles. ' +
+        'Set USE_NEW_ADAPTERS=true in .env to enable modern adapters.');
       return this.createLegacyAdapter(vendor);
     }
 
