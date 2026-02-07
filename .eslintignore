@@ -10,3 +10,4 @@ frontend-admin/
 frontend/
 *.log
 *.pid
+backend/test-amazon-models.ts
