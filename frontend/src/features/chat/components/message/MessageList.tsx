@@ -12,7 +12,7 @@ import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 import { useRafThrottledCallback } from '../../../../hooks/useEventOptimization';
 import { getEventOptions } from '../../../../utils/performance';
 import { useBatchedLayout, useOptimizedScroll } from '../../../../hooks/useLayoutOptimization';
-import { useStableCallback } from '../../../../hooks/useMemoryOptimization';
+import { useStableCallback } from '../../../../hooks/memory';
 
 
 interface MessageListProps {

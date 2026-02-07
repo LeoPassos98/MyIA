@@ -65,11 +65,18 @@ interface ModelWithError {
  */
 export function useModelBadges(model: ModelWithError): ModelBadgesData {
   const { getModelById } = useModelRating();
-  const { isCertified, isUnavailable, hasQualityWarning } = useCertificationCache();
+  const { isCertified, isUnavailable, hasQualityWarning, getRatingData } = useCertificationCache();
   
-  // Buscar dados do modelo
+  // Buscar dados do modelo via /api/providers/models
   const modelWithRating = getModelById(model.apiModelId);
-  const hasBadge = !!modelWithRating?.badge;
+  
+  // ✅ Fallback: Se useModelRating não tem o modelo (ex: não está em awsEnabledModels),
+  // usar dados de rating/badge do cache de certificações (que inclui TODOS os modelos certificados)
+  const certRatingData = getRatingData(model.apiModelId);
+  
+  const badge = modelWithRating?.badge || certRatingData?.badge || undefined;
+  const rating = modelWithRating?.rating ?? certRatingData?.rating ?? undefined;
+  const hasBadge = !!badge;
   const isRateLimited = model.error?.includes('Limite de certificações excedido') ?? false;
   
   // ✅ FIX: Usar dados de certificação em tempo real se disponíveis (sobrescreve cache)
@@ -92,8 +99,8 @@ export function useModelBadges(model: ModelWithError): ModelBadgesData {
   
   return {
     // Dados brutos
-    rating: modelWithRating?.rating,
-    badge: modelWithRating?.badge,
+    rating,
+    badge,
     isCertified: certified,
     hasQualityWarning: qualityWarning,
     isUnavailable: unavailable,

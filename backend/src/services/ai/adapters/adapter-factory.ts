@@ -20,22 +20,31 @@ import { CohereAdapter } from './cohere.adapter';
 // Adapters novos (INFERENCE_PROFILE)
 import { AnthropicProfileAdapter, AmazonProfileAdapter } from './inference-profile';
 
+// Novo sistema (Strategy Pattern + Registry Pattern)
+import { AdapterRegistry } from './registry/adapter-registry';
+import { VendorDetector } from './registry/vendor-detector';
+import { registerAllStrategies } from './strategies';
+
 /**
- * Feature flag para migração gradual (verificação dinâmica para suportar testes)
+ * Feature flags para migração gradual
  */
 function isUseNewAdapters(): boolean {
   return process.env.USE_NEW_ADAPTERS === 'true';
 }
 
+function isUseStrategyPattern(): boolean {
+  return process.env.USE_STRATEGY_PATTERN === 'true';
+}
+
 /**
- * Mapa de adapters por vendor e inference type
+ * Mapa de adapters por vendor e inference type (LEGADO)
  */
 const adapterMap: Record<string, Record<InferenceType, new () => BaseModelAdapter>> = {
   anthropic: {
     ON_DEMAND: AnthropicAdapter,
     INFERENCE_PROFILE: AnthropicProfileAdapter,
-    PROVISIONED: AnthropicAdapter, // Fallback
-    CROSS_REGION: AnthropicAdapter // Fallback
+    PROVISIONED: AnthropicAdapter,
+    CROSS_REGION: AnthropicAdapter
   },
   amazon: {
     ON_DEMAND: AmazonAdapter,
@@ -45,7 +54,7 @@ const adapterMap: Record<string, Record<InferenceType, new () => BaseModelAdapte
   },
   cohere: {
     ON_DEMAND: CohereAdapter,
-    INFERENCE_PROFILE: CohereAdapter, // Cohere não suporta profiles
+    INFERENCE_PROFILE: CohereAdapter,
     PROVISIONED: CohereAdapter,
     CROSS_REGION: CohereAdapter
   }
@@ -55,22 +64,62 @@ const adapterMap: Record<string, Record<InferenceType, new () => BaseModelAdapte
  * Factory para criar adapters
  */
 export class AdapterFactory {
+  // Sistema legado (cache de adapters)
   private static adapters: Map<string, BaseModelAdapter> = new Map();
   private static allAdapters: BaseModelAdapter[] | null = null;
+
+  // Novo sistema (Strategy Pattern + Registry Pattern)
+  private static registry: AdapterRegistry = new AdapterRegistry();
+  private static detector: VendorDetector = new VendorDetector();
+  private static strategiesInitialized = false;
+
+  /**
+   * Inicializa strategies (lazy initialization)
+   */
+  private static initializeStrategies(): void {
+    if (this.strategiesInitialized) {
+      return;
+    }
+
+    logger.info('[AdapterFactory] Initializing Strategy Pattern system');
+    registerAllStrategies(this.registry);
+    this.strategiesInitialized = true;
+
+    // Validar registry
+    const errors = this.registry.validate();
+    if (errors.length > 0) {
+      logger.error('[AdapterFactory] Registry validation failed', { errors });
+      throw new Error(`Registry validation failed: ${errors.join(', ')}`);
+    }
+
+    logger.info('[AdapterFactory] Strategy Pattern system initialized', {
+      vendors: this.registry.getAllVendors(),
+      stats: this.registry.getStats()
+    });
+  }
 
   /**
    * Cria adapter apropriado baseado em vendor e inference type
    */
   static createAdapter(vendor: string, inferenceType: InferenceType = 'ON_DEMAND'): BaseModelAdapter {
+    const useStrategyPattern = isUseStrategyPattern();
     const useNewAdapters = isUseNewAdapters();
-    logger.info('🏭 [AdapterFactory] Creating adapter', { 
+
+    logger.info('[AdapterFactory] Creating adapter', { 
       vendor, 
       inferenceType, 
+      useStrategyPattern,
       useNewAdapters,
+      env_USE_STRATEGY_PATTERN: process.env.USE_STRATEGY_PATTERN,
       env_USE_NEW_ADAPTERS: process.env.USE_NEW_ADAPTERS 
     });
 
-    // Se feature flag desabilitada, usar adapters antigos
+    // Novo sistema: Strategy Pattern
+    if (useStrategyPattern) {
+      return this.createAdapterV2(vendor, inferenceType);
+    }
+
+    // Sistema intermediário: USE_NEW_ADAPTERS
     if (!useNewAdapters) {
       logger.warn('⚠️ [AdapterFactory] USE_NEW_ADAPTERS is not enabled, using legacy adapters. ' +
         'This may cause issues with Claude 4.x models that require Inference Profiles. ' +
@@ -78,7 +127,7 @@ export class AdapterFactory {
       return this.createLegacyAdapter(vendor);
     }
 
-    // Buscar adapter no mapa
+    // Sistema atual: adapterMap
     const vendorAdapters = adapterMap[vendor.toLowerCase()];
     if (!vendorAdapters) {
       logger.warn(`No adapters found for vendor: ${vendor}, using legacy`);
@@ -93,6 +142,31 @@ export class AdapterFactory {
 
     logger.info(`Using adapter: ${vendor}/${inferenceType}`);
     return new AdapterClass();
+  }
+
+  /**
+   * Cria adapter usando Strategy Pattern (V2)
+   */
+  private static createAdapterV2(vendor: string, inferenceType: InferenceType): BaseModelAdapter {
+    // Inicializar strategies se necessário
+    this.initializeStrategies();
+
+    logger.debug('[AdapterFactory] Using Strategy Pattern', { vendor, inferenceType });
+
+    // Buscar strategy no registry
+    const strategy = this.registry.getStrategy(vendor.toLowerCase());
+    if (!strategy) {
+      throw new Error(`Vendor not supported: ${vendor}`);
+    }
+
+    // Validar inference type
+    if (!strategy.supportedInferenceTypes.includes(inferenceType)) {
+      logger.warn(`[AdapterFactory] Inference type ${inferenceType} not supported by ${vendor}, using ON_DEMAND`);
+      inferenceType = 'ON_DEMAND';
+    }
+
+    // Criar adapter
+    return strategy.createAdapter(inferenceType);
   }
 
   /**
@@ -113,16 +187,26 @@ export class AdapterFactory {
 
   /**
    * Detecta inference type de um modelId
-   * Consulta o registry para verificar platformRules
    */
   static detectInferenceType(modelId: string): InferenceType {
+    const useStrategyPattern = isUseStrategyPattern();
+
+    // Novo sistema: usar strategy
+    if (useStrategyPattern) {
+      this.initializeStrategies();
+      
+      const strategy = this.registry.findStrategyForModel(modelId);
+      if (strategy) {
+        return strategy.detectInferenceType(modelId);
+      }
+    }
+
+    // Sistema legado: detecção por formato
     // 1. Verificar formato do modelId primeiro (mais rápido)
-    // Inference Profile: {region}.{vendor}.{model}
     if (/^(us|eu|apac)\.[a-z]+\./i.test(modelId)) {
       return 'INFERENCE_PROFILE';
     }
 
-    // Provisioned: arn:aws:bedrock:...
     if (modelId.startsWith('arn:aws:bedrock')) {
       return 'PROVISIONED';
     }
@@ -138,7 +222,6 @@ export class AdapterFactory {
         }
       }
     } catch (error) {
-      // Se modelo não está no registry, continuar com detecção por formato
       logger.debug(`Model ${modelId} not found in registry, using format-based detection`);
     }
 
@@ -150,9 +233,6 @@ export class AdapterFactory {
    * Get adapter for a specific vendor (Legacy method - mantido para compatibilidade)
    * 
    * @deprecated Use createAdapter(vendor, inferenceType) instead
-   * @param vendor - Vendor name (e.g., 'anthropic', 'cohere', 'amazon')
-   * @returns Adapter instance
-   * @throws Error if vendor not supported
    */
   static getAdapter(vendor: string): BaseModelAdapter {
     const normalizedVendor = vendor.toLowerCase();
@@ -172,15 +252,24 @@ export class AdapterFactory {
 
   /**
    * Get adapter for a specific model ID
-   * 
-   * Searches all adapters to find one that supports the model.
-   * 
-   * @param modelId - Model ID to find adapter for
-   * @returns Adapter instance
-   * @throws Error if no adapter supports the model
    */
   static getAdapterForModel(modelId: string): BaseModelAdapter {
-    // Detectar inference type e vendor
+    const useStrategyPattern = isUseStrategyPattern();
+
+    // Novo sistema: usar strategy
+    if (useStrategyPattern) {
+      this.initializeStrategies();
+      
+      const strategy = this.registry.findStrategyForModel(modelId);
+      if (strategy) {
+        const inferenceType = strategy.detectInferenceType(modelId);
+        return strategy.createAdapter(inferenceType);
+      }
+      
+      throw new Error(`No strategy found for model: ${modelId}`);
+    }
+
+    // Sistema legado
     const inferenceType = this.detectInferenceType(modelId);
     const vendor = this.detectVendor(modelId);
 
@@ -192,8 +281,7 @@ export class AdapterFactory {
       }
     }
 
-    // Fallback: buscar em todos os adapters (comportamento legado)
-    // Initialize all adapters if not done yet
+    // Fallback: buscar em todos os adapters
     if (!this.allAdapters) {
       this.allAdapters = [
         this.getAdapter('anthropic'),
@@ -202,7 +290,6 @@ export class AdapterFactory {
       ];
     }
 
-    // Find adapter that supports this model
     for (const adapter of this.allAdapters) {
       if (adapter.supportsModel(modelId)) {
         return adapter;
@@ -214,28 +301,29 @@ export class AdapterFactory {
 
   /**
    * Detect vendor from model ID
-   * 
-   * @param modelId - Model ID
-   * @returns Vendor name or null if not detected
    */
   static detectVendor(modelId: string): string | null {
-    // Inference Profile format: {region}.{vendor}.{model}
+    const useStrategyPattern = isUseStrategyPattern();
+
+    // Novo sistema: usar detector
+    if (useStrategyPattern) {
+      this.initializeStrategies();
+      return this.detector.detect(modelId);
+    }
+
+    // Sistema legado
     const inferenceProfileMatch = modelId.match(/^(us|eu|apac)\.([a-z]+)\./i);
     if (inferenceProfileMatch) {
       return inferenceProfileMatch[2].toLowerCase();
     }
 
-    // Standard format: {vendor}.{model}
     const prefix = modelId.split('.')[0].toLowerCase();
-    
-    // Check if prefix matches a known vendor
     const knownVendors = ['anthropic', 'cohere', 'amazon', 'ai21', 'meta', 'mistral'];
     
     if (knownVendors.includes(prefix)) {
       return prefix;
     }
 
-    // Check for direct API format (e.g., 'claude-3-5-sonnet')
     if (modelId.startsWith('claude-')) {
       return 'anthropic';
     }
@@ -249,9 +337,6 @@ export class AdapterFactory {
 
   /**
    * Check if a model is supported
-   * 
-   * @param modelId - Model ID to check
-   * @returns true if supported
    */
   static isModelSupported(modelId: string): boolean {
     try {
@@ -264,8 +349,6 @@ export class AdapterFactory {
 
   /**
    * Get all registered adapters
-   * 
-   * @returns Array of all adapter instances
    */
   static getAllAdapters(): BaseModelAdapter[] {
     if (!this.allAdapters) {
@@ -284,5 +367,30 @@ export class AdapterFactory {
   static clearCache(): void {
     this.adapters.clear();
     this.allAdapters = null;
+  }
+
+  /**
+   * Get registry (para testes e extensibilidade)
+   */
+  static getRegistry(): AdapterRegistry {
+    this.initializeStrategies();
+    return this.registry;
+  }
+
+  /**
+   * Get detector (para testes e extensibilidade)
+   */
+  static getDetector(): VendorDetector {
+    return this.detector;
+  }
+
+  /**
+   * Reset factory (útil para testes)
+   */
+  static reset(): void {
+    this.clearCache();
+    this.registry.clear();
+    this.detector.reset();
+    this.strategiesInitialized = false;
   }
 }

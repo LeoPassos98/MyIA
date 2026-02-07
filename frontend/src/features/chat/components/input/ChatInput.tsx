@@ -11,7 +11,7 @@ import { SendButton } from './SendButton';
 import { InputTextField } from './InputTextField';
 import { useThrottledCallback } from '../../../../hooks/useEventOptimization';
 import { useBatchedLayout } from '../../../../hooks/useLayoutOptimization';
-import { useMemoryLeakDetection } from '../../../../hooks/useMemoryOptimization';
+import { useMemoryLeakDetection } from '../../../../hooks/memory';
 
 interface ChatInputProps {
   inputMessage: string;

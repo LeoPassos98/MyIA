@@ -23,7 +23,7 @@ import { useLayout } from '../../../../contexts/LayoutContext';
 import { useTheme as useAppTheme } from '../../../../contexts/ThemeContext';
 import { scrollbarStyles } from '../../../../theme/scrollbarStyles';
 import { useDebounce } from '../../../../hooks/useEventOptimization';
-import { useStableCallback } from '../../../../hooks/useMemoryOptimization';
+import { useStableCallback } from '../../../../hooks/memory';
 
 // Fase 3: Componente memoizado para item de chat individual
 interface ChatItemProps {

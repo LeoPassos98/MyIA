@@ -69,10 +69,11 @@ async function clearAllCertifications(provider?: string) {
     
     // Agrupar por vendor para melhor visualização
     const byVendor = toDelete.reduce((acc, cert) => {
-      if (!acc[cert.vendor]) {
-        acc[cert.vendor] = [];
+      const vendor = cert.vendor || 'unknown';
+      if (!acc[vendor]) {
+        acc[vendor] = [];
       }
-      acc[cert.vendor].push(cert);
+      acc[vendor].push(cert);
       return acc;
     }, {} as Record<string, typeof toDelete>);
 
@@ -125,9 +126,9 @@ async function clearAllCertifications(provider?: string) {
     // Mostrar estatísticas
     console.log('📊 Estatísticas da limpeza:');
     Object.entries(byVendor).forEach(([vendorName, certs]) => {
-      const certified = certs.filter(c => c.status === 'certified').length;
-      const failed = certs.filter(c => c.status === 'failed').length;
-      const warning = certs.filter(c => c.status === 'quality_warning').length;
+      const certified = certs.filter(c => c.status === 'CERTIFIED').length;
+      const failed = certs.filter(c => c.status === 'FAILED').length;
+      const warning = certs.filter(c => c.status === 'QUALITY_WARNING').length;
       
       console.log(`   ${vendorName}:`);
       console.log(`     - Certified: ${certified}`);

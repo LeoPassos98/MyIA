@@ -11,7 +11,7 @@ import { jsend } from '../utils/jsend';
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Aumentado temporariamente para testes
+  max: 1000, // Aumentado para desenvolvimento
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -30,7 +30,7 @@ export const authLimiter = rateLimit({
  */
 export const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minuto
-  max: 100, // Máximo de 100 requisições por minuto por IP
+  max: 500, // Aumentado para desenvolvimento (500 requisições/min)
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -48,7 +48,7 @@ export const apiLimiter = rateLimit({
  */
 export const chatLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minuto
-  max: 30, // Máximo de 30 mensagens por minuto
+  max: 100, // Aumentado para desenvolvimento (100 mensagens/min)
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {

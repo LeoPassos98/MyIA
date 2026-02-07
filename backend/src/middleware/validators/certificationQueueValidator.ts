@@ -102,6 +102,7 @@ const JOB_TYPES = [
 
 /**
  * Status válidos para ModelCertification
+ * ✅ CORRIGIDO: Adicionado CERTIFIED e QUALITY_WARNING conforme enum Prisma CertificationStatus
  */
 const CERTIFICATION_STATUSES = [
   'PENDING',
@@ -109,7 +110,9 @@ const CERTIFICATION_STATUSES = [
   'PROCESSING',
   'COMPLETED',
   'FAILED',
-  'CANCELLED'
+  'CANCELLED',
+  'CERTIFIED',       // ✅ Status final de sucesso
+  'QUALITY_WARNING'  // ✅ Status para modelos com avisos de qualidade
 ] as const;
 
 /**
@@ -159,7 +162,7 @@ export const certificationsQuerySchema = z.object({
         return parsed > 100 ? 100 : parsed;
       })
       .refine(val => val >= 1, 'limit must be at least 1'),
-    modelId: z.string().uuid('modelId must be a valid UUID').optional(),
+    modelId: z.string().min(1, 'modelId cannot be empty').optional(),  // ✅ CORRIGIDO: Aceita apiModelId (ID da AWS) ao invés de apenas UUID
     region: z.enum(AWS_REGIONS, {
       errorMap: () => ({ message: 'Invalid AWS region' })
     }).optional(),

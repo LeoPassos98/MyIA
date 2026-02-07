@@ -1,12 +1,19 @@
 // backend/src/controllers/certificationQueueController.ts
-// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+// Standards: docs/STANDARDS.md
 
 import { Request, Response } from 'express';
-import { certificationQueueService } from '../services/queue/CertificationQueueService';
 import { PrismaClient } from '@prisma/client';
+import { certificationQueueService } from '../services/queue/CertificationQueueService';
 import { logger } from '../utils/logger';
 import { ApiResponse } from '../utils/api-response';
-import { BedrockClient, ListFoundationModelsCommand } from '@aws-sdk/client-bedrock';
+
+// Importar módulos especializados
+import { modelValidator } from './certificationQueue/validators/modelValidator';
+import { regionValidator } from './certificationQueue/validators/regionValidator';
+import { payloadValidator } from './certificationQueue/validators/payloadValidator';
+import { responseTransformer } from './certificationQueue/transformers/responseTransformer';
+import { errorHandler } from './certificationQueue/handlers/errorHandler';
+import { awsStatusHandler } from './certificationQueue/handlers/awsStatusHandler';
 
 const prisma = new PrismaClient();
 
@@ -16,26 +23,28 @@ const prisma = new PrismaClient();
  */
 export async function certifyModel(req: Request, res: Response) {
   try {
-    const { modelId, region } = req.body;
-    const userId = (req as any).userId;
+    logger.info('[certifyModel] Requisição recebida');
 
-    if (!modelId || !region) {
+    // Validar payload
+    const payloadValidation = payloadValidator.validateCertifyModelPayload(req.body);
+    if (!payloadValidation.valid) {
       return res.status(400).json(
-        ApiResponse.error('modelId and region are required', 400)
+        ApiResponse.error(payloadValidation.error!, 400)
       );
     }
 
-    // Verificar se modelo existe
-    const model = await prisma.aIModel.findUnique({
-      where: { id: modelId }
-    });
+    const { modelId, region } = req.body;
+    const userId = (req as any).userId;
 
-    if (!model) {
+    // Validar modelo
+    const modelValidation = await modelValidator.validateModelExists(modelId);
+    if (!modelValidation.exists) {
       return res.status(404).json(
         ApiResponse.error('Model not found', 404)
       );
     }
 
+    // Criar job de certificação
     const result = await certificationQueueService.certifyModel(
       modelId,
       region,
@@ -54,10 +63,10 @@ export async function certifyModel(req: Request, res: Response) {
       })
     );
   } catch (error: any) {
-    logger.error('Error creating certification job:', error);
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to create certification job', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'certifyModel',
+      params: { modelId: req.body.modelId, region: req.body.region }
+    });
   }
 }
 
@@ -67,21 +76,20 @@ export async function certifyModel(req: Request, res: Response) {
  */
 export async function certifyMultipleModels(req: Request, res: Response) {
   try {
+    logger.info('[certifyMultipleModels] Requisição recebida');
+
+    // Validar payload
+    const payloadValidation = payloadValidator.validateMultipleModelsPayload(req.body);
+    if (!payloadValidation.valid) {
+      return res.status(400).json(
+        ApiResponse.error(payloadValidation.error!, 400)
+      );
+    }
+
     const { modelIds, regions } = req.body;
     const userId = (req as any).userId;
 
-    if (!modelIds || !Array.isArray(modelIds) || modelIds.length === 0) {
-      return res.status(400).json(
-        ApiResponse.error('modelIds must be a non-empty array', 400)
-      );
-    }
-
-    if (!regions || !Array.isArray(regions) || regions.length === 0) {
-      return res.status(400).json(
-        ApiResponse.error('regions must be a non-empty array', 400)
-      );
-    }
-
+    // Criar job de certificação em lote
     const result = await certificationQueueService.certifyMultipleModels(
       modelIds,
       regions,
@@ -100,10 +108,10 @@ export async function certifyMultipleModels(req: Request, res: Response) {
       })
     );
   } catch (error: any) {
-    logger.error('Error creating batch certification job:', error);
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to create batch certification job', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'certifyMultipleModels',
+      params: { modelIds: req.body.modelIds, regions: req.body.regions }
+    });
   }
 }
 
@@ -113,15 +121,20 @@ export async function certifyMultipleModels(req: Request, res: Response) {
  */
 export async function certifyAllModels(req: Request, res: Response) {
   try {
-    const { regions } = req.body;
-    const userId = (req as any).userId;
+    logger.info('[certifyAllModels] Requisição recebida');
 
-    if (!regions || !Array.isArray(regions) || regions.length === 0) {
+    // Validar payload
+    const payloadValidation = payloadValidator.validateAllModelsPayload(req.body);
+    if (!payloadValidation.valid) {
       return res.status(400).json(
-        ApiResponse.error('regions must be a non-empty array', 400)
+        ApiResponse.error(payloadValidation.error!, 400)
       );
     }
 
+    const { regions } = req.body;
+    const userId = (req as any).userId;
+
+    // Criar job de certificação de todos os modelos
     const result = await certificationQueueService.certifyAllModels(
       regions,
       userId
@@ -138,10 +151,10 @@ export async function certifyAllModels(req: Request, res: Response) {
       })
     );
   } catch (error: any) {
-    logger.error('Error creating all models certification job:', error);
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to create all models certification job', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'certifyAllModels',
+      params: { regions: req.body.regions }
+    });
   }
 }
 
@@ -151,40 +164,33 @@ export async function certifyAllModels(req: Request, res: Response) {
  */
 export async function getJobStatus(req: Request, res: Response) {
   try {
-    const { jobId } = req.params;
+    logger.info('[getJobStatus] Requisição recebida');
 
-    // Validação adicional: verificar se é UUID válido
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(jobId)) {
+    // Validar jobId
+    const paramValidation = payloadValidator.validateJobIdParam(req.params);
+    if (!paramValidation.valid) {
       return res.status(400).json(
-        ApiResponse.error(`Invalid job ID format. Expected UUID, got: ${jobId}`, 400)
+        ApiResponse.error(paramValidation.error!, 400)
       );
     }
 
+    const { jobId } = req.params;
+
+    // Buscar status do job
     const status = await certificationQueueService.getJobStatus(jobId);
 
     if (!status) {
-      return res.status(404).json(
-        ApiResponse.error(`Job not found with ID: ${jobId}`, 404)
-      );
+      return errorHandler.handleNotFoundError('Job', jobId, res);
     }
 
     return res.status(200).json(
       ApiResponse.success(status)
     );
   } catch (error: any) {
-    logger.error('Error getting job status:', error);
-    
-    // Tratamento específico para erros do Prisma
-    if (error.code === 'P2023') {
-      return res.status(400).json(
-        ApiResponse.error('Invalid job ID format', 400)
-      );
-    }
-    
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to get job status', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'getJobStatus',
+      params: { jobId: req.params.jobId }
+    });
   }
 }
 
@@ -194,22 +200,33 @@ export async function getJobStatus(req: Request, res: Response) {
  */
 export async function getJobHistory(req: Request, res: Response) {
   try {
-    const { page = '1', limit = '20', status, type } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const take = parseInt(limit as string);
+    logger.info('[getJobHistory] Requisição recebida');
 
+    // Validar paginação
+    const paginationValidation = payloadValidator.validatePaginationParams(req.query);
+    if (!paginationValidation.valid) {
+      return res.status(400).json(
+        ApiResponse.error(paginationValidation.error!, 400)
+      );
+    }
+
+    const { page, limit } = paginationValidation;
+    const { status, type } = req.query;
+    const skip = (page! - 1) * limit!;
+
+    // Construir filtros
     const where: any = {};
     if (status) where.status = status;
     if (type) where.type = type;
 
+    // Buscar jobs
     const [jobs, total] = await Promise.all([
       prisma.certificationJob.findMany({
         where,
         skip,
-        take,
+        take: limit,
         include: {
           certifications: {
-            // FK para model removido - modelId é referência direta
             orderBy: { createdAt: 'desc' }
           }
         },
@@ -222,29 +239,18 @@ export async function getJobHistory(req: Request, res: Response) {
       ApiResponse.success({
         jobs,
         pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page: page!,
+          limit: limit!,
           total,
-          totalPages: Math.ceil(total / take)
+          totalPages: Math.ceil(total / limit!)
         }
       })
     );
   } catch (error: any) {
-    logger.error('Error getting job history:', error);
-    
-    // Tratamento específico para erros de enum inválido
-    if (error.code === 'P2006' || error.message?.includes('Invalid enum value')) {
-      return res.status(400).json(
-        ApiResponse.error(
-          `Invalid filter value. Status must be one of: PENDING, QUEUED, PROCESSING, COMPLETED, FAILED, CANCELLED, PAUSED. Type must be one of: SINGLE_MODEL, MULTIPLE_MODELS, ALL_MODELS, RECERTIFY`,
-          400
-        )
-      );
-    }
-    
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to get job history', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'getJobHistory',
+      params: req.query
+    });
   }
 }
 
@@ -254,60 +260,56 @@ export async function getJobHistory(req: Request, res: Response) {
  */
 export async function getCertifications(req: Request, res: Response) {
   try {
-    const { page = '1', limit = '20', modelId, region, status } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const take = parseInt(limit as string);
+    logger.info('[getCertifications] Requisição recebida');
 
+    // Validar paginação
+    const paginationValidation = payloadValidator.validatePaginationParams(req.query);
+    if (!paginationValidation.valid) {
+      return res.status(400).json(
+        ApiResponse.error(paginationValidation.error!, 400)
+      );
+    }
+
+    const { page, limit } = paginationValidation;
+    const { modelId, region, status } = req.query;
+    const skip = (page! - 1) * limit!;
+
+    // Construir filtros
     const where: any = {};
     if (modelId) where.modelId = modelId;
     if (region) where.region = region;
     if (status) where.status = status;
 
-    // Query sem FK para AIModel (removida do schema)
+    // Buscar certificações
     const [certifications, total] = await Promise.all([
       prisma.modelCertification.findMany({
         where,
         skip,
-        take,
+        take: limit,
         orderBy: { createdAt: 'desc' }
       }),
       prisma.modelCertification.count({ where })
     ]);
 
+    // Transformar certificações (converter status para lowercase)
+    const transformedCertifications = responseTransformer.transformCertifications(certifications);
+
     return res.status(200).json(
       ApiResponse.success({
-        certifications,
+        certifications: transformedCertifications,
         pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page: page!,
+          limit: limit!,
           total,
-          totalPages: Math.ceil(total / take)
+          totalPages: Math.ceil(total / limit!)
         }
       })
     );
   } catch (error: any) {
-    logger.error('Error getting certifications:', error);
-    
-    // Tratamento específico para erros de enum inválido
-    if (error.code === 'P2006' || error.message?.includes('Invalid enum value')) {
-      return res.status(400).json(
-        ApiResponse.error(
-          `Invalid filter value. Status must be one of: PENDING, QUEUED, PROCESSING, COMPLETED, FAILED, CANCELLED`,
-          400
-        )
-      );
-    }
-    
-    // Tratamento específico para UUID inválido
-    if (error.code === 'P2023' || error.message?.includes('Invalid UUID')) {
-      return res.status(400).json(
-        ApiResponse.error('Invalid modelId format. Must be a valid UUID', 400)
-      );
-    }
-    
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to get certifications', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'getCertifications',
+      params: req.query
+    });
   }
 }
 
@@ -317,39 +319,42 @@ export async function getCertifications(req: Request, res: Response) {
  */
 export async function getStats(_req: Request, res: Response) {
   try {
+    logger.info('[getStats] Requisição recebida');
+
+    // Buscar estatísticas da fila
     const queueStats = await certificationQueueService.getQueueStats();
 
-    // Estatísticas de certificações por região
-    const certificationsByRegion = await prisma.modelCertification.groupBy({
-      by: ['region', 'status'],
-      _count: true
-    });
+    // Buscar estatísticas de certificações
+    const [certificationsByRegion, certificationsByStatus, recentCertifications] = await Promise.all([
+      prisma.modelCertification.groupBy({
+        by: ['region', 'status'],
+        _count: true
+      }),
+      prisma.modelCertification.groupBy({
+        by: ['status'],
+        _count: true
+      }),
+      prisma.modelCertification.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
 
-    // Estatísticas de certificações por status
-    const certificationsByStatus = await prisma.modelCertification.groupBy({
-      by: ['status'],
-      _count: true
-    });
-
-    // Últimas certificações (sem FK para AIModel)
-    const recentCertifications = await prisma.modelCertification.findMany({
-      take: 10,
-      orderBy: { createdAt: 'desc' }
+    // Transformar estatísticas
+    const transformedStats = responseTransformer.transformStats({
+      queue: queueStats,
+      certificationsByRegion,
+      certificationsByStatus,
+      recentCertifications
     });
 
     return res.status(200).json(
-      ApiResponse.success({
-        queue: queueStats,
-        certificationsByRegion,
-        certificationsByStatus,
-        recentCertifications
-      })
+      ApiResponse.success(transformedStats)
     );
   } catch (error: any) {
-    logger.error('Error getting stats:', error);
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to get statistics', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'getStats'
+    });
   }
 }
 
@@ -359,8 +364,19 @@ export async function getStats(_req: Request, res: Response) {
  */
 export async function cancelJob(req: Request, res: Response) {
   try {
+    logger.info('[cancelJob] Requisição recebida');
+
+    // Validar jobId
+    const paramValidation = payloadValidator.validateJobIdParam(req.params);
+    if (!paramValidation.valid) {
+      return res.status(400).json(
+        ApiResponse.error(paramValidation.error!, 400)
+      );
+    }
+
     const { jobId } = req.params;
 
+    // Cancelar job
     await certificationQueueService.cancelJob(jobId);
 
     logger.info(`Job cancelled: ${jobId}`);
@@ -369,10 +385,10 @@ export async function cancelJob(req: Request, res: Response) {
       ApiResponse.success({ jobId })
     );
   } catch (error: any) {
-    logger.error('Error cancelling job:', error);
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to cancel job', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'cancelJob',
+      params: { jobId: req.params.jobId }
+    });
   }
 }
 
@@ -382,109 +398,38 @@ export async function cancelJob(req: Request, res: Response) {
  */
 export async function getAvailableRegions(_req: Request, res: Response) {
   try {
-    // Lista de regiões AWS Bedrock disponíveis
-    const regions = [
-      { id: 'us-east-1', name: 'US East (N. Virginia)' },
-      { id: 'us-west-2', name: 'US West (Oregon)' },
-      { id: 'eu-west-1', name: 'Europe (Ireland)' },
-      { id: 'eu-central-1', name: 'Europe (Frankfurt)' },
-      { id: 'ap-southeast-1', name: 'Asia Pacific (Singapore)' },
-      { id: 'ap-northeast-1', name: 'Asia Pacific (Tokyo)' }
-    ];
+    logger.info('[getAvailableRegions] Requisição recebida');
+
+    // Obter regiões disponíveis
+    const regions = regionValidator.getAvailableRegions();
 
     return res.status(200).json(
       ApiResponse.success(regions)
     );
   } catch (error: any) {
-    logger.error('Error getting available regions:', error);
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to get available regions', 500)
-    );
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'getAvailableRegions'
+    });
   }
 }
 
 /**
  * GET /api/certification-queue/aws-status
  * Verifica status das credenciais AWS configuradas no .env
- * 
- * ⚠️ IMPORTANTE: Este endpoint verifica credenciais de AMBIENTE (.env),
- * não credenciais de usuário. Usado pelo admin para verificar se o
- * sistema está configurado para executar certificações reais.
  */
 export async function getAWSStatus(_req: Request, res: Response) {
   try {
-    const credentials = process.env.AWS_BEDROCK_CREDENTIALS;
-    const region = process.env.AWS_BEDROCK_REGION || 'us-east-1';
-    
-    // Verificar se credenciais estão configuradas
-    if (!credentials) {
-      return res.status(200).json(
-        ApiResponse.success({
-          configured: false,
-          valid: false,
-          message: 'AWS_BEDROCK_CREDENTIALS não configurado no .env',
-          region: null,
-          modelsAvailable: 0
-        })
-      );
-    }
-    
-    // Parsear credenciais (formato: ACCESS_KEY:SECRET_KEY)
-    const parts = credentials.split(':');
-    if (parts.length !== 2) {
-      return res.status(200).json(
-        ApiResponse.success({
-          configured: true,
-          valid: false,
-          message: 'Formato inválido de AWS_BEDROCK_CREDENTIALS (esperado: ACCESS_KEY:SECRET_KEY)',
-          region,
-          modelsAvailable: 0
-        })
-      );
-    }
-    
-    const [accessKeyId, secretAccessKey] = parts;
-    
-    // Testar credenciais fazendo chamada real à AWS
-    try {
-      const client = new BedrockClient({
-        region,
-        credentials: { accessKeyId, secretAccessKey }
-      });
-      
-      const response = await client.send(new ListFoundationModelsCommand({}));
-      const modelsAvailable = response.modelSummaries?.length || 0;
-      
-      logger.info(`AWS credentials validated successfully. Models available: ${modelsAvailable}`);
-      
-      return res.status(200).json(
-        ApiResponse.success({
-          configured: true,
-          valid: true,
-          message: `Credenciais AWS válidas! ${modelsAvailable} modelos disponíveis.`,
-          region,
-          modelsAvailable,
-          accessKeyPreview: accessKeyId.substring(0, 8) + '...'
-        })
-      );
-    } catch (awsError: any) {
-      logger.error('AWS credentials validation failed:', awsError.message);
-      
-      return res.status(200).json(
-        ApiResponse.success({
-          configured: true,
-          valid: false,
-          message: `Erro ao validar credenciais: ${awsError.message}`,
-          region,
-          modelsAvailable: 0,
-          error: awsError.name
-        })
-      );
-    }
-  } catch (error: any) {
-    logger.error('Error checking AWS status:', error);
-    return res.status(500).json(
-      ApiResponse.error(error.message || 'Failed to check AWS status', 500)
+    logger.info('[getAWSStatus] Requisição recebida');
+
+    // Verificar status das credenciais AWS
+    const status = await awsStatusHandler.checkAWSCredentials();
+
+    return res.status(200).json(
+      ApiResponse.success(status)
     );
+  } catch (error: any) {
+    return errorHandler.handleControllerError(error, res, {
+      operation: 'getAWSStatus'
+    });
   }
 }

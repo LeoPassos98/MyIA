@@ -48,3 +48,9 @@ observability/*.pid
 
 # Backups de reorganização
 backups/scripts-backup-*/
+
+# Arquivos de backup
+*.backup
+*.bak
+*.old
+*.orig

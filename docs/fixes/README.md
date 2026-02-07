@@ -22,6 +22,14 @@
   - Correções do script manage-certifications.sh
   - Melhorias de UX
   - Correção do Inference Profile
+- [**FOREIGN-KEY-CERTIFICATION-FIX.md**](FOREIGN-KEY-CERTIFICATION-FIX.md) - Correção de Foreign Key
+  - Detecção automática UUID vs apiModelId
+  - Uso correto de UUID nas operações de banco
+  - Uso correto de apiModelId para AWS Bedrock
+- [**MODELCERTIFICATION-UPSERT-FIX.md**](MODELCERTIFICATION-UPSERT-FIX.md) - Correção de Prisma P2025
+  - Substituição de update() por upsert() em ModelCertification
+  - Resiliência contra registros não existentes
+  - Idempotência e consistência de dados
 
 ### 🚨 Hotfixes
 - [**HOTFIXES-SUMMARY.md**](HOTFIXES-SUMMARY.md) - Hotfixes 2 e 4
@@ -39,10 +47,10 @@
 
 ## 📊 Estatísticas
 
-- **Total de correções documentadas:** 20+
+- **Total de correções documentadas:** 22+
 - **Categorias:** 6
-- **Última atualização:** 04/02/2026
-- **Documentos consolidados:** 17 arquivos → 6 arquivos
+- **Última atualização:** 05/02/2026
+- **Documentos consolidados:** 17 arquivos → 8 arquivos
 
 ## 🔍 Busca Rápida
 
@@ -53,6 +61,8 @@
 | Grafana não atualiza | [GRAFANA-FIXES.md](GRAFANA-FIXES.md#correcao-tempo-real) | Tempo Real |
 | Grafana para sozinho | [HOTFIXES-SUMMARY.md](HOTFIXES-SUMMARY.md#hotfix-2) | Hotfix 2 |
 | Certificação falha | [CERTIFICATION-FIXES.md](CERTIFICATION-FIXES.md#correcoes-script) | Script |
+| Foreign Key na certificação | [FOREIGN-KEY-CERTIFICATION-FIX.md](FOREIGN-KEY-CERTIFICATION-FIX.md) | Foreign Key |
+| ModelCertification não existe (P2025) | [MODELCERTIFICATION-UPSERT-FIX.md](MODELCERTIFICATION-UPSERT-FIX.md) | Certificação |
 | Validação AWS | [CORRECOES-GERAIS.md](CORRECOES-GERAIS.md#validacao-aws) | AWS |
 | Checkbox não marca | [CORRECOES-GERAIS.md](CORRECOES-GERAIS.md#checkbox-visual) | Checkbox |
 | Badge "Falhou" incorreto | [CORRECOES-GERAIS.md](CORRECOES-GERAIS.md#correcoes-badges) | Badges |
@@ -88,10 +98,12 @@ docs/fixes/
 4. **Hotfix 3** - Exibição de error logs
 5. **Verificação de modelos** - Status de certificação
 
-### Certificação (3 correções)
+### Certificação (5 correções)
 1. **Script manage-certifications.sh** - Usuário de teste e Redis
 2. **UX do script** - Menu sem autenticação obrigatória
 3. **Inference Profile** - Feature flag e código descomentado
+4. **Foreign Key** - Detecção UUID vs apiModelId e uso correto nas operações
+5. **ModelCertification Upsert** - Substituição de update() por upsert() para evitar P2025
 
 ### Hotfixes (2 correções)
 1. **Hotfix 2** - Instruções, URL do Worker, Grafana estável
@@ -122,6 +134,8 @@ docs/fixes/
 | 02/02/2026 | Hotfix 4 | Hotfixes |
 | 02/02/2026 | Script Certificação | Certificação |
 | 02/02/2026 | UX Certificação | Certificação |
+| 05/02/2026 | Foreign Key Certificação | Certificação |
+| 05/02/2026 | ModelCertification Upsert | Certificação |
 
 ## 🔗 Links Úteis
 
@@ -146,10 +160,10 @@ docs/fixes/
 |-----------|-------|------------|-----------|
 | Badges | 4 | 4 | 0 |
 | Grafana | 5 | 5 | 0 |
-| Certificação | 3 | 3 | 0 |
+| Certificação | 5 | 5 | 0 |
 | Hotfixes | 2 | 2 | 0 |
 | Gerais | 5 | 5 | 0 |
-| **TOTAL** | **19** | **19** | **0** |
+| **TOTAL** | **21** | **21** | **0** |
 
 ## 📝 Como Usar Este Índice
 
@@ -185,8 +199,20 @@ docs/fixes/
 - Schemas Zod devem ser compatíveis com middlewares
 - Validação deve permitir fluxos alternativos
 
+### Foreign Key
+- Detecção automática de UUID vs apiModelId
+- Operações de banco usam UUID
+- Chamadas AWS usam apiModelId
+- Tratamento robusto de erros
+
+### ModelCertification Upsert
+- Usar upsert() ao invés de update() para evitar P2025
+- Garantir resiliência contra registros não existentes
+- Idempotência nas operações de certificação
+- Consistência entre Redis e PostgreSQL
+
 ---
 
-**Última atualização:** 04/02/2026  
-**Mantido por:** Equipe de Documentação  
-**Versão:** 2.0 (Consolidada)
+**Última atualização:** 05/02/2026
+**Mantido por:** Equipe de Documentação
+**Versão:** 2.2 (Consolidada + Foreign Key Fix + Upsert Fix)

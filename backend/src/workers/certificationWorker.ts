@@ -1,12 +1,24 @@
 // backend/src/workers/certificationWorker.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
+import dotenv from 'dotenv';
+// 🔍 DEBUG: Carregar .env ANTES de qualquer import
+dotenv.config();
+
 import { Job } from 'bull';
 import { queueService } from '../services/queue/QueueService';
 import { certificationQueueService } from '../services/queue/CertificationQueueService';
 import { logger } from '../utils/logger';
 import { config } from '../config/env';
 import { prisma } from '../lib/prisma';
+
+// 🔍 DEBUG: Log das variáveis de ambiente no início do worker
+logger.info('🔍 DEBUG - Worker iniciado com variáveis de ambiente:', {
+  CERTIFICATION_SIMULATION: process.env.CERTIFICATION_SIMULATION,
+  CERTIFICATION_SIMULATION_type: typeof process.env.CERTIFICATION_SIMULATION,
+  NODE_ENV: process.env.NODE_ENV,
+  AWS_BEDROCK_REGION: process.env.AWS_BEDROCK_REGION
+});
 
 class CertificationWorker {
   private queue: any;
@@ -50,15 +62,76 @@ class CertificationWorker {
 
     // Event handlers
     this.queue.on('completed', async (job: Job, result: any) => {
+      const completedTimestamp = new Date().toISOString();
       logger.info(`✅ Job ${job.id} completed`, { 
         jobId: job.id,
         modelId: job.data.modelId,
         region: job.data.region,
-        result 
+        result,
+        timestamp: completedTimestamp
+      });
+      
+      // 🔍 LOG: Estado antes de atualizar banco
+      logger.info(`🔍 [SYNC-CHECK] Job completed - ANTES de atualizar banco`, {
+        bullJobId: job.id,
+        modelId: job.data.modelId,
+        region: job.data.region,
+        redisState: 'completed',
+        resultPassed: result?.passed,
+        resultScore: result?.score,
+        timestamp: completedTimestamp
       });
       
       // Atualizar CertificationJob no banco
       await this.updateJobOnCompleted(job, result);
+      
+      // 🔍 LOG: Verificar se banco foi atualizado com sucesso
+      try {
+        const certInDb = await prisma.modelCertification.findUnique({
+          where: {
+            modelId_region: { 
+              modelId: job.data.modelId, 
+              region: job.data.region 
+            }
+          },
+          select: {
+            status: true,
+            passed: true,
+            score: true,
+            completedAt: true
+          }
+        });
+        
+        logger.info(`🔍 [SYNC-CHECK] Job completed - DEPOIS de atualizar banco`, {
+          bullJobId: job.id,
+          modelId: job.data.modelId,
+          region: job.data.region,
+          redisState: 'completed',
+          dbState: certInDb?.status || 'NOT_FOUND',
+          dbPassed: certInDb?.passed,
+          dbScore: certInDb?.score,
+          dbCompletedAt: certInDb?.completedAt,
+          syncOk: certInDb?.status === 'CERTIFIED' || certInDb?.status === 'FAILED',
+          timestamp: new Date().toISOString()
+        });
+        
+        // ⚠️ ALERTA: Detectar dessincronia
+        if (!certInDb || (certInDb.status !== 'CERTIFIED' && certInDb.status !== 'FAILED')) {
+          logger.error(`🚨 [SYNC-ERROR] Dessincronia detectada! Job completed no Redis mas banco não atualizado`, {
+            bullJobId: job.id,
+            modelId: job.data.modelId,
+            region: job.data.region,
+            redisResult: result,
+            dbState: certInDb,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error: any) {
+        logger.error(`❌ Erro ao verificar sincronia banco↔Redis`, {
+          bullJobId: job.id,
+          error: error.message
+        });
+      }
     });
 
     this.queue.on('failed', async (job: Job, err: Error) => {
@@ -90,14 +163,25 @@ class CertificationWorker {
     });
 
     this.queue.on('active', async (job: Job) => {
+      const activeTimestamp = new Date().toISOString();
       logger.info(`▶️  Job ${job.id} started processing`, {
         jobId: job.id,
         modelId: job.data.modelId,
-        region: job.data.region
+        region: job.data.region,
+        timestamp: activeTimestamp
       });
       
       // Atualizar CertificationJob no banco
       await this.updateJobOnActive(job);
+      
+      // 🔍 LOG: Verificar sincronia banco↔Redis após active
+      logger.debug(`🔍 [SYNC-CHECK] Job active - verificando estado no banco`, {
+        bullJobId: job.id,
+        modelId: job.data.modelId,
+        region: job.data.region,
+        redisState: 'active',
+        timestamp: activeTimestamp
+      });
     });
 
     this.isRunning = true;
@@ -230,6 +314,16 @@ class CertificationWorker {
         ? Date.now() - certJob.startedAt.getTime() 
         : null;
 
+      // 🔍 LOG: Antes de atualizar CertificationJob
+      logger.debug(`🔍 [DB-UPDATE] Atualizando CertificationJob`, {
+        bullJobId: job.id,
+        jobId,
+        isComplete,
+        newStatus: isComplete ? 'COMPLETED' : 'PROCESSING',
+        processedModels: certJob.processedModels,
+        totalModels: certJob.totalModels
+      });
+      
       await prisma.certificationJob.update({
         where: { id: jobId },
         data: {
@@ -239,10 +333,11 @@ class CertificationWorker {
         }
       });
 
-      logger.debug(`📊 CertificationJob ${jobId} atualizado após conclusão`, {
+      logger.info(`✅ [DB-UPDATE] CertificationJob atualizado com sucesso`, {
         bullJobId: job.id,
         jobId,
         isComplete,
+        status: isComplete ? 'COMPLETED' : 'PROCESSING',
         processedModels: certJob.processedModels,
         totalModels: certJob.totalModels
       });

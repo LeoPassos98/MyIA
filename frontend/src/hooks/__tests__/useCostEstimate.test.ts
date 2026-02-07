@@ -364,10 +364,17 @@ describe('useCostComparison', () => {
 
     expect(result.current).toHaveLength(3);
 
-    // Modelos gratuitos/sem preço devem vir primeiro
-    expect(result.current[0].totalCost).toBe(0); // Groq ou unknown
-    expect(result.current[1].totalCost).toBe(0); // Groq ou unknown
-    expect(result.current[2].totalCost).toBeGreaterThan(0); // Haiku
+    // Ordenação: modelos com preço por custo (menor primeiro), depois modelos sem preço
+    // Groq tem preço $0 (menor custo)
+    expect(result.current[0].totalCost).toBe(0); // Groq (preço $0)
+    expect(result.current[0].hasPricing).toBe(true);
+    
+    // Haiku tem preço > $0
+    expect(result.current[1].totalCost).toBeGreaterThan(0); // Haiku
+    expect(result.current[1].hasPricing).toBe(true);
+    
+    // Unknown não tem preço (vai para o final)
+    expect(result.current[2].hasPricing).toBe(false); // Unknown (sem preço)
   });
 
   it('preserva informações do modelo na comparação', () => {

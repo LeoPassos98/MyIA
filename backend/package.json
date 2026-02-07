@@ -7,6 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "worker": "tsx src/workers/index.ts",
     "worker:dev": "tsx watch src/workers/index.ts",
     "worker:prod": "node dist/workers/index.js",
@@ -20,7 +22,9 @@
     "test:integration": "jest ../tests/backend/integration",
     "test:e2e": "jest ../tests/backend/e2e",
     "cleanup:db": "tsx scripts/cleanupDatabase.ts",
-    "cleanup:db:sql": "bash scripts/cleanup-database.sh"
+    "cleanup:db:sql": "bash scripts/cleanup-database.sh",
+    "diagnose:sync": "tsx scripts/diagnose-cert-sync.ts",
+    "worker:logs": "tail -f ../logs/worker.out.log"
   },
   "keywords": [
     "ia",

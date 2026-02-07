@@ -9,7 +9,16 @@ import { logger } from '../utils/logger';
 export const validateRequest = (schema: AnyZodObject | ZodEffects<any>) => 
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      logger.info(`[validateRequest] Validando ${req.method} ${req.path}`);
+      // 🔍 LOG: Dados recebidos ANTES da validação
+      logger.info(`[validateRequest] 📥 Validando ${req.method} ${req.path}`, {
+        body: req.body,
+        query: req.query,
+        params: req.params,
+        headers: {
+          contentType: req.headers['content-type'],
+          authorization: req.headers.authorization ? 'Bearer ***' : 'none'
+        }
+      });
       
       await schema.parseAsync({
         body: req.body,
@@ -24,15 +33,26 @@ export const validateRequest = (schema: AnyZodObject | ZodEffects<any>) =>
         // Formata os erros do Zod para o frontend
         const formattedErrors = error.errors.map(err => ({
           path: err.path.join('.'),
-          message: err.message
+          message: err.message,
+          code: err.code // 🔍 Adicionar código do erro
         }));
         
-        logger.warn(`[validateRequest] ❌ Validação falhou para ${req.method} ${req.path}`, { errors: formattedErrors });
+        logger.warn(`[validateRequest] ❌ Validação falhou para ${req.method} ${req.path}`, {
+          errors: formattedErrors,
+          receivedData: {
+            body: req.body,
+            query: req.query,
+            params: req.params
+          }
+        });
         
         return res.status(400).json(ApiResponse.fail({ validation: formattedErrors }));
       }
       
-      logger.error(`[validateRequest] ❌ Erro interno na validação para ${req.method} ${req.path}`, { error });
+      logger.error(`[validateRequest] ❌ Erro interno na validação para ${req.method} ${req.path}`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return res.status(500).json(ApiResponse.error('Erro interno na validação'));
     }
   };

@@ -27,6 +27,13 @@ api.interceptors.request.use(
 // 🔍 O Pulo do Gato: Interceptor de Resposta
 api.interceptors.response.use(
   (response) => {
+    // 🔍 LOG: Resposta bem-sucedida
+    console.log(`[API Response] ✅ ${response.config.url}`, {
+      status: response.status,
+      hasData: !!response.data,
+      dataKeys: response.data ? Object.keys(response.data) : []
+    });
+
     // Se a resposta vier no padrão JSend com status 'success'
     if (response.data && response.data.status === 'success') {
       // 🪄 "Desembrulhamos" o pacote aqui. 
@@ -39,10 +46,27 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // 🔍 LOG: Erro capturado
+    console.error(`[API Response] ❌ ${error.config?.url}`, {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      code: error.code
+    });
+
     // Tratamento global de erros JSend (fail ou error)
     const jsendError = error.response?.data;
     
     if (jsendError) {
+      // 🔍 LOG: Estrutura do erro JSend
+      console.error('[API Response] 🔍 JSend Error Structure:', {
+        status: jsendError.status,
+        message: jsendError.message,
+        data: jsendError.data,
+        fullError: jsendError
+      });
+
       // Se for um 'fail', a mensagem costuma estar em data.message
       // Se for um 'error', a mensagem está em message
       const message = jsendError.data?.message || jsendError.message || 'Erro inesperado';
@@ -53,6 +77,7 @@ api.interceptors.response.use(
 
     // Se for 401 (Não autorizado), poderíamos deslogar o usuário aqui
     if (error.response?.status === 401) {
+      console.warn('[API Response] ⚠️ 401 Unauthorized - Removendo token');
       localStorage.removeItem('token');
       // window.location.href = '/login'; // Opcional: força redirecionamento
     }

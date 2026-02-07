@@ -7,8 +7,6 @@
 
 # Padrões de Desenvolvimento – MyIA
 
-> **NOTA SOBRE NUMERAÇÃO:** As seções têm gaps intencionais para permitir futuras adições sem renumerar todo o documento. Isso preserva referências existentes em código e documentação.
-
 Este documento define regras **estritas e imutáveis** de arquitetura e codificação para o projeto MyIA.
 **ESCOPO:** Estas regras aplicam-se a **TODOS** os diretórios (Frontend, Backend, Scripts e Docs).
 
@@ -16,259 +14,135 @@ Este documento define regras **estritas e imutáveis** de arquitetura e codifica
 
 ## 📑 Índice
 
-### 🎯 Fundamentos
-- 1. [Convenções de Arquivos](#1-convenções-de-arquivos-header-obrigatório)
-- 2. [Convenção de Nomes](#2-convenção-de-nomes-naming-convention)
-- 8. [Código Simulado e Transparência](#8-código-simulado-e-modo-de-desenvolvimento-regra-de-transparência)
-- 13. [Sistema de Logging Estruturado](#13-sistema-de-logging-estruturado)
+### PARTE I: FUNDAMENTOS
+- [1. Convenções de Arquivos (Header Obrigatório)](#1-convenções-de-arquivos-header-obrigatório)
+- [2. Convenção de Nomes (Naming Convention)](#2-convenção-de-nomes-naming-convention)
+- [3. Código Simulado e Transparência](#3-código-simulado-e-transparência)
 
-### 🎨 Frontend
-- 3. [Arquitetura Frontend](#3-arquitetura-frontend)
-- 6. [ObservabilityPageLayout](#6-observabilitypagelayout-padrão-obrigatório-para-páginas-complexas)
-- 10. [Identidade Visual e Design System](#10-identidade-visual-e-design-system)
+### PARTE II: ARQUITETURA E MODULARIZAÇÃO
+- [4. Princípios de Modularização](#4-princípios-de-modularização)
+- [5. Arquitetura Frontend](#5-arquitetura-frontend)
+  - [5.5 Estrutura de Features](#55-estrutura-de-features)
+  - [5.6 Services Frontend](#56-services-frontend)
+- [6. Arquitetura Backend](#6-arquitetura-backend)
+  - [6.5 Workers e Filas (Bull/Redis)](#65-workers-e-filas-bullredis)
+- [7. Tamanho de Arquivos (Sinalizador)](#7-tamanho-de-arquivos-sinalizador)
 
-### ⚙️ Backend
-- 4. [Arquitetura Backend](#4-arquitetura-backend)
-- 5. [Fonte Única de Verdade](#5-fonte-única-de-verdade-regra-arquitetural-imutável)
-- 7. [Armazenamento Lean](#7-armazenamento-lean-anti-duplicação-de-dados)
-- 11. [Versionamento de Mensagens](#11-versionamento-de-mensagens-arquitetura-preparada)
-- 12. [Padronização de API (JSend)](#12-padronização-de-api-e-respostas-jsend)
+### PARTE III: DESIGN SYSTEM
+- [8. Identidade Visual e Design System](#8-identidade-visual-e-design-system)
 
-### 🔒 Segurança
-- 9. [Segurança (Padrões Obrigatórios)](#9-segurança-padrões-obrigatórios)
+### PARTE IV: API E COMUNICAÇÃO
+- [9. Padronização de API (JSend)](#9-padronização-de-api-jsend)
+  - [9.5 Server-Sent Events (SSE)](#95-server-sent-events-sse)
 
-### 📋 Desenvolvimento
-- 14. [Commits e Versionamento](#14-commits-e-versionamento)
-- 15. [Tamanho de Arquivos e Manutenibilidade](#15-tamanho-de-arquivos-e-manutenibilidade)
+### PARTE V: SEGURANÇA
+- [10. Segurança (Padrões Obrigatórios)](#10-segurança-padrões-obrigatórios)
+
+### PARTE VI: OBSERVABILIDADE
+- [11. Sistema de Logging](#11-sistema-de-logging)
+  - [11.8 Exceções Permitidas](#118-exceções-permitidas)
+
+### PARTE VII: QUALIDADE
+- [12. Commits e Versionamento](#12-commits-e-versionamento)
+  - [12.6 Arquivos Proibidos no Repositório](#126-arquivos-proibidos-no-repositório)
+- [13. Testes](#13-testes)
+
+### APÊNDICES
+- [A. Glossário de Termos](#a-glossário-de-termos)
+- [B. Links para Documentos Externos](#b-links-para-documentos-externos)
+- [C. Changelog do STANDARDS.md](#c-changelog-do-standardsmd)
+
+---
+
+# PARTE I: FUNDAMENTOS
 
 ---
 
 ## 1. Convenções de Arquivos (Header Obrigatório)
 
-- **Caminho Relativo:** Todo arquivo de código **DEVE** iniciar, obrigatoriamente na **primeira linha**, com um comentário indicando seu caminho relativo.
-  - *Exemplo:* `// backend/src/services/ai/index.ts`
-  - Caso não encontre ou saiba o caminho, deixe apenas // NULL
+### 1.1 Caminho Relativo
 
-- **Referência aos Padrões:** Logo abaixo, deve haver a referência a este documento.
-  - *Exemplo:* `// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)`
+Todo arquivo de código **DEVE** iniciar, obrigatoriamente na **primeira linha**, com um comentário indicando seu caminho relativo.
+
+```typescript
+// backend/src/services/ai/index.ts
+```
+
+**Regras:**
+- ✅ Caminho relativo a partir da raiz do projeto
+- ✅ Se desconhecido temporariamente: `// TODO: definir caminho`
+- ❌ PROIBIDO deixar em branco ou omitir
+
+### 1.2 Referência aos Padrões
+
+Logo abaixo do caminho, deve haver a referência a este documento:
+
+**Formato Completo (Arquivos de Produção):**
+```typescript
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+```
+
+**Formato Curto (Scripts e Utilitários):**
+```typescript
+// Standards: docs/STANDARDS.md
+```
+
+**Quando usar formato curto:**
+- Scripts em `scripts/`
+- Arquivos de seed/migration
+- Arquivos de configuração
+- Arquivos de teste (`*.test.ts`, `*.spec.ts`)
 
 ---
 
 ## 2. Convenção de Nomes (Naming Convention)
 
-### Arquivos e Pastas
-- **Arquivos TS/JS (Lógica):** `camelCase` (Ex: `chatController.ts`, `api.ts`)
-- **Arquivos React (Componentes):** `PascalCase` (Ex: `ChatInput.tsx`)
-- **Hooks:** `camelCase` com prefixo `use` (Ex: `useChatLogic.ts`)
+### 2.1 Arquivos e Pastas
 
-### Código
-- **Interfaces e Tipos:** `PascalCase`. **NÃO** use prefixo "I" (ex: `User`, não `IUser`).
-- **Componentes React:** `PascalCase`.
-- **Services (Instâncias):** `camelCase` (Ex: `chatService`).
-- **DTOs:** Seguem padrão de Interfaces.
+| Tipo | Convenção | Exemplo |
+|------|-----------|---------|
+| **Arquivos TS/JS (Lógica)** | `camelCase` | `chatController.ts`, `api.ts` |
+| **Arquivos React (Componentes)** | `PascalCase` | `ChatInput.tsx` |
+| **Hooks** | `camelCase` com prefixo `use` | `useChatLogic.ts` |
+| **Pastas de Padrões** | `kebab-case` ou `camelCase` | `builders/`, `handlers/` |
 
----
+### 2.2 Código
 
-## 3. Arquitetura Frontend
-
-### 3.0 Separação Estrita (View/Logic)
-
-- **Arquivo `.tsx` (View):** Apenas JSX e estilos. Sem lógica de estado complexa.
-- **Arquivo `useX.ts` (Lógica):** Regras de negócio, `useState`, `useEffect` e handlers devem ser extraídos para **Custom Hooks**.
-
-### 3.1 Arquitetura de Layout (Scroll & Viewport)
-
-- **Scroll vertical da aplicação é responsabilidade EXCLUSIVA do `MainContentWrapper`.**
-- O layout raiz (`MainLayout`) **DEVE** usar `overflow: hidden`.
-- Páginas (ex: Chat, AuditPage, Settings) **NUNCA** devem controlar scroll global.
-- ❌ É proibido usar `overflow`, `height: 100vh` ou controle de scroll em páginas.
-- ✅ Qualquer página deve assumir que o scroll já está resolvido pelo layout.
-
-### 3.2 Centralização Total de Cores no theme.ts
-
-- **Todas as cores da aplicação DEVEM ser definidas explicitamente em `frontend/src/theme.ts`.**
-- **É proibido usar valores default do MUI sem que estejam declarados no theme.ts.**
-- **Novos tokens de cor DEVEM ser criados no theme.ts antes de serem usados.**
-- **A adição de qualquer cor nova deve ser feita exclusivamente em theme.ts.**
-
-#### Exemplo de implementação correta:
-
-```typescript
-// theme.ts
-palette: {
-  primary: { main: '#1976d2' },
-  error: { main: '#e53935' },
-  custom: { matrix: '#00FF41', hackerBg: '#0d1117' },
-  status: { warning: '#ffb300', info: '#0288d1' }
-}
-
-// Uso:
-sx={{ color: theme.palette.status.warning }}
-```
-
-#### Justificativa
-
-- Garante rastreabilidade, branding e fácil manutenção.
-- Permite dark/light mode real e branding dinâmico.
-- Evita inconsistências visuais e dependência de defaults do MUI.
+| Tipo | Convenção | Exemplo |
+|------|-----------|---------|
+| **Interfaces e Tipos** | `PascalCase` (sem prefixo "I") | `User`, não `IUser` |
+| **Componentes React** | `PascalCase` | `ChatMessage` |
+| **Services (Instâncias)** | `camelCase` | `chatService` |
+| **DTOs** | `PascalCase` | `CreateUserDto` |
+| **Constantes** | `UPPER_SNAKE_CASE` | `MAX_RETRIES` |
 
 ---
 
-## 4. Arquitetura Backend
+## 3. Código Simulado e Transparência
 
-- **Modularidade (Factory Pattern):** Lógica de IA deve usar `ProviderFactory`.
-- **Database-Driven:** Configurações residem no banco, nunca hardcoded.
-- **Banco de Dados:** Models em `PascalCase`, tabelas em `snake_case`.
-
----
-
-## 5. Fonte Única de Verdade (Regra Arquitetural Imutável)
-
-- **Qualquer entidade auditável, persistida ou governável DEVE ter sua identidade criada exclusivamente no backend.**
-- O frontend **NUNCA** é fonte de verdade para:
-  - IDs de mensagens
-  - IDs de inferências
-  - IDs de auditoria
-  - Decisões, custos ou status de execução
-
-### Definições
-
-- **Frontend:** camada de visualização e interação.
-- **Backend:** fonte única de verdade (persistência, auditoria, governança).
-
-### Regras Práticas
-
-- ❌ Proibido gerar IDs auditáveis no frontend (`Date.now()`, `uuid()`, etc).
-- ✅ O frontend deve sempre consumir IDs retornados pelo backend.
-- ✅ Se um dado pode ser auditado, ele **não pode** nascer no frontend.
-
-### Justificativa
-
-Auditoria, governança e compliance exigem:
-- Persistência
-- Rastreabilidade
-- Consistência histórica
-
-Esses requisitos **só podem ser garantidos pelo backend**.
-
-> 📌 **Regra de ouro:**  
-> *Se pode ser auditado, não pode ter identidade criada no frontend.*
-
----
-
-## 6. ObservabilityPageLayout (Padrão Obrigatório para Páginas Complexas)
-
-O `ObservabilityPageLayout` é o layout base ("framework interno") para páginas densas e observáveis
-(ex.: Audit, PromptTrace, futuras páginas com sidebar, seções e navegação interna).
-
-### Regras
-
-- Páginas complexas/observáveis **DEVEM** utilizar `ObservabilityPageLayout`.
-- Features **NÃO DEVEM** recriar estruturas próprias de:
-  - sidebar + drawer
-  - header de seção
-  - navegação interna / scroll spy
-  - wrappers de layout equivalentes ao Observability
-- Controle de scroll/viewport **NÃO** deve ser feito pela feature/página.
-
-### Quando usar ObservabilityPageLayout?
-Use quando a página tiver pelo menos um dos seguintes:
-- múltiplas seções com navegação/âncoras
-- sidebar persistente ou drawer contextual
-- visualização de dados (tabelas, gráficos, timelines)
-- necessidade de inspeção de registros (ex.: modais de detalhes/trace)
-
-### Motivação
-- padronização de UX
-- consistência de scroll e performance
-- manutenção mais simples e previsível
-
----
-
-## 7. Armazenamento Lean (Anti-Duplicação de Dados)
-
-O sistema **NÃO DEVE** duplicar conteúdo que já existe em tabelas normalizadas.
-
-### Regra
-
-- **Salvar apenas metadados e referências (IDs), nunca conteúdo duplicado.**
-- Dados de auditoria/trace devem armazenar **ponteiros** para entidades, não cópias.
-
-### Aplicação: `sentContext` (Prompt Trace)
-
-O campo `sentContext` da tabela `messages` armazena metadados de auditoria da inferência.
-
-✅ **O que DEVE ser salvo:**
-```typescript
-{
-  config_V47: { mode, model, provider, timestamp, strategy, params },
-  systemPrompt: "Você é uma IA útil...",  // ← ÚNICO! Não está no banco
-  messageIds: ["uuid1", "uuid2", ...],  // ← IDs do histórico, não conteúdo!
-  userMessageId: "uuid-da-pergunta",
-  pinnedStepIndices: [0, 2, 5],
-  stepOrigins: { "0": "pinned", "1": "rag" },
-  preflightTokenCount: 1500
-}
-```
-
-❌ **O que NÃO DEVE ser salvo:**
-```typescript
-{
-  payloadSent: [{ role: "user", content: "texto enorme..." }]  // ← DUPLICAÇÃO!
-}
-```
-
-### Justificativa
-
-| Abordagem | 1.000 chats × 50 msgs | 10.000 chats |
-|-----------|----------------------|--------------|
-| Com duplicação | ~2.5 GB | ~25 GB |
-| Lean (só IDs) | ~50 MB | ~500 MB |
-
-**Economia: ~98% de espaço.**
-
-### Reconstrução sob Demanda
-
-O `promptTraceController` deve **reconstruir** o payload original usando os `messageIds` salvos:
-```typescript
-const messages = await prisma.message.findMany({
-  where: { id: { in: savedMessageIds } },
-  orderBy: { createdAt: 'asc' }
-});
-```
-
----
-
-## 8. Código Simulado e Modo de Desenvolvimento (Regra de Transparência)
-
-### 8.1 Princípio Fundamental
+### 3.1 Princípio Fundamental
 
 **Todo código que executa comportamento simulado (mock/fake/stub) DEVE ser explicitamente identificável.**
 
-Esta regra existe para evitar situações onde código de simulação é confundido com código de produção, causando comportamentos inesperados.
+Esta regra existe para evitar situações onde código de simulação é confundido com código de produção.
 
-### 8.2 Regras Obrigatórias
+### 3.2 Regras Obrigatórias
 
-#### 8.2.1 Marcação Explícita no Código
-
-Todo bloco de código simulado **DEVE** incluir:
+#### 3.2.1 Marcação Explícita no Código
 
 ```typescript
 // ⚠️ SIMULAÇÃO: Este bloco NÃO executa lógica real
 // TODO: Substituir por implementação real usando [serviço/API específica]
-const passed = Math.random() > 0.3; // Resultado aleatório para testes
+const passed = Math.random() > 0.3;
 ```
 
-#### 8.2.2 Flag de Controle Obrigatória
-
-Simulações **DEVEM** ser controladas por variável de ambiente:
+#### 3.2.2 Flag de Controle Obrigatória
 
 ```typescript
 // ✅ CORRETO - Simulação controlada por flag
 const USE_SIMULATION = process.env.CERTIFICATION_SIMULATION === 'true';
 
 if (USE_SIMULATION) {
-  // ⚠️ SIMULAÇÃO ATIVA
   logger.warn('🎭 MODO SIMULAÇÃO: Usando dados fake para certificação');
   return { passed: Math.random() > 0.3, simulated: true };
 }
@@ -277,18 +151,14 @@ if (USE_SIMULATION) {
 return await realCertificationService.certify(modelId);
 ```
 
-#### 8.2.3 Logging de Alerta
-
-Quando simulação está ativa, **DEVE** haver log de warning:
+#### 3.2.3 Logging de Alerta
 
 ```typescript
 // ✅ OBRIGATÓRIO - Log visível quando simulação está ativa
 logger.warn('🎭 SIMULAÇÃO ATIVA: [nome do serviço/funcionalidade]');
 ```
 
-#### 8.2.4 Retorno Identificável
-
-Respostas de código simulado **DEVEM** incluir flag `simulated: true`:
+#### 3.2.4 Retorno Identificável
 
 ```typescript
 // ✅ CORRETO - Resposta marcada como simulada
@@ -300,9 +170,22 @@ return {
 };
 ```
 
-### 8.3 Checklist Pré-Commit (Simulações)
+### 3.3 Anti-Padrões (PROIBIDO)
 
-Antes de commitar código com simulações:
+```typescript
+// ❌ PROIBIDO - Simulação silenciosa sem marcação
+const passed = Math.random() > 0.3;
+return { passed, score: 75 };
+
+// ❌ PROIBIDO - Simulação sem flag de controle
+const result = generateFakeData();
+return result;
+
+// ❌ PROIBIDO - Simulação ativa por padrão
+const USE_REAL = process.env.USE_REAL_API === 'true'; // Default é simulação!
+```
+
+### 3.4 Checklist Pré-Commit (Simulações)
 
 - [ ] Bloco tem comentário `⚠️ SIMULAÇÃO` visível
 - [ ] Controlado por variável de ambiente (não hardcoded `true`)
@@ -311,92 +194,948 @@ Antes de commitar código com simulações:
 - [ ] TODO documentado para implementação real
 - [ ] Padrão por default é **NÃO simular** (produção segura)
 
-### 8.4 Anti-Padrões (PROIBIDO)
+---
 
-```typescript
-// ❌ PROIBIDO - Simulação silenciosa sem marcação
-const passed = Math.random() > 0.3;
-return { passed, score: 75 };
-
-// ❌ PROIBIDO - Simulação sem flag de controle
-const result = generateFakeData(); // Sempre fake
-return result;
-
-// ❌ PROIBIDO - Simulação ativa por padrão
-const USE_REAL = process.env.USE_REAL_API === 'true'; // Default é simulação!
-```
-
-### 8.5 Justificativa
-
-Esta regra foi criada após incidente onde certificações de modelos executaram em modo simulado sem que a equipe percebesse, resultando em resultados aleatórios sendo tratados como reais. A transparência é essencial para evitar confusão entre ambientes de desenvolvimento e produção.
+# PARTE II: ARQUITETURA E MODULARIZAÇÃO
 
 ---
 
-## 9. Segurança (Padrões Obrigatórios)
+## 4. Princípios de Modularização
 
-### 9.1 Regra de Segurança Zero-Trust
+### 4.1 Responsabilidade Única
 
-**TODA aplicação DEVE seguir os padrões de segurança desde o primeiro commit.**
+**Cada arquivo DEVE ter uma única responsabilidade claramente nomeável.**
 
-- Secrets validados na inicialização (exit se ausentes/inseguros)
-- Rate limiting aplicado em TODAS as rotas expostas
-- Validação Zod em TODAS as rotas POST/PUT/PATCH/DELETE
-- Helmet configurado com CSP em produção
-- HTTPS obrigatório em produção (redirect automático)
+Se você não consegue descrever a responsabilidade do arquivo em **uma frase curta**, ele provavelmente faz coisas demais.
 
-### 9.2 Documento de Referência
+> **Relação com Seção 7:** Limites de linhas servem como **sinal de alerta**, não como regra primária. A regra primária é responsabilidade única. Se um arquivo tem 1 responsabilidade e 180 linhas, está OK. Se tem 1 responsabilidade e 400 linhas, a responsabilidade provavelmente é genérica demais.
 
-Para padrões detalhados de segurança, consulte: **[SECURITY-STANDARDS.md](SECURITY-STANDARDS.md)**
+### 4.2 Quando Modularizar
 
-### 9.3 Checklist Pré-Commit (Segurança)
+**Trigger obrigatório:** Arquivo com **≥2 responsabilidades distintas**, independente do tamanho.
 
-Antes de qualquer commit que modifique:
-- Rotas de API → Verificar rate limiting + validação Zod
-- Autenticação → Verificar authMiddleware aplicado
-- Variáveis de ambiente → Verificar validação obrigatória
-- Queries ao banco → Verificar uso de Prisma (NUNCA raw SQL)
+**Trigger de investigação:** Arquivo com >200 linhas → perguntar:
+- [ ] A responsabilidade é realmente **única e específica**?
+- [ ] Posso descrevê-la em **uma frase**?
+- [ ] A complexidade é **inerente ao domínio** (ex: parser de protocolo AWS)?
+- [ ] O arquivo tem **coesão alta** (tudo fortemente relacionado)?
 
-### 9.4 Testes de Segurança Obrigatórios
+Se respondeu **"não"** a qualquer pergunta → modularizar.
 
-```bash
-# Executar ANTES de push/deploy
-cd backend
-./security-tests.sh
+### 4.3 Estrutura Padrão de Modularização
 
-# Resultado esperado: 100% PASS (7/7 testes)
+```
+feature/
+├── index.ts              # Re-exports (Nível raiz)
+├── FeatureMain.ts        # Orquestrador (apenas delegação)
+├── types.ts              # Tipos compartilhados (se necessário)
+├── responsibility1/      # Subpasta por responsabilidade
+│   ├── index.ts          # Re-exports (Nível subpasta)
+│   └── Module1.ts
+└── responsibility2/
+    ├── index.ts
+    └── Module2.ts
 ```
 
-### 9.5 Princípio de Fail-Secure
+**Regras:**
+- Arquivo original (`feature.ts`) vira **re-export** para manter compatibilidade
+- Imports externos **NÃO devem quebrar** após modularização
+- Cada subpasta tem seu `index.ts` com re-exports
+
+### 4.4 Padrões de Design como Navegação Semântica
+
+**Princípio:** O nome da pasta indica o **padrão de design implementado**, o **tipo de responsabilidade** e o **método público principal**. Isso torna o código auto-documentado e navegável.
+
+#### Tabela de Referência
+
+| Pasta | Padrão de Design | Método Principal | Responsabilidade |
+|-------|------------------|------------------|------------------|
+| `builders/` | Builder | `.build()` | Criação/montagem de objetos complexos |
+| `handlers/` | Strategy / Chain of Responsibility | `.handle()` | Processamento de lógica condicional |
+| `validators/` | Template Method | `.validate()` | Validação de dados (lança erro ou void) |
+| `transformers/` | Transformer | `.transform()` | Conversão de formato/estrutura |
+| `strategies/` | Strategy | `.execute()` | Algoritmos intercambiáveis |
+| `matchers/` | Specification | `.matches()` | Verificação de condição (retorna boolean) |
+| `registry/` | Registry | `.register()` / `.get()` | Catálogo de implementações |
+| `factories/` | Factory | `.create()` | Instanciação de objetos |
+| `loaders/` | Lazy Loading | `.load()` | Carregamento sob demanda |
+| `adapters/` | Adapter | `.adapt()` | Conversão de interface externa |
+| `categories/` | Strategy | `.match()` | Classificação por tipo |
+| `errors/` | Template Method | `.categorize()` | Tratamento/classificação de erros |
+| `repositories/` | Repository | `.find*()` / `.save()` | Acesso a dados |
+
+#### Regras de Conformidade
+
+- ✅ Classes dentro de `builders/` **DEVEM** ter método `.build()`
+- ✅ Classes dentro de `handlers/` **DEVEM** ter método `.handle()`
+- ✅ Classes dentro de `validators/` **DEVEM** ter método `.validate()`
+- ❌ **PROIBIDO** misturar padrões (ex: `.validate()` dentro de `builders/`)
+
+### 4.5 Classe Orquestradora
+
+Após modularização, a classe principal **DEVE apenas delegar**:
 
 ```typescript
-// ❌ PROIBIDO - Fail-open (inseguro)
-const secret = process.env.JWT_SECRET || 'dev-secret';
-const user = await findUser(input) || { role: 'guest' };
+// ✅ CORRETO — Orquestrador delega tudo
+class ChatOrchestrator {
+  constructor(
+    private configBuilder: ConfigBuilder,
+    private validator: MessageValidator,
+    private streamHandler: StreamHandler
+  ) {}
 
-// ✅ OBRIGATÓRIO - Fail-secure (exit/error se inseguro)
-if (!process.env.JWT_SECRET) process.exit(1);
-if (!user) throw new AppError('Unauthorized', 401);
+  async orchestrate(input: ChatInput): Promise<ChatOutput> {
+    const config = this.configBuilder.build(input);
+    await this.validator.validate(config);
+    return this.streamHandler.handle(config);
+  }
+}
+
+// ❌ ERRADO — Orquestrador implementa lógica
+class ChatOrchestrator {
+  async orchestrate(input: ChatInput): Promise<ChatOutput> {
+    // 200 linhas de lógica inline...
+  }
+}
 ```
 
-**Regra:** Em caso de falha de segurança, o sistema DEVE falhar de forma segura (negar acesso, exit), NUNCA permitir por padrão.
+**Regras:**
+- Métodos públicos ≤20 linhas
+- Injeção de dependências no construtor
+- Sem lógica de negócio direta (apenas delegação e composição)
+
+### 4.6 Anti-Padrões de Modularização (PROIBIDO)
+
+| Anti-Padrão | Descrição | Solução |
+|-------------|-----------|---------|
+| **Over-modularização** | Criar pasta para 1 arquivo de 50 linhas | Manter arquivo único até ter ≥2 responsabilidades |
+| **Modularização prematura** | Dividir antes de ter clareza das responsabilidades | Esperar padrões emergirem |
+| **Pastas vazias** | Criar estrutura "para o futuro" sem implementação | Criar apenas quando necessário |
+| **Mistura de padrões** | `.validate()` dentro de `builders/` | Respeitar tabela 4.4 |
+| **God index.ts** | `index.ts` com lógica além de re-exports | Apenas re-exports |
+| **Arquivos de tipos centralizados** | `types.ts` com 500+ linhas | Dividir por domínio |
+
+### 4.7 Métricas de Qualidade
+
+Após modularização, verificar:
+
+- [ ] Cada arquivo tem ≤1 responsabilidade
+- [ ] Cada arquivo é descritível em 1 frase
+- [ ] Imports externos não quebraram
+- [ ] Cobertura de testes mantida ou aumentada
+- [ ] Tempo de navegação no código reduzido
+- [ ] Nomes de pastas seguem tabela 4.4
+
+### 4.8 Exemplo Completo
+
+**ANTES (1 arquivo, 397 linhas, 5 responsabilidades):**
+```typescript
+// chatOrchestrator.service.ts
+class ChatOrchestrator {
+  buildConfig() { /* 80 linhas */ }
+  buildPayload() { /* 70 linhas */ }
+  validateMessage() { /* 50 linhas */ }
+  validateContext() { /* 40 linhas */ }
+  handleStream() { /* 60 linhas */ }
+  handleError() { /* 50 linhas */ }
+  handleSuccess() { /* 47 linhas */ }
+}
+```
+
+**DEPOIS (8 arquivos, 1 responsabilidade cada):**
+```
+orchestrator/
+├── index.ts                          # Re-exports
+├── chatOrchestrator.ts               # Orquestrador (delegação)
+│
+├── builders/                         # Builder Pattern → .build()
+│   ├── index.ts
+│   ├── configBuilder.ts              # "Montar configuração"
+│   └── payloadBuilder.ts             # "Montar payload"
+│
+├── validators/                       # Template Method → .validate()
+│   ├── index.ts
+│   ├── messageValidator.ts           # "Validar mensagem"
+│   └── contextValidator.ts           # "Validar contexto"
+│
+└── handlers/                         # Strategy/Chain → .handle()
+    ├── index.ts
+    ├── streamErrorHandler.ts         # "Processar erros de stream"
+    └── successHandler.ts             # "Processar resposta com sucesso"
+```
 
 ---
 
-## 10. Identidade Visual e Design System
+## 5. Arquitetura Frontend
 
-> **Documento Completo:** [docs/VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md)
+### 5.1 Separação Estrita (View/Logic)
 
-### Princípios Fundamentais
+| Arquivo | Responsabilidade | Conteúdo |
+|---------|------------------|----------|
+| **`.tsx` (View)** | Apenas JSX e estilos | Sem lógica de estado complexa |
+| **`useX.ts` (Lógica)** | Regras de negócio | `useState`, `useEffect`, handlers |
 
-1. **Theme-First:** NUNCA usar cores hardcoded (`#HEX`, `rgba()`)
+**Regra:** Extrair lógica para **Custom Hooks** sempre que houver:
+- Mais de 3 `useState`
+- Lógica condicional complexa
+- Chamadas de API
+- Side effects (`useEffect`)
+
+### 5.2 Arquitetura de Layout (Scroll & Viewport)
+
+**Scroll vertical da aplicação é responsabilidade EXCLUSIVA do `MainContentWrapper`.**
+
+| Componente | Responsabilidade |
+|------------|------------------|
+| `MainLayout` | `overflow: hidden` |
+| `MainContentWrapper` | Controle de scroll |
+| Páginas (Chat, Audit, etc.) | **NUNCA** controlam scroll |
+
+**Regras:**
+- ❌ PROIBIDO usar `overflow`, `height: 100vh` em páginas
+- ✅ Páginas assumem que scroll já está resolvido pelo layout
+
+### 5.3 ObservabilityPageLayout
+
+O `ObservabilityPageLayout` é o layout base para páginas densas e observáveis.
+
+**Quando usar:**
+- Múltiplas seções com navegação/âncoras
+- Sidebar persistente ou drawer contextual
+- Visualização de dados (tabelas, gráficos, timelines)
+- Inspeção de registros (modais de detalhes/trace)
+
+**Regras:**
+- Páginas complexas **DEVEM** utilizar `ObservabilityPageLayout`
+- Features **NÃO DEVEM** recriar estruturas próprias de sidebar/drawer
+- Controle de scroll/viewport **NÃO** deve ser feito pela feature/página
+
+### 5.4 Mappers (Transformação de Dados)
+
+Mappers são funções que transformam dados entre camadas (API → Frontend).
+
+**Localização:** `features/{feature}/mappers/` ou `services/mappers/`
+
+**Quando usar:**
+- Conversão de snake_case para camelCase
+- Adição de campos derivados/calculados
+- Normalização de datas (string → Date)
+- Transformação de estrutura de resposta
+
+**Exemplo:**
+```typescript
+// features/audit/mappers/mapAuditRecord.ts
+
+interface ApiAuditRecord {
+  created_at: string;
+  user_id: string;
+  total_cost: number;
+}
+
+interface AuditRecord {
+  createdAt: Date;
+  userId: string;
+  totalCost: number;
+  formattedCost: string;  // Campo derivado
+}
+
+export function mapAuditRecord(raw: ApiAuditRecord): AuditRecord {
+  return {
+    createdAt: new Date(raw.created_at),
+    userId: raw.user_id,
+    totalCost: raw.total_cost,
+    formattedCost: `$${raw.total_cost.toFixed(4)}`
+  };
+}
+```
+
+**Regras:**
+- ✅ Mappers são funções puras (sem side effects)
+- ✅ Tipagem explícita de entrada e saída
+- ✅ Um mapper por entidade/domínio
+- ❌ PROIBIDO fazer chamadas de API dentro de mappers
+
+### 5.5 Estrutura de Features
+
+Cada feature no frontend DEVE seguir a estrutura padrão para garantir consistência e manutenibilidade.
+
+**Estrutura Padrão:**
+```
+features/
+└── featureName/
+    ├── index.tsx              # Re-export da página principal
+    ├── FeaturePage.tsx        # Componente de página
+    ├── components/            # Componentes específicos da feature
+    │   ├── ComponentA.tsx
+    │   └── ComponentB.tsx
+    ├── hooks/                 # Hooks específicos da feature
+    │   ├── useFeatureLogic.ts
+    │   └── useFeatureData.ts
+    ├── types.ts               # Tipos da feature (se necessário)
+    ├── services/              # Services específicos (se necessário)
+    │   └── featureService.ts
+    └── mappers/               # Transformadores de dados (se necessário)
+        └── mapFeatureData.ts
+```
+
+**Regras de Organização:**
+
+1. **Re-export no index.tsx:**
+```typescript
+// features/chat/index.tsx
+// ✅ CORRETO - Apenas re-export
+export { default } from './ChatPage';
+
+// ❌ ERRADO - Lógica no index
+export default function ChatPage() {
+  // 200 linhas de código...
+}
+```
+
+2. **Extração de Hooks:**
+- Extrair para `hooks/` quando houver **>3 useState**
+- Extrair quando houver lógica condicional complexa
+- Extrair quando houver chamadas de API ou side effects
+
+```typescript
+// ✅ CORRETO - Lógica extraída
+// hooks/useChatLogic.ts
+export function useChatLogic() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<ChatConfig>(defaultConfig);
+  
+  // Lógica complexa aqui...
+  
+  return { messages, isLoading, error, config, sendMessage };
+}
+
+// ChatPage.tsx
+function ChatPage() {
+  const { messages, isLoading, sendMessage } = useChatLogic();
+  return <div>{/* JSX apenas */}</div>;
+}
+```
+
+3. **Divisão de Componentes:**
+- Dividir quando componente exceder **>100 linhas**
+- Dividir quando houver responsabilidades distintas
+- Criar subpastas para componentes relacionados
+
+```typescript
+// ✅ CORRETO - Componentes divididos
+features/chat/components/
+├── ControlPanel/
+│   ├── ControlPanel.tsx
+│   ├── ModelSelector.tsx
+│   └── ConfigPanel.tsx
+├── input/
+│   ├── ChatInput.tsx
+│   └── SendButton.tsx
+└── message/
+    ├── MessageList.tsx
+    ├── MessageItem.tsx
+    └── MessageActions.tsx
+```
+
+4. **Regras de Importação:**
+```typescript
+// ❌ PROIBIDO - Importar diretamente de outra feature
+import { useAuditLogic } from '@/features/audit/hooks/useAuditLogic';
+
+// ✅ CORRETO - Usar services compartilhados
+import { auditService } from '@/services/auditService';
+
+// ✅ CORRETO - Importar de shared/common
+import { Button } from '@/components/common/Button';
+```
+
+**Exemplo Real (Chat):**
+```
+features/chat/
+├── index.tsx                  # Re-export
+├── ChatPage.tsx               # Página principal (~80 linhas)
+├── components/
+│   ├── ControlPanel/          # Painel de controle
+│   │   ├── ControlPanel.tsx
+│   │   ├── ModelSelector.tsx
+│   │   └── ConfigPanel.tsx
+│   ├── input/                 # Input de mensagens
+│   │   ├── ChatInput.tsx
+│   │   └── SendButton.tsx
+│   └── message/               # Mensagens
+│       ├── MessageList.tsx
+│       ├── MessageItem.tsx
+│       └── MessageActions.tsx
+├── hooks/
+│   ├── useChatLogic.ts        # Lógica principal
+│   ├── useChatMessages.ts     # Gerenciamento de mensagens
+│   └── useChatStreaming.ts    # Streaming SSE
+└── types/
+    └── index.ts               # Tipos do chat
+```
+
+**Checklist de Conformidade:**
+- [ ] `index.tsx` apenas re-exporta (sem lógica)
+- [ ] Hooks extraídos quando >3 useState
+- [ ] Componentes divididos quando >100 linhas
+- [ ] Sem importações diretas entre features
+- [ ] Services compartilhados em `services/`
+- [ ] Tipos em `types.ts` quando necessário
+
+### 5.6 Services Frontend
+
+Services encapsulam chamadas de API e lógica de comunicação com o backend.
+
+**Estrutura Padrão:**
+```
+frontend/src/services/
+├── api.ts                    # Instância Axios configurada
+├── authService.ts            # Autenticação
+├── chatService.ts            # Chat/Streaming
+├── certificationService.ts   # Certificações
+├── modelsService.ts          # Modelos
+└── api/                      # Services específicos por domínio
+    ├── modelsApi.ts
+    └── providersApi.ts
+```
+
+**Padrões Obrigatórios:**
+
+#### 5.6.1 Singleton Export (Não Classes)
+
+```typescript
+// ✅ CORRETO - Export de objeto singleton
+export const authService = {
+  login: async (data: LoginData): Promise<LoginResponse> => {
+    const response = await api.post('/auth/login', data);
+    return response.data;
+  },
+  
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout');
+    localStorage.removeItem('token');
+  }
+};
+
+// ❌ ERRADO - Export de classe
+export class AuthService {
+  async login(data: LoginData) { ... }
+  async logout() { ... }
+}
+```
+
+**Justificativa:** Singletons são mais simples, não requerem instanciação e facilitam mocking em testes.
+
+#### 5.6.2 Tipagem Explícita de Retorno
+
+```typescript
+// ✅ CORRETO - Tipo explícito
+async function fetchModels(): Promise<Model[]> {
+  const response = await api.get('/models');
+  return response.data;
+}
+
+// ❌ ERRADO - Tipo implícito
+async function fetchModels() {
+  const response = await api.get('/models');
+  return response.data;
+}
+```
+
+#### 5.6.3 Tratamento de Erros (Propagar, Não Silenciar)
+
+```typescript
+// ✅ CORRETO - Propagar erro para componente tratar
+async function fetchData(): Promise<Data> {
+  const response = await api.get('/data');
+  return response.data;
+  // Erro propagado automaticamente
+}
+
+// ❌ ERRADO - Silenciar erro
+async function fetchData(): Promise<Data | null> {
+  try {
+    const response = await api.get('/data');
+    return response.data;
+  } catch (error) {
+    console.error(error);
+    return null; // ← Erro silenciado! Componente não sabe que falhou
+  }
+}
+
+// ✅ CORRETO - Transformar erro se necessário
+async function fetchData(): Promise<Data> {
+  try {
+    const response = await api.get('/data');
+    return response.data;
+  } catch (error) {
+    // Transformar erro para formato específico
+    throw new AppError('Falha ao buscar dados', error);
+  }
+}
+```
+
+**Regra:** Componentes devem decidir como tratar erros (toast, modal, retry). Services apenas propagam.
+
+#### 5.6.4 Cache de Promises (Deduplicação)
+
+```typescript
+// ✅ CORRETO - Evitar requests duplicados
+let cachedPromise: Promise<Model[]> | null = null;
+
+export const modelsService = {
+  getModels: async (): Promise<Model[]> => {
+    if (cachedPromise) return cachedPromise;
+    
+    cachedPromise = api.get('/models')
+      .then(response => response.data)
+      .finally(() => {
+        // Limpar cache após 5 minutos
+        setTimeout(() => { cachedPromise = null; }, 5 * 60 * 1000);
+      });
+    
+    return cachedPromise;
+  },
+  
+  invalidateCache: () => {
+    cachedPromise = null;
+  }
+};
+```
+
+**Benefício:** Se 3 componentes chamarem `getModels()` simultaneamente, apenas 1 request é feito.
+
+#### 5.6.5 Estrutura de api.ts
+
+```typescript
+// frontend/src/services/api.ts
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Interceptor de request (adicionar token)
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Interceptor de response (desembrulhar JSend)
+api.interceptors.response.use(
+  (response) => {
+    // Desembrulhar JSend: { status: 'success', data: {...} } → {...}
+    if (response.data?.status === 'success') {
+      return { ...response, data: response.data.data };
+    }
+    return response;
+  },
+  (error) => {
+    // Tratar erros globais (401, 403, 500)
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+```
+
+**Anti-Padrões (PROIBIDO):**
+
+| Anti-Padrão | Problema | Solução |
+|-------------|----------|---------|
+| Classes de Service | Requer instanciação, mais complexo | Usar singleton objects |
+| Silenciar erros | Componente não sabe que falhou | Propagar erros |
+| Tipo implícito | Dificulta manutenção e refatoração | Tipagem explícita |
+| Requests duplicados | Desperdício de banda e processamento | Cache de promises |
+| Lógica de negócio | Service não deve ter regras de negócio | Apenas comunicação |
+
+**Checklist de Conformidade:**
+- [ ] Export de singleton (não classe)
+- [ ] Tipagem explícita de retorno
+- [ ] Erros propagados (não silenciados)
+- [ ] Cache de promises quando aplicável
+- [ ] Interceptors configurados em `api.ts`
+- [ ] Sem lógica de negócio (apenas comunicação)
+
+---
+
+## 6. Arquitetura Backend
+
+### 6.1 Modularidade e Factory Pattern
+
+**Princípios:**
+- Lógica de IA deve usar `ProviderFactory` para instanciação
+- Configurações residem no banco, nunca hardcoded
+- Injeção de dependências via construtor
+
+**Convenções de Banco:**
+- Models em `PascalCase`
+- Tabelas em `snake_case`
+
+### 6.2 Fonte Única de Verdade
+
+**Qualquer entidade auditável, persistida ou governável DEVE ter sua identidade criada exclusivamente no backend.**
+
+O frontend **NUNCA** é fonte de verdade para:
+- IDs de mensagens
+- IDs de inferências
+- IDs de auditoria
+- Decisões, custos ou status de execução
+
+**Regras Práticas:**
+- ❌ PROIBIDO gerar IDs auditáveis no frontend (`Date.now()`, `uuid()`, etc)
+- ✅ Frontend deve sempre consumir IDs retornados pelo backend
+- ✅ Se um dado pode ser auditado, ele **não pode** nascer no frontend
+
+> 📌 **Regra de ouro:** *Se pode ser auditado, não pode ter identidade criada no frontend.*
+
+### 6.3 Armazenamento Lean (Anti-Duplicação)
+
+O sistema **NÃO DEVE** duplicar conteúdo que já existe em tabelas normalizadas.
+
+**Regra:** Salvar apenas metadados e referências (IDs), nunca conteúdo duplicado.
+
+✅ **O que DEVE ser salvo:**
+```typescript
+{
+  config_V47: { mode, model, provider, timestamp, strategy, params },
+  systemPrompt: "Você é uma IA útil...",  // ← ÚNICO! Não está no banco
+  messageIds: ["uuid1", "uuid2", ...],    // ← IDs do histórico, não conteúdo!
+  userMessageId: "uuid-da-pergunta",
+  pinnedStepIndices: [0, 2, 5],
+  preflightTokenCount: 1500
+}
+```
+
+❌ **O que NÃO DEVE ser salvo:**
+```typescript
+{
+  payloadSent: [{ role: "user", content: "texto enorme..." }]  // ← DUPLICAÇÃO!
+}
+```
+
+**Economia estimada:** ~98% de espaço (50 MB vs 2.5 GB para 1.000 chats × 50 msgs)
+
+### 6.4 Versionamento de Mensagens (Arquitetura Preparada)
+
+> ⚠️ **STATUS:** Esta seção descreve arquitetura planejada. Implementação atual usa apenas `messageIds` no `sentContext`.
+
+Quando a edição de mensagens for implementada:
+- Editar uma mensagem **NÃO sobrescreve** o original
+- Edições criam uma **nova versão** (branch)
+- Traces existentes preservam referência à versão original
+
+### 6.5 Workers e Filas (Bull/Redis)
+
+O sistema utiliza **Bull** (biblioteca de filas baseada em Redis) para processamento assíncrono de tarefas pesadas, especialmente certificação de modelos AI.
+
+#### 6.5.1 Arquitetura de Workers
+
+**Estrutura de Diretórios:**
+```
+backend/src/
+├── workers/
+│   └── certificationWorker.ts      # Worker dedicado para certificações
+├── services/queue/
+│   ├── QueueService.ts              # Gerenciamento genérico de filas
+│   ├── CertificationQueueService.ts # Orquestrador de certificações
+│   ├── validators/
+│   │   └── ModelValidator.ts        # Validação de modelos
+│   ├── creators/
+│   │   └── JobCreator.ts            # Criação de jobs
+│   ├── processors/
+│   │   ├── JobProcessor.ts          # Processamento de jobs
+│   │   └── StatusUpdater.ts         # Atualização de status
+│   └── queries/
+│       └── StatusQuery.ts           # Consultas de status
+└── config/
+    ├── redis.ts                     # Configuração Redis
+    └── bullBoard.ts                 # Dashboard de monitoramento
+```
+
+**Princípios:**
+- **Separação de Responsabilidades:** Worker apenas processa, service orquestra
+- **Idempotência:** Jobs podem ser reprocessados sem efeitos colaterais
+- **Rastreabilidade:** Logs estruturados em cada etapa
+- **Resiliência:** Retry automático com backoff exponencial
+
+#### 6.5.2 Configuração Redis
+
+**Variáveis de Ambiente Obrigatórias:**
+```env
+# Redis Connection
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=                      # Vazio em dev, obrigatório em prod
+REDIS_DB=0
+
+# Bull Queue
+BULL_QUEUE_PREFIX=myia               # Prefixo para chaves Redis
+CERTIFICATION_QUEUE_NAME=model-certification
+CERTIFICATION_CONCURRENCY=3          # Jobs simultâneos (dev: 3, prod: 5-10)
+CERTIFICATION_TIMEOUT=300000         # 5 minutos
+CERTIFICATION_MAX_RETRIES=3
+```
+
+**Exemplo de Configuração ([`backend/src/config/redis.ts`](backend/src/config/redis.ts)):**
+```typescript
+import Redis from 'ioredis';
+import { config } from './env';
+
+export const redisClient = new Redis({
+  host: config.redisHost,
+  port: config.redisPort,
+  password: config.redisPassword || undefined,
+  db: config.redisDb,
+  maxRetriesPerRequest: null,  // Requerido por Bull
+  enableReadyCheck: false
+});
+
+redisClient.on('connect', () => {
+  logger.info('✅ Redis connected');
+});
+
+redisClient.on('error', (err) => {
+  logger.error('❌ Redis error', { error: err.message });
+});
+```
+
+#### 6.5.3 Padrão de Jobs (CertificationQueueService)
+
+**Criação de Job:**
+```typescript
+// backend/src/services/queue/CertificationQueueService.ts
+
+// Job único (1 modelo, 1 região)
+const { jobId, bullJobId } = await certificationQueueService.certifyModel(
+  'anthropic.claude-3-5-sonnet-20241022-v2:0',
+  'us-east-1',
+  'user-uuid'
+);
+
+// Job em lote (N modelos x M regiões)
+const { jobId, totalJobs } = await certificationQueueService.certifyMultipleModels(
+  ['model-1', 'model-2'],
+  ['us-east-1', 'us-west-2'],
+  'user-uuid'
+);
+
+// Certificar todos os modelos Bedrock
+const { jobId, totalJobs } = await certificationQueueService.certifyAllModels(
+  ['us-east-1', 'us-west-2'],
+  'user-uuid'
+);
+```
+
+**Estrutura de Job Data:**
+```typescript
+interface CertificationJobData {
+  jobId: string;           // UUID do CertificationJob (banco)
+  modelId: string;         // UUID do modelo no ModelRegistry
+  region: string;          // Região AWS (ex: us-east-1)
+  createdBy?: string;      // UUID do usuário que iniciou
+  timestamp: string;       // ISO 8601
+}
+```
+
+**Resultado de Job:**
+```typescript
+interface CertificationResult {
+  modelId: string;
+  region: string;
+  passed: boolean;         // true se todos os testes passaram
+  score: number;           // 0-100
+  rating: string;          // 'A+', 'A', 'B', 'C', 'D', 'F'
+  testsPassed: number;
+  testsFailed: number;
+  duration: number;        // Duração em ms
+  results: TestResult[];   // Detalhes de cada teste
+}
+```
+
+#### 6.5.4 Retry Strategies
+
+**Configuração de Retry:**
+```typescript
+// backend/src/services/queue/QueueService.ts
+
+const jobOptions = {
+  attempts: 3,                    // Máximo 3 tentativas
+  backoff: {
+    type: 'exponential',
+    delay: 5000                   // 5s, 25s, 125s
+  },
+  timeout: 300000,                // 5 minutos por tentativa
+  removeOnComplete: false,        // Manter histórico
+  removeOnFail: false
+};
+```
+
+**Quando Retry é Acionado:**
+- ❌ Timeout de certificação (>5 min)
+- ❌ Erro de rede AWS (throttling, timeout)
+- ❌ Erro temporário do modelo (503 Service Unavailable)
+- ✅ Erro de validação (não faz retry)
+- ✅ Modelo não existe (não faz retry)
+
+**Logs de Retry:**
+```typescript
+logger.warn('🔄 Retrying job', {
+  jobId: job.id,
+  attempt: job.attemptsMade,
+  maxAttempts: job.opts.attempts,
+  error: error.message
+});
+```
+
+#### 6.5.5 Monitoramento (Bull Board)
+
+**Acesso ao Dashboard:**
+```
+URL: http://localhost:3001/admin/queues
+Credenciais: admin / admin123 (configurável via .env)
+```
+
+**Funcionalidades:**
+- 📊 Visualizar jobs ativos, completados, falhados
+- 🔄 Retry manual de jobs falhados
+- 🗑️ Limpeza de filas (completed/failed)
+- 📈 Métricas de throughput e latência
+- 🔍 Inspeção de payload e resultado
+
+**Configuração ([`backend/src/config/bullBoard.ts`](backend/src/config/bullBoard.ts)):**
+```typescript
+import { createBullBoard } from '@bull-board/api';
+import { BullAdapter } from '@bull-board/api/bullAdapter';
+import { ExpressAdapter } from '@bull-board/express';
+import { queueService } from '../services/queue/QueueService';
+
+const serverAdapter = new ExpressAdapter();
+serverAdapter.setBasePath('/admin/queues');
+
+createBullBoard({
+  queues: [
+    new BullAdapter(queueService.getQueue({ name: 'model-certification' }))
+  ],
+  serverAdapter
+});
+
+// Proteger com autenticação básica
+app.use('/admin/queues', basicAuth({
+  users: {
+    [config.bullBoardUsername]: config.bullBoardPassword
+  },
+  challenge: true
+}));
+
+app.use('/admin/queues', serverAdapter.getRouter());
+```
+
+#### 6.5.6 Checklist de Conformidade (Workers)
+
+**Configuração:**
+- [ ] Redis configurado e acessível
+- [ ] Variáveis de ambiente definidas (`.env`)
+- [ ] Concurrency ajustada para ambiente (dev: 3, prod: 5-10)
+- [ ] Timeout adequado para operação (certificação: 5min)
+
+**Código:**
+- [ ] Worker registra processador via `queue.process()`
+- [ ] Jobs são idempotentes (podem ser reprocessados)
+- [ ] Logs estruturados em cada etapa (active, completed, failed)
+- [ ] Retry configurado com backoff exponencial
+- [ ] Erros propagados corretamente (não silenciados)
+
+**Monitoramento:**
+- [ ] Bull Board acessível e protegido
+- [ ] Logs de jobs salvos no banco (CertificationJob)
+- [ ] Métricas de fila monitoradas (waiting, active, completed, failed)
+
+**Referências:**
+- Guia completo: [`backend/docs/REDIS-BULL-SETUP.md`](backend/docs/REDIS-BULL-SETUP.md)
+- Worker: [`backend/src/workers/certificationWorker.ts`](backend/src/workers/certificationWorker.ts)
+- Service: [`backend/src/services/queue/CertificationQueueService.ts`](backend/src/services/queue/CertificationQueueService.ts)
+
+---
+
+## 7. Tamanho de Arquivos (Sinalizador)
+
+### 7.1 Princípio
+
+**Tamanho é um SINALIZADOR, não uma regra primária.**
+
+A regra primária é **responsabilidade única** (Seção 4.1). Limites de linhas servem para alertar sobre possíveis violações.
+
+### 7.2 Limites por Tipo de Arquivo
+
+| Tipo | Recomendado | Warning | Bloqueado |
+|------|-------------|---------|-----------|
+| **Controllers** | ≤200 | >250 | >400 |
+| **Services** | ≤250 | >300 | >400 |
+| **Components (React)** | ≤200 | >250 | >400 |
+| **Hooks** | ≤150 | >200 | >300 |
+| **Utilities** | ≤150 | >200 | >300 |
+| **Types/Interfaces** | ≤100 | >150 | >200 |
+
+### 7.3 Pre-Commit Hook
+
+O projeto possui um **pre-commit hook** que verifica automaticamente:
+
+- **⚠️ WARNING (300-400 linhas):** Mostra aviso, permite commit
+- **🚨 ERROR (>400 linhas):** Bloqueia commit, exige refatoração
+
+**Localização:** [`.husky/check-file-size.sh`](../.husky/check-file-size.sh)
+
+### 7.4 Quando Arquivo Grande é Aceitável
+
+Arquivo entre 300-400 linhas é aceitável SE:
+- [ ] Tem **1 responsabilidade única e específica**
+- [ ] Responsabilidade é descritível em **1 frase**
+- [ ] Complexidade é **inerente ao domínio**
+- [ ] Coesão é **alta** (tudo fortemente relacionado)
+
+**❌ Justificativas NÃO Aceitáveis:**
+- "Não tive tempo de refatorar"
+- "É mais fácil manter tudo junto"
+- "Vou refatorar depois" (sem issue criada)
+
+---
+
+# PARTE III: DESIGN SYSTEM
+
+---
+
+## 8. Identidade Visual e Design System
+
+### 8.1 Princípios Fundamentais
+
+1. **Theme-First:** NUNCA usar cores hardcoded
 2. **Consistência de Ícones:** Material Icons (Outlined padrão)
 3. **Acessibilidade:** Todo IconButton DEVE ter Tooltip
 4. **Hierarquia Clara:** Primário → Secundário → Terciário
 5. **Animações Suaves:** Transições de 0.2s-0.3s
 
-### Paleta de Cores (Tokens Obrigatórios)
+### 8.2 Centralização de Cores no theme.ts
 
-**❌ PROIBIDO:**
+**Todas as cores da aplicação DEVEM ser definidas em `frontend/src/theme.ts`.**
+
+❌ **PROIBIDO:**
 ```typescript
 color: '#00FF41'
 bgcolor: 'rgba(255,255,255,0.1)'
@@ -404,7 +1143,7 @@ borderColor: 'rgba(0,0,0,0.2)'
 background: alpha(theme.palette.primary.main, 0.2)
 ```
 
-**✅ PERMITIDO:**
+✅ **PERMITIDO:**
 ```typescript
 color: 'text.secondary'
 bgcolor: 'grey.100'
@@ -412,7 +1151,12 @@ borderColor: 'divider'
 opacity: 0.8
 ```
 
-### Ícones Padronizados
+**Regras:**
+- ❌ PROIBIDO usar valores default do MUI sem declarar no theme.ts
+- ✅ Novos tokens de cor DEVEM ser criados no theme.ts antes de usar
+- ✅ Usar apenas tokens do tema para garantir dark/light mode
+
+### 8.3 Ícones Padronizados
 
 | Categoria | Ícones | Uso |
 |-----------|--------|-----|
@@ -422,7 +1166,7 @@ opacity: 0.8
 | Estado | `Warning`, `Error`, `CheckCircle` | Avisos, erros, sucesso |
 | IA | `SmartToy`, `AutoAwesome` | Avatar bot, recursos IA |
 
-### Espaçamento (Grid 8px)
+### 8.4 Espaçamento (Grid 8px)
 
 ```typescript
 gap: 0.5   // 4px
@@ -432,7 +1176,7 @@ gap: 2     // 16px (generoso)
 gap: 3     // 24px (seções)
 ```
 
-### Componentes de Ação
+### 8.5 Componentes de Ação
 
 **IconButton Template:**
 ```typescript
@@ -453,23 +1197,7 @@ gap: 3     // 24px (seções)
 </Tooltip>
 ```
 
-**Botão Primário (Gradiente):**
-```typescript
-<IconButton
-  sx={{
-    background: theme.palette.gradients.primary,
-    color: 'white',
-    width: 48,
-    height: 48,
-    '&:hover': { transform: 'scale(1.05)' },
-    transition: 'all 0.2s',
-  }}
->
-  <SendIcon />
-</IconButton>
-```
-
-### Checklist de Conformidade Visual
+### 8.6 Checklist de Conformidade Visual
 
 - [ ] Usa apenas tokens do tema
 - [ ] Todos IconButtons têm Tooltip
@@ -478,84 +1206,38 @@ gap: 3     // 24px (seções)
 - [ ] Transições suaves (0.2s/0.3s)
 - [ ] Responsivo (xs/sm/md)
 - [ ] Hover states definidos
-- [ ] Border radius consistente (1, 2, 3)
 
 ---
 
-## 11. Versionamento de Mensagens (Arquitetura Preparada)
-
-Quando a edição de mensagens for implementada, o sistema **DEVE** preservar a integridade do histórico de traces.
-
-### Regra Arquitetural
-
-- **Editar uma mensagem NÃO sobrescreve o original.**
-- Edições criam uma **nova versão** (branch), preservando o conteúdo original para traces existentes.
-
-### Estrutura Preparada (Schema Futuro)
-
-```prisma
-model Message {
-  id              String    @id @default(uuid())
-  // ... campos existentes ...
-  
-  // === VERSIONAMENTO (FUTURO) ===
-  version         Int       @default(1)
-  originalId      String?   // Aponta para a mensagem original (se for edição)
-  original        Message?  @relation("MessageVersions", fields: [originalId], references: [id])
-  versions        Message[] @relation("MessageVersions")
-  isLatest        Boolean   @default(true)  // Marca a versão mais recente
-  editedAt        DateTime? // Quando foi editada
-}
-```
-
-### Comportamento Esperado
-
-| Ação | Resultado |
-|------|-----------|
-| Criar mensagem | `version: 1`, `originalId: null`, `isLatest: true` |
-| Editar mensagem | Original: `isLatest: false`. Nova: `version: 2`, `originalId: original.id`, `isLatest: true` |
-| Buscar para chat | Filtrar por `isLatest: true` |
-| Reconstruir trace | Usar `messageIds` salvos (aponta para versão exata no momento do trace) |
-
-### Benefícios
-
-1. **Traces Imutáveis:** O trace sempre mostra exatamente o que foi enviado à IA
-2. **Histórico Completo:** Todas as versões são preservadas
-3. **Plug-and-Play:** Quando edição for implementada, a arquitetura já suporta
-
-### Implementação Atual (Stub)
-
-Até a edição ser implementada:
-- Campo `version` pode não existir ainda no schema
-- O código deve ser escrito de forma **defensiva** (assume `version: 1` se ausente)
-- `messageIds` no `sentContext` já garante rastreabilidade futura
+# PARTE IV: API E COMUNICAÇÃO
 
 ---
 
-## 12. Padronização de API e Respostas (JSend)
+## 9. Padronização de API (JSend)
 
-Toda comunicação entre Backend e Frontend deve seguir o padrão **JSend** para garantir previsibilidade.
+### 9.1 Formato de Resposta
 
-### Formato de Resposta
-- **Sucesso (200, 201):** `{ "status": "success", "data": { ... } }`
-- **Falha de Cliente/Validação (400, 403):** `{ "status": "fail", "data": { "campo": "mensagem" } }`
-- **Erro de Servidor (500):** `{ "status": "error", "message": "Descrição amigável", "code": 500 }`
+Toda comunicação Backend ↔ Frontend segue o padrão **JSend**:
 
-### Validação e Fluxo
-1. **Zod Middleware:** Nenhuma rota deve processar dados sem antes passar pelo middleware `validate(schema)`.
-2. **Controller:** Deve ser focado apenas na orquestração (chamar services/providers e retornar `ApiResponse`).
-3. **Segurança:** 
-   - Senhas nunca devem ser salvas em texto puro (usar `bcrypt` com salt de 10).
-   - O objeto de usuário retornado jamais deve incluir o campo `password`.
-4. **Erros:** Proibido o uso de `try/catch` genérico dentro dos controllers para retornar erro. Os erros devem ser lançados (`throw`) e capturados pelo `errorHandler` global.
+| Status | HTTP Code | Formato |
+|--------|-----------|---------|
+| **Sucesso** | 200, 201 | `{ "status": "success", "data": { ... } }` |
+| **Falha de Cliente** | 400, 403 | `{ "status": "fail", "data": { "campo": "mensagem" } }` |
+| **Erro de Servidor** | 500 | `{ "status": "error", "message": "Descrição", "code": 500 }` |
 
-### Frontend: Interceptor JSend (Desembrulhamento Automático)
+### 9.2 Validação e Fluxo
 
-**Regra Arquitetural:** O frontend possui um interceptor Axios (`frontend/src/services/api.ts`) que **desembrulha automaticamente** respostas JSend.
+1. **Zod Middleware:** Nenhuma rota processa dados sem `validate(schema)`
+2. **Controller:** Apenas orquestração (chamar services e retornar `ApiResponse`)
+3. **Segurança:** Senhas com `bcrypt` (salt 10), nunca retornar `password`
+4. **Erros:** Lançar (`throw`), capturar no `errorHandler` global
 
-**Comportamento:**
+### 9.3 Frontend: Interceptor (Desembrulhamento)
+
+O frontend possui interceptor Axios que **desembrulha automaticamente** respostas JSend:
+
 ```typescript
-// Backend retorna (JSend completo):
+// Backend retorna:
 { "status": "success", "data": { "user": {...} } }
 
 // Interceptor transforma em:
@@ -566,427 +1248,457 @@ const user = response.data.user; // ✅ CORRETO
 const user = response.data.data.user; // ❌ ERRADO
 ```
 
-**Implementação do Interceptor:**
-```typescript
-api.interceptors.response.use(
-  (response) => {
-    if (response.data && response.data.status === 'success') {
-      return { ...response, data: response.data.data };
-    }
-    return response;
-  }
-);
-```
-
 **Padrão Obrigatório:**
-- ✅ Backend SEMPRE retorna JSend completo: `jsend.success({ user })`
-- ✅ Frontend SEMPRE acessa dados desembrulhados: `response.data.user`
-- ❌ NUNCA acessar `response.data.data.X` no frontend (duplicação)
-- ❌ NUNCA retornar dados sem JSend no backend
+- ✅ Backend SEMPRE retorna JSend completo
+- ✅ Frontend SEMPRE acessa dados desembrulhados
+- ❌ NUNCA acessar `response.data.data.X` no frontend
 
-### 12.5 Tratamento de Erros (Error Handling)
+### 9.4 Tratamento de Erros
 
-**Princípio:** Erros devem ser informativos para o desenvolvedor, mas seguros para o usuário final.
+#### 9.4.1 Stack Traces
+- ✅ Permitido em desenvolvimento (`NODE_ENV=development`)
+- ❌ PROIBIDO em produção
 
-#### Regras de Implementação
-
-1. **Stack Traces:**
-   - ✅ Permitido em desenvolvimento (`NODE_ENV=development`)
-   - ❌ Proibido em produção (expõe estrutura interna)
-
-2. **Validação Zod:**
-   ```typescript
-   // ❌ PROIBIDO - Expor erro bruto do Zod
-   return res.status(400).json({ error: zodError });
-   
-   // ✅ OBRIGATÓRIO - Formatar com JSend
-   return res.status(400).json({
-     status: 'fail',
-     data: { email: 'Email inválido', password: 'Mínimo 8 caracteres' }
-   });
-   ```
-
-3. **Rate Limiting:**
-   - Status: `429 Too Many Requests`
-   - Formato: `{ status: 'fail', data: { message: 'Muitas tentativas' } }`
-   - Headers: `Retry-After` (segundos até reset)
-
-4. **Erros de Autenticação:**
-   - `401 Unauthorized`: Token ausente/inválido
-   - `403 Forbidden`: Token válido mas sem permissão
-   - Mensagem genérica (não revelar se usuário existe)
-
-5. **Erros de Servidor (500):**
-   ```typescript
-   // ✅ Mensagem amigável
-   { status: 'error', message: 'Erro interno do servidor', code: 500 }
-   
-   // ✅ Log completo (backend only)
-   logger.error('Database connection failed', { error, userId, timestamp });
-   ```
-
-#### Frontend: Tratamento de Erros
-
+#### 9.4.2 Validação Zod
 ```typescript
-// Interceptor automático (api.ts)
-if (error.response?.status === 429) {
-  // Não mostrar erro genérico, deixar UI tratar
-  return Promise.reject(error);
-}
+// ❌ PROIBIDO - Expor erro bruto
+return res.status(400).json({ error: zodError });
 
-// Componente
-try {
-  await api.post('/chat', data);
-} catch (error) {
-  if (error.response?.status === 429) {
-    setError('Aguarde antes de enviar outra mensagem');
-  } else {
-    setError(error.response?.data?.message || 'Erro desconhecido');
-  }
-}
-```
-
-#### Checklist de Conformidade
-
-- [ ] Erros 4xx usam JSend `fail` com campo específico
-- [ ] Erros 5xx usam JSend `error` com mensagem genérica
-- [ ] Stack traces removidos em produção
-- [ ] Rate limit retorna 429 com `Retry-After`
-- [ ] Frontend trata 429 sem mostrar erro genérico
-- [ ] Logs estruturados com Winston (não `console.log`) — Ver [Seção 13](#13-sistema-de-logging-estruturado)
-
----
-
-## 13. Sistema de Logging Estruturado
-
-### 13.1 Princípios Fundamentais
-
-**Logging estruturado é OBRIGATÓRIO em todo o projeto.**
-
-- ❌ **PROIBIDO:** `console.log()`, `console.error()`, `console.warn()`
-- ✅ **OBRIGATÓRIO:** `logger.info()`, `logger.error()`, `logger.warn()`, `logger.debug()`
-
-> **Integração com APIs:** Para tratamento de erros em rotas REST, veja [Seção 12.5](#125-tratamento-de-erros-error-handling)
-
----
-
-### 13.2 Estrutura de Log Padronizada
-
-Todo log DEVE seguir a interface [`LogEntry`](../backend/src/types/logging.ts):
-
-```typescript
-// backend/src/types/logging.ts
-interface LogEntry {
-  // Metadados obrigatórios
-  timestamp: string;        // ISO 8601
-  level: LogLevel;          // 'info' | 'warn' | 'error' | 'debug'
-  message: string;
-  
-  // Contexto de requisição
-  requestId?: string;       // UUID da requisição HTTP
-  userId?: string;          // ID do usuário autenticado
-  
-  // Contexto de inferência
-  inferenceId?: string;     // ID da inferência (se aplicável)
-  provider?: string;        // Provider usado (bedrock, openai)
-  model?: string;           // Modelo usado
-  
-  // Dados adicionais
-  metadata?: Record<string, unknown>;
-  error?: {
-    name: string;
-    message: string;
-    stack?: string;         // APENAS em desenvolvimento
-  };
-  
-  // Performance e auditoria
-  duration?: number;        // Duração da operação (ms)
-  statusCode?: number;      // HTTP status code
-  action?: string;          // Ação executada
-  resource?: string;        // Recurso afetado
-}
-
-type LogLevel = 'info' | 'warn' | 'error' | 'debug';
-```
-
-> **Detalhes de implementação:** Veja [logging/LOGGING-SYSTEM.md](./logging/LOGGING-SYSTEM.md)
-
----
-
-### 13.3 Níveis de Log
-
-| Nível | Uso | Exemplo |
-|-------|-----|---------|
-| `info` | Operações normais | Login, inferência concluída, requisição processada |
-| `warn` | Situações anormais (não críticas) | Rate limit atingido, cache miss, retry |
-| `error` | Erros que impedem operação | Falha de autenticação, erro de API, timeout |
-| `debug` | Informações detalhadas (dev) | Payload enviado, resposta recebida, estado interno |
-
----
-
-### 13.4 Uso Básico
-
-#### Exemplo 1: Log Simples (Informação)
-
-```typescript
-import { logger } from '../utils/logger';
-
-// Log básico sem contexto adicional
-logger.info('Aplicação iniciada');
-
-// Log com contexto simples
-logger.info('Usuário autenticado', {
-  userId: 'user-123',
-  requestId: req.id
+// ✅ OBRIGATÓRIO - Formatar com JSend
+return res.status(400).json({
+  status: 'fail',
+  data: { email: 'Email inválido', password: 'Mínimo 8 caracteres' }
 });
 ```
 
-#### Exemplo 2: Log em Controller (Requisição HTTP)
+#### 9.4.3 Rate Limiting
+- Status: `429 Too Many Requests`
+- Headers: `Retry-After` (segundos até reset)
 
-```typescript
-// backend/src/controllers/authController.ts
-import { logger } from '../utils/logger';
-import { AuthRequest } from '../middleware/authMiddleware';
+#### 9.4.4 Erros de Autenticação
+- `401 Unauthorized`: Token ausente/inválido
+- `403 Forbidden`: Token válido mas sem permissão
+- Mensagem genérica (não revelar se usuário existe)
 
-export async function login(req: AuthRequest, res: Response) {
-  const startTime = Date.now();
-  
-  try {
-    logger.info('Login attempt', {
-      requestId: req.id,
-      email: req.body.email // ❌ NÃO FAZER - dados sensíveis
-    });
-    
-    // ✅ CORRETO - apenas ID do usuário
-    logger.info('Login attempt', {
-      requestId: req.id,
-      // Não logar email ou senha
-    });
-    
-    const user = await authService.login(req.body);
-    
-    logger.info('Login successful', {
-      requestId: req.id,
-      userId: user.id,
-      duration: Date.now() - startTime
-    });
-    
-    return res.json(jsend.success({ user, token }));
-    
-  } catch (error) {
-    logger.error('Login failed', {
-      requestId: req.id,
-      duration: Date.now() - startTime,
-      error: error instanceof Error ? error.message : String(error)
-    });
-    
-    throw error;
-  }
-}
+### 9.5 Server-Sent Events (SSE)
+
+O sistema utiliza **Server-Sent Events (SSE)** para comunicação unidirecional em tempo real do backend para o frontend, especialmente para streaming de chat e feedback de progresso de certificações.
+
+#### 9.5.1 Quando Usar SSE
+
+**SSE é apropriado para:**
+- ✅ Streaming de respostas de chat (tokens incrementais)
+- ✅ Feedback de progresso de tarefas longas (certificação de modelos)
+- ✅ Notificações em tempo real (atualizações de status)
+- ✅ Logs de processamento em tempo real
+
+**SSE NÃO é apropriado para:**
+- ❌ Comunicação bidirecional (use WebSockets)
+- ❌ Transferência de arquivos grandes (use HTTP multipart)
+- ❌ Requisições simples request/response (use REST)
+
+#### 9.5.2 Formato de Eventos SSE
+
+**Estrutura Padrão:**
+```
+data: <JSON_PAYLOAD>\n\n
 ```
 
-#### Exemplo 3: Log em Service (Inferência de IA)
+**Tipos de Eventos:**
 
+| Tipo | Uso | Exemplo |
+|------|-----|---------|
+| `progress` | Atualização de progresso | Certificação: teste 2/6 concluído |
+| `chunk` | Fragmento de conteúdo | Chat: token incremental |
+| `complete` | Conclusão com sucesso | Resultado final da operação |
+| `error` | Erro durante processamento | Falha na certificação |
+
+#### 9.5.3 Implementação Backend
+
+**Configuração de Headers ([`backend/src/utils/chat/sseHandler.ts`](backend/src/utils/chat/sseHandler.ts)):**
 ```typescript
-// backend/src/services/ai/adapters/anthropic.adapter.ts
-import { logger } from '../../../utils/logger';
+export const sseHandler = {
+  setupHeaders(res: Response): void {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');  // Desabilitar buffering nginx
+    res.flushHeaders();
+  },
 
-export class AnthropicAdapter {
-  async generate(payload: any, options: any) {
-    const startTime = Date.now();
+  createWriter(res: Response): (data: StreamChunk) => void {
+    return (data: StreamChunk) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+  }
+};
+```
+
+**Exemplo de Controller:**
+```typescript
+// backend/src/controllers/certificationController.ts
+
+export async function certifyModelStream(req: Request, res: Response) {
+  const { modelId } = req.params;
+  
+  // Configurar SSE
+  sseHandler.setupHeaders(res);
+  const write = sseHandler.createWriter(res);
+  
+  try {
+    // Evento inicial
+    write({ type: 'progress', current: 0, total: 6, message: 'Iniciando certificação' });
     
-    logger.info('Starting AI inference', {
-      requestId: options.requestId,
-      userId: options.userId,
-      provider: 'anthropic',
-      model: options.modelId,
-      metadata: {
-        messageCount: payload.length,
-        estimatedTokens: this.estimateTokens(payload)
+    // Processar certificação com callbacks de progresso
+    const result = await certificationService.certify(modelId, {
+      onProgress: (current, total, testName, status) => {
+        write({ type: 'progress', current, total, testName, status });
       }
     });
     
-    try {
-      const response = await this.client.messages.create({
-        model: options.modelId,
-        messages: payload,
-        max_tokens: options.maxTokens || 4096
-      });
-      
-      logger.info('AI inference completed', {
-        requestId: options.requestId,
-        userId: options.userId,
-        provider: 'anthropic',
-        model: options.modelId,
-        duration: Date.now() - startTime,
-        metadata: {
-          tokensIn: response.usage.input_tokens,
-          tokensOut: response.usage.output_tokens,
-          cost: this.calculateCost(response.usage)
+    // Evento de conclusão
+    write({ type: 'complete', certification: result });
+    res.end();
+    
+  } catch (error) {
+    write({ type: 'error', message: error.message });
+    res.end();
+  }
+}
+```
+
+#### 9.5.4 Implementação Frontend
+
+**Usando EventSource (Browser Nativo):**
+```typescript
+// frontend/src/services/certificationService.ts
+
+export const certificationService = {
+  certifyWithProgress: (modelId: string, onProgress: (data: any) => void): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      const token = localStorage.getItem('token');
+      const eventSource = new EventSource(
+        `/api/certification/certify-model/${modelId}/stream`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
         }
-      });
+      );
       
-      return response;
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        switch (data.type) {
+          case 'progress':
+            onProgress(data);
+            break;
+            
+          case 'complete':
+            eventSource.close();
+            resolve(data.certification);
+            break;
+            
+          case 'error':
+            eventSource.close();
+            reject(new Error(data.message));
+            break;
+        }
+      };
       
-    } catch (error) {
-      logger.error('AI inference failed', {
-        requestId: options.requestId,
-        userId: options.userId,
-        provider: 'anthropic',
-        model: options.modelId,
-        duration: Date.now() - startTime,
-        error: error instanceof Error ? error.message : String(error),
-        stack: process.env.NODE_ENV === 'development' && error instanceof Error
-          ? error.stack
-          : undefined
-      });
-      
-      throw error;
+      eventSource.onerror = (error) => {
+        eventSource.close();
+        reject(new Error('Erro na conexão SSE'));
+      };
+    });
+  }
+};
+```
+
+**Usando fetch (Mais Controle):**
+```typescript
+async function streamCertification(modelId: string) {
+  const response = await fetch(`/api/certification/certify-model/${modelId}/stream`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n\n');
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = JSON.parse(line.substring(6));
+        handleEvent(data);
+      }
     }
   }
 }
 ```
 
-#### Exemplo 4: Log de Aviso (Warning)
+#### 9.5.5 Formato de Chunks (Chat Streaming)
 
+**Estrutura de Chunk:**
 ```typescript
-import { logger } from '../utils/logger';
-
-// Rate limit atingido
-logger.warn('Rate limit approaching', {
-  requestId: req.id,
-  userId: req.user.id,
-  metadata: {
-    currentRequests: 45,
-    limit: 50,
-    resetAt: new Date(Date.now() + 60000).toISOString()
-  }
-});
-
-// Cache miss
-logger.warn('Cache miss', {
-  requestId: req.id,
-  metadata: {
-    cacheKey: 'user-settings-123',
-    fallbackUsed: 'database'
-  }
-});
-
-// Retry de operação
-logger.warn('Retrying operation', {
-  requestId: req.id,
-  metadata: {
-    operation: 'fetch-embeddings',
-    attempt: 2,
-    maxAttempts: 3,
-    reason: 'timeout'
-  }
-});
+interface StreamChunk {
+  type: 'start' | 'chunk' | 'end' | 'error';
+  content?: string;           // Token incremental
+  metadata?: {
+    model?: string;
+    provider?: string;
+    inferenceId?: string;
+  };
+  error?: string;
+}
 ```
 
-#### Exemplo 5: Log de Debug (Desenvolvimento)
-
+**Exemplo de Sequência:**
 ```typescript
-import { logger } from '../utils/logger';
+// 1. Início do stream
+{ type: 'start', metadata: { model: 'claude-3-5-sonnet', inferenceId: 'uuid' } }
 
-// Debug de payload (apenas em desenvolvimento)
-if (process.env.NODE_ENV === 'development') {
-  logger.debug('Request payload', {
-    requestId: req.id,
-    metadata: {
-      body: req.body,
-      query: req.query,
-      params: req.params
-    }
+// 2. Chunks de conteúdo
+{ type: 'chunk', content: 'Olá' }
+{ type: 'chunk', content: ', como' }
+{ type: 'chunk', content: ' posso' }
+{ type: 'chunk', content: ' ajudar?' }
+
+// 3. Fim do stream
+{ type: 'end', metadata: { totalTokens: 150, duration: 2340 } }
+```
+
+#### 9.5.6 Tratamento de Erros em Stream
+
+**Erros HTTP (Antes do SSE Iniciar):**
+```typescript
+// Backend
+if (!modelId) {
+  return res.status(400).json({
+    status: 'fail',
+    data: { modelId: 'modelId é obrigatório' }
   });
 }
 
-// Debug de estado interno
-logger.debug('Context service state', {
-  requestId: req.id,
-  metadata: {
-    historySize: historyMessages.length,
-    pinnedCount: pinnedMessages.length,
-    ragEnabled: isRagMode,
-    estimatedTokens: totalTokens
+// Frontend
+try {
+  const eventSource = new EventSource(url);
+} catch (error) {
+  if (error.response?.status === 400) {
+    showError('Parâmetros inválidos');
   }
+}
+```
+
+**Erros Durante SSE:**
+```typescript
+// Backend - Enviar evento de erro
+write({ type: 'error', message: 'Falha ao processar certificação' });
+res.end();
+
+// Frontend - Tratar evento de erro
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  if (data.type === 'error') {
+    eventSource.close();
+    showError(data.message);
+  }
+};
+```
+
+#### 9.5.7 Timeout e Reconexão
+
+**Configuração de Timeout (Backend):**
+```typescript
+// Manter conexão viva com heartbeat
+const heartbeatInterval = setInterval(() => {
+  res.write(': heartbeat\n\n');  // Comentário SSE (ignorado pelo cliente)
+}, 30000);  // 30 segundos
+
+// Limpar ao finalizar
+res.on('close', () => {
+  clearInterval(heartbeatInterval);
 });
 ```
 
-> **Guia completo de uso:** Veja [`logging/README.md`](./logging/README.md:1)
+**Reconexão Automática (Frontend):**
+```typescript
+let reconnectAttempts = 0;
+const MAX_RECONNECTS = 3;
+
+function connectSSE() {
+  const eventSource = new EventSource(url);
+  
+  eventSource.onerror = () => {
+    eventSource.close();
+    
+    if (reconnectAttempts < MAX_RECONNECTS) {
+      reconnectAttempts++;
+      setTimeout(() => connectSSE(), 2000 * reconnectAttempts);  // Backoff exponencial
+    } else {
+      showError('Falha ao conectar após 3 tentativas');
+    }
+  };
+  
+  eventSource.onopen = () => {
+    reconnectAttempts = 0;  // Reset ao conectar com sucesso
+  };
+}
+```
+
+#### 9.5.8 Checklist de Conformidade (SSE)
+
+**Backend:**
+- [ ] Headers SSE configurados corretamente (`Content-Type`, `Cache-Control`, `Connection`)
+- [ ] `X-Accel-Buffering: no` para desabilitar buffering de proxy
+- [ ] Eventos seguem formato `data: <JSON>\n\n`
+- [ ] Tipos de eventos padronizados (`progress`, `chunk`, `complete`, `error`)
+- [ ] Heartbeat implementado para conexões longas (>30s)
+- [ ] Cleanup de recursos ao fechar conexão (`res.on('close')`)
+
+**Frontend:**
+- [ ] EventSource ou fetch com ReadableStream
+- [ ] Tratamento de todos os tipos de eventos
+- [ ] Fechamento de conexão ao receber `complete` ou `error`
+- [ ] Tratamento de erros de conexão (`onerror`)
+- [ ] Reconexão automática com backoff exponencial
+- [ ] Cleanup ao desmontar componente
+
+**Segurança:**
+- [ ] Autenticação via header `Authorization` (EventSource não suporta headers customizados nativamente)
+- [ ] Rate limiting aplicado (mesmo limite de rotas REST equivalentes)
+- [ ] Validação de parâmetros antes de iniciar stream
+- [ ] Timeout de conexão configurado
+
+**Referências:**
+- Exemplo completo: [`backend/docs/SSE-CERTIFICATION-EXAMPLE.md`](backend/docs/SSE-CERTIFICATION-EXAMPLE.md)
+- Handler SSE: [`backend/src/utils/chat/sseHandler.ts`](backend/src/utils/chat/sseHandler.ts)
+- Controller: [`backend/src/controllers/certificationController.ts`](backend/src/controllers/certificationController.ts)
 
 ---
 
-### 13.5 Segurança e Dados Sensíveis
+# PARTE V: SEGURANÇA
+
+---
+
+## 10. Segurança (Padrões Obrigatórios)
+
+### 10.1 Regra Zero-Trust
+
+**TODA aplicação DEVE seguir os padrões de segurança desde o primeiro commit.**
+
+| Requisito | Implementação |
+|-----------|---------------|
+| Secrets | Validados na inicialização (exit se ausentes) |
+| Rate Limiting | Aplicado em TODAS as rotas expostas |
+| Validação | Zod em TODAS as rotas POST/PUT/PATCH/DELETE |
+| Helmet | Configurado com CSP em produção |
+| HTTPS | Obrigatório em produção (redirect automático) |
+
+### 10.2 Princípio Fail-Secure
+
+```typescript
+// ❌ PROIBIDO - Fail-open (inseguro)
+const secret = process.env.JWT_SECRET || 'dev-secret';
+const user = await findUser(input) || { role: 'guest' };
+
+// ✅ OBRIGATÓRIO - Fail-secure
+if (!process.env.JWT_SECRET) process.exit(1);
+if (!user) throw new AppError('Unauthorized', 401);
+```
+
+**Regra:** Em caso de falha, o sistema DEVE negar acesso, NUNCA permitir por padrão.
+
+### 10.3 Checklist Pré-Commit (Segurança)
+
+Antes de commit que modifique:
+- [ ] Rotas de API → Verificar rate limiting + validação Zod
+- [ ] Autenticação → Verificar authMiddleware aplicado
+- [ ] Variáveis de ambiente → Verificar validação obrigatória
+- [ ] Queries ao banco → Verificar uso de Prisma (NUNCA raw SQL)
+
+### 10.4 Testes de Segurança
+
+```bash
+# Executar ANTES de push/deploy
+cd backend
+./security-tests.sh
+
+# Resultado esperado: 100% PASS (7/7 testes)
+```
+
+### 10.5 Documento de Referência
+
+Para padrões detalhados de segurança, consulte: **[SECURITY-STANDARDS.md](SECURITY-STANDARDS.md)**
+
+---
+
+# PARTE VI: OBSERVABILIDADE
+
+---
+
+## 11. Sistema de Logging
+
+### 11.1 Princípios Fundamentais
+
+**Logging estruturado é OBRIGATÓRIO em todo o projeto.**
+
+| Proibido | Obrigatório |
+|----------|-------------|
+| `console.log()` | `logger.info()` |
+| `console.error()` | `logger.error()` |
+| `console.warn()` | `logger.warn()` |
+
+### 11.2 Níveis de Log
+
+| Nível | Uso | Exemplo |
+|-------|-----|---------|
+| `info` | Operações normais | Login, inferência concluída |
+| `warn` | Situações anormais (não críticas) | Rate limit atingido, cache miss |
+| `error` | Erros que impedem operação | Falha de autenticação, timeout |
+| `debug` | Informações detalhadas (dev) | Payload enviado, estado interno |
+
+### 11.3 Estrutura de Log Padronizada
+
+```typescript
+interface LogEntry {
+  timestamp: string;        // ISO 8601
+  level: LogLevel;          // 'info' | 'warn' | 'error' | 'debug'
+  message: string;
+  requestId?: string;       // UUID da requisição HTTP
+  userId?: string;          // ID do usuário autenticado
+  inferenceId?: string;     // ID da inferência (se aplicável)
+  provider?: string;        // Provider usado
+  model?: string;           // Modelo usado
+  duration?: number;        // Duração da operação (ms)
+  metadata?: Record<string, unknown>;
+}
+```
+
+### 11.4 Segurança e Dados Sensíveis
 
 **REGRAS ESTRITAS:**
-
 - ❌ **NUNCA** logar senhas, tokens, chaves de API
 - ❌ **NUNCA** logar dados pessoais (CPF, cartão de crédito)
-- ❌ **NUNCA** logar payloads completos (podem conter dados sensíveis)
+- ❌ **NUNCA** logar payloads completos
 - ✅ Logar apenas IDs de usuários (não nomes/emails)
-- ✅ Sanitizar inputs antes de logar
 - ✅ Stack traces **APENAS** em desenvolvimento
 
 ```typescript
 // ❌ PROIBIDO
-logger.info('User login', {
-  email: user.email,
-  password: user.password
-});
+logger.info('User login', { email: user.email, password: user.password });
 
 // ✅ PERMITIDO
-logger.info('User login', {
-  userId: user.id,
-  requestId: req.id
-});
+logger.info('User login', { userId: user.id, requestId: req.id });
 ```
 
----
-
-### 13.6 Performance
-
-**Logs NÃO DEVEM impactar performance da aplicação.**
-
-- ❌ Evitar logar objetos pesados (arrays grandes, payloads completos)
-- ✅ Logar apenas resumos ou tamanhos
-- ✅ Usar logs assíncronos (Winston cuida disso)
-
-```typescript
-// ❌ PROIBIDO
-logger.info('Processing data', { data: heavyArray });
-
-// ✅ PERMITIDO
-logger.info('Processing data', {
-  dataSize: heavyArray.length,
-  summary: heavyArray.slice(0, 5)
-});
-```
-
----
-
-### 13.7 Correlação de Logs
+### 11.5 Correlação de Logs
 
 **Todo log DEVE incluir `requestId` quando disponível.**
-
-```typescript
-// Middleware de requestId (obrigatório)
-// backend/src/middleware/requestId.ts
-import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-
-export function requestIdMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  req.id = uuidv4();
-  res.setHeader('X-Request-ID', req.id);
-  next();
-}
-```
-
-**Uso em toda a aplicação:**
 
 ```typescript
 logger.info('Operation', {
@@ -996,61 +1708,63 @@ logger.info('Operation', {
 });
 ```
 
-> **Implementação completa:** Veja [logging/LOGGING-SYSTEM.md](./logging/LOGGING-SYSTEM.md#2-middleware-de-request-id)
-
----
-
-### 13.8 Checklist de Conformidade
-
-Antes de commitar código que usa logging:
+### 11.6 Checklist de Conformidade (Logging)
 
 - [ ] Usa `logger.info/warn/error/debug` (não `console.log`)
 - [ ] Inclui `requestId` quando disponível
 - [ ] Inclui `userId` quando disponível
-- [ ] NÃO loga dados sensíveis (senhas, tokens)
+- [ ] NÃO loga dados sensíveis
 - [ ] Stack traces apenas em desenvolvimento
-- [ ] Contexto rico (metadata relevante)
-- [ ] Nível de log correto (info/warn/error/debug)
-- [ ] Performance considerada (não loga objetos pesados)
+- [ ] Nível de log correto
 
----
-
-### 13.9 Exemplo de Log Completo
-
-```json
-{
-  "timestamp": "2026-01-26T18:00:00.000Z",
-  "level": "info",
-  "message": "Inference completed successfully",
-  "requestId": "550e8400-e29b-41d4-a716-446655440000",
-  "userId": "user-123",
-  "inferenceId": "inf-456",
-  "provider": "bedrock",
-  "model": "anthropic.claude-3-sonnet-20240229-v1:0",
-  "duration": 1234,
-  "statusCode": 200,
-  "metadata": {
-    "tokens": 500,
-    "cost": 0.01,
-    "strategy": "rag"
-  }
-}
-```
-
----
-
-### 13.10 Referências
+### 11.7 Referências
 
 - **Proposta Completa:** [logging/LOGGING-SYSTEM.md](./logging/LOGGING-SYSTEM.md)
 - **ADR:** [ADR-005-LOGGING-SYSTEM.md](./architecture/ADR-005-LOGGING-SYSTEM.md)
 
+### 11.8 Exceções Permitidas
+
+**Contextos onde `console.*` é permitido:**
+
+| Contexto | console.* Permitido? | Justificativa |
+|----------|---------------------|---------------|
+| Scripts CLI (`scripts/`) | ✅ Sim | Output direto para terminal |
+| Seed/Migration | ✅ Sim | Feedback de progresso |
+| Testes (`*.test.ts`, `*.spec.ts`) | ✅ Sim | Debug de testes |
+| Frontend (dev only) | ✅ Condicional | Debug local |
+| Frontend (produção) | ❌ Não | Usar logger frontend |
+| Backend (produção) | ❌ Não | Usar Winston |
+
+**Regra para Frontend:**
+```typescript
+// ✅ CORRETO - Condicional para dev
+if (process.env.NODE_ENV === 'development') {
+  console.log('[Debug]', data);
+}
+
+// ✅ CORRETO - Usar logger do frontend (quando implementado)
+import { logger } from '@/utils/logger';
+logger.info('Operação concluída', { data });
+
+// ❌ ERRADO - console.log em produção
+console.log('Dados:', data);
+```
+
+**Checklist de Conformidade:**
+- [ ] Scripts CLI podem usar `console.*` livremente
+- [ ] Testes podem usar `console.*` para debug
+- [ ] Frontend usa `console.*` apenas em dev (condicional)
+- [ ] Backend produção usa APENAS `logger.*`
+
 ---
 
-## 14. Commits e Versionamento
+# PARTE VII: DESENVOLVIMENTO
 
-### 14.1 Formato de Commit (Conventional Commits)
+---
 
-Todo commit DEVE seguir o padrão:
+## 12. Commits e Versionamento
+
+### 12.1 Formato de Commit (Conventional Commits)
 
 ```
 <type>: <description>
@@ -1060,14 +1774,17 @@ Todo commit DEVE seguir o padrão:
 ```
 
 **Types Permitidos:**
-- `feat`: Nova funcionalidade
-- `fix`: Correção de bug
-- `docs`: Documentação
-- `refactor`: Refatoração sem mudança de comportamento
-- `test`: Adição/correção de testes
-- `chore`: Tarefas de manutenção (deps, config)
-- `perf`: Melhoria de performance
-- `style`: Formatação (não afeta lógica)
+
+| Type | Uso |
+|------|-----|
+| `feat` | Nova funcionalidade |
+| `fix` | Correção de bug |
+| `docs` | Documentação |
+| `refactor` | Refatoração sem mudança de comportamento |
+| `test` | Adição/correção de testes |
+| `chore` | Tarefas de manutenção (deps, config) |
+| `perf` | Melhoria de performance |
+| `style` | Formatação (não afeta lógica) |
 
 **Exemplos:**
 ```bash
@@ -1075,411 +1792,423 @@ feat: add JSend standardization to all controllers
 fix: resolve JWT payload mismatch (userId vs id)
 docs: update STANDARDS.md with Section 14
 refactor: extract chat logic to custom hook
-test: add security test suite (7 categories)
-chore: update dependencies to latest versions
 ```
 
-### 14.2 Mensagens de Commit
+### 12.2 Regras de Mensagens
 
-**Regras:**
-- Idioma: Inglês (padrão internacional)
-- Tamanho: Máximo 72 caracteres no título
-- Imperativo: "add" não "added", "fix" não "fixed"
-- Minúsculo: Após o tipo (exceto nomes próprios)
-- Sem ponto final no título
+- **Idioma:** Inglês
+- **Tamanho:** Máximo 72 caracteres no título
+- **Verbo:** Imperativo ("add" não "added")
+- **Caixa:** Minúsculo após o tipo
+- **Pontuação:** Sem ponto final no título
 
-**❌ PROIBIDO:**
 ```bash
+# ❌ PROIBIDO
 Fixed bug in chat  # Passado
 Added new feature.  # Ponto final
 FEAT: BIG CHANGE  # Maiúsculas
-fixed stuff  # Sem tipo
-```
 
-**✅ PERMITIDO:**
-```bash
+# ✅ PERMITIDO
 fix: resolve race condition in AuthContext
 feat: implement prompt trace visualization
-docs: add API endpoints documentation
 ```
 
-### 14.3 Estratégia de Branches
+### 12.3 Estratégia de Branches
 
 **Branches Principais:**
 - `main`: Código em produção (protegido)
 - `develop`: Integração de features (opcional)
 
 **Branches de Trabalho:**
-- `feature/nome-da-feature`: Novas funcionalidades
-- `fix/nome-do-bug`: Correções
-- `docs/nome-do-doc`: Documentação
-- `refactor/nome-da-refatoracao`: Refatorações
+- `feature/nome-da-feature`
+- `fix/nome-do-bug`
+- `docs/nome-do-doc`
+- `refactor/nome-da-refatoracao`
 
-**Exemplo de Fluxo:**
-```bash
-# Criar branch
-git checkout -b feature/jsend-migration
-
-# Commits incrementais
-git commit -m "feat: add JSend helper utility"
-git commit -m "refactor: migrate aiController to JSend"
-git commit -m "test: validate JSend format in 10 routes"
-
-# Merge para main
-git checkout main
-git merge feature/jsend-migration
-```
-
-### 14.4 Checklist Pré-Commit
+### 12.4 Checklist Pré-Commit (Unificado)
 
 Antes de cada commit, verificar:
 
-- [ ] **ESLint passa sem erros** (`npm run lint` - 0 errors obrigatório)
-- [ ] **TypeScript compila** (`npm run type-check` - 0 errors obrigatório)
-- [ ] **Tamanho de arquivos** (Pre-commit hook verifica automaticamente)
-- [ ] Código compila sem erros (`npm run build`)
-- [ ] Testes passam (`npm test` se aplicável)
-- [ ] Headers obrigatórios em novos arquivos (Seção 1)
-- [ ] Sem cores hardcoded (Seção 3.2)
-- [ ] JSend em novas rotas (Seção 12)
-- [ ] Segurança validada se modificou rotas (Seção 9.3)
-- [ ] Arquivos não excedem 400 linhas (Seção 15)
+**Quality Gates (Obrigatório):**
+- [ ] `npm run lint` → 0 errors
+- [ ] `npm run type-check` → exit code 0
+- [ ] Pre-commit hook passou (tamanho de arquivos)
 
-**Quality Gates (Portões de Qualidade):**
+#### 12.4.1 ESLint Enforcement
+
+**O projeto possui rules ESLint rigorosas para enforcement automático dos padrões do STANDARDS.md.**
+
+**Rules Configuradas:**
+
+| Rule | Severidade | Descrição | Exceções |
+|------|-----------|-----------|----------|
+| `no-console` | error | Proíbe `console.log()` (permite `warn`/`error`) | `scripts/**`, `**/*.test.ts`, `**/seed.ts` |
+| `no-restricted-imports` | error | Proíbe imports relativos profundos (`../../..`) | Nenhuma |
+| `no-restricted-syntax` | error | Proíbe cores hardcoded (`#FFF`, `rgba()`) | Apenas frontend |
+
+**Arquivos de Configuração:**
+- Backend: [`backend/.eslintrc.cjs`](../backend/.eslintrc.cjs)
+- Frontend: [`.eslintrc.json`](./.eslintrc.json) (raiz do projeto)
+- Ignore: [`backend/.eslintignore`](../backend/.eslintignore), [`.eslintignore`](./.eslintignore)
+
+**Comandos:**
 ```bash
-# Executar ANTES de cada commit
-npm run lint        # Deve retornar: 0 errors (warnings são aceitáveis)
-npm run type-check  # Deve retornar: exit code 0
+# Backend
+cd backend && npm run lint
+cd backend && npm run lint:fix
+
+# Frontend (raiz)
+npm run lint
+npm run lint:fix
 ```
 
-**Regra:** Commits com erros de ESLint ou TypeScript são **proibidos**.
+**Exceções Documentadas:**
 
-### 14.5 Versionamento Semântico (SemVer)
+1. **console.log permitido em:**
+   - Scripts CLI (`scripts/**/*.ts`, `scripts/**/*.js`, `scripts/**/*.mjs`)
+   - Testes (`**/*.test.ts`, `**/*.spec.ts`)
+   - Seeds (`**/seed.ts`)
+
+2. **Cores hardcoded:**
+   - Rule aplicada APENAS em `frontend/**` e `frontend-admin/**`
+   - Backend não tem restrição (não usa cores)
+
+3. **Imports relativos profundos:**
+   - Proibido em TODO o projeto
+   - Use path aliases (`@/`) ou imports absolutos
+
+**Resultado Esperado:**
+- ⚠️ Warnings: Permitidos (não bloqueiam commit)
+- 🚨 Errors: Bloqueiam commit (devem ser corrigidos)
+
+**Nota:** Esta configuração pode detectar violações existentes no código legado. Corrija gradualmente ou adicione exceções específicas no `.eslintignore` se necessário.
+
+**Código:**
+- [ ] Headers obrigatórios em novos arquivos (Seção 1)
+- [ ] Sem cores hardcoded (Seção 8.2)
+- [ ] JSend em novas rotas (Seção 9)
+- [ ] Arquivos não excedem 400 linhas (Seção 7)
+
+**Segurança (se aplicável):**
+- [ ] Rate limiting em novas rotas
+- [ ] Validação Zod em rotas POST/PUT/PATCH/DELETE
+- [ ] authMiddleware em rotas protegidas
+
+**Simulações (se aplicável):**
+- [ ] Marcação `⚠️ SIMULAÇÃO` visível
+- [ ] Flag de controle por variável de ambiente
+- [ ] Resposta inclui `simulated: true`
+
+### 12.5 Versionamento Semântico (SemVer)
 
 **Formato:** `MAJOR.MINOR.PATCH` (ex: `1.3.2`)
 
-- **MAJOR:** Mudanças incompatíveis (breaking changes)
-- **MINOR:** Novas funcionalidades (compatível)
-- **PATCH:** Correções de bugs (compatível)
+| Componente | Quando Incrementar |
+|------------|-------------------|
+| **MAJOR** | Mudanças incompatíveis (breaking changes) |
+| **MINOR** | Novas funcionalidades (compatível) |
+| **PATCH** | Correções de bugs (compatível) |
 
-**Exemplos:**
-- `1.0.0 → 1.1.0`: Adicionado chat multi-provider
-- `1.1.0 → 1.1.1`: Corrigido bug de autenticação
-- `1.1.1 → 2.0.0`: Migrado de REST para GraphQL (breaking)
+### 12.6 Arquivos Proibidos no Repositório
 
-**Quando Incrementar:**
-- Após merge de feature → MINOR
-- Após hotfix → PATCH
-- Após refatoração grande → MAJOR (se quebrar API)
+**Arquivos que NÃO devem ser commitados:**
 
-### 14.6 Changelog (Recomendado)
+| Padrão | Motivo | Alternativa |
+|--------|--------|-------------|
+| `*.backup` | Poluição do repositório | Usar branches ou stash |
+| `*.bak` | Poluição do repositório | Usar branches ou stash |
+| `*.old` | Poluição do repositório | Usar branches ou stash |
+| `*.orig` | Arquivo de merge | Resolver conflitos e deletar |
 
-Manter arquivo `CHANGELOG.md` na raiz:
-
-```markdown
-# Changelog
-
-## [1.3.0] - 2024-01-15
-### Added
-- JSend standardization across all REST endpoints
-- Security test suite with 7 categories
-
-### Fixed
-- JWT payload mismatch (userId vs id)
-- Race condition in AuthContext
-
-## [1.2.0] - 2024-01-10
-### Added
-- Analytics dashboard with 3 charts
-- Telemetry tracking per message
-```
-
----
-
-## 15. Tamanho de Arquivos e Manutenibilidade
-
-### 15.1 Princípios Fundamentais
-
-**Arquivos menores são mais fáceis de entender, testar e manter.**
-
-- ❌ **PROIBIDO:** Arquivos com mais de 400 linhas de código
-- ⚠️ **ATENÇÃO:** Arquivos entre 300-400 linhas (permitido mas desencorajado)
-- ✅ **RECOMENDADO:** Arquivos com até 250 linhas de código
-
-> **Nota:** Contam apenas linhas de código efetivo (excluindo comentários e linhas vazias)
-
----
-
-### 15.2 Limites por Tipo de Arquivo
-
-| Tipo de Arquivo | Recomendado | Warning | Bloqueado | Justificativa |
-|-----------------|-------------|---------|-----------|---------------|
-| **Controllers** | ≤200 linhas | >250 | >400 | Devem apenas orquestrar, não implementar lógica |
-| **Services** | ≤250 linhas | >300 | >400 | Lógica complexa deve ser dividida em sub-services |
-| **Components (React)** | ≤200 linhas | >250 | >400 | Extrair sub-componentes e custom hooks |
-| **Hooks** | ≤150 linhas | >200 | >300 | Dividir em hooks menores e mais focados |
-| **Utilities** | ≤150 linhas | >200 | >300 | Funções utilitárias devem ser atômicas |
-| **Types/Interfaces** | ≤100 linhas | >150 | >200 | Dividir em múltiplos arquivos por domínio |
-| **Config** | ≤200 linhas | >250 | >400 | Separar por ambiente ou feature |
-
----
-
-### 15.3 Pre-Commit Hook (Verificação Automática)
-
-O projeto possui um **pre-commit hook** que verifica automaticamente o tamanho dos arquivos staged:
-
-**Localização:** [`.husky/check-file-size.sh`](../.husky/check-file-size.sh)
-
-**Comportamento:**
-
-1. **⚠️ WARNING (300-400 linhas):**
-   - Mostra aviso mas **permite commit**
-   - Sugere refatoração
-   - Não bloqueia o desenvolvimento
-
-2. **🚨 ERROR (>400 linhas):**
-   - **Bloqueia commit**
-   - Exige refatoração antes de commitar
-   - Garante que código crítico não entre no repositório
-
-**Exemplo de Output (Warning):**
+**Regra:** Use `git stash` ou branches para preservar código temporariamente.
 
 ```bash
-⚠️  FILE SIZE WARNING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-The following files exceed recommended size:
+# ❌ PROIBIDO
+cp arquivo.ts arquivo.ts.backup
+git add arquivo.ts.backup
 
-  ⚠ backend/src/controllers/chatController.ts (350 lines) - Consider refactoring
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 RECOMMENDATIONS:
-  • Extract complex logic into separate functions
-  • Split large components into smaller ones
-  • Move reusable code to utility files
-  • Consider using composition patterns
-
-📏 Size Guidelines:
-  • Recommended: ≤250 lines
-  • Warning: >300 lines (current)
-  • Blocked: >400 lines
-
-✓ Commit allowed (warning only)
+# ✅ CORRETO
+git stash push -m "backup antes de refatorar"
+# ou
+git checkout -b backup/feature-x
 ```
 
 ---
 
-### 15.4 Estratégias de Refatoração
+## 13. Testes
 
-#### 15.4.1 Controllers Grandes
+### 13.1 Princípios Fundamentais
 
-**Problema:** Controller com muitas rotas ou lógica complexa
+**Testes são parte integral do código, não um adicional.**
 
-**Solução:**
+- ✅ Todo código crítico DEVE ter testes
+- ✅ Testes devem ser mantidos junto com o código
+- ❌ PROIBIDO commitar código quebrado que falha em testes existentes
+
+### 13.2 Estrutura de Arquivos
+
+| Tipo de Teste | Localização | Padrão de Nome |
+|---------------|-------------|----------------|
+| **Unitários** | `__tests__/` dentro do módulo | `*.test.ts` |
+| **Integração** | `tests/integration/` | `*.integration.test.ts` |
+| **E2E** | `tests/e2e/` | `*.e2e.test.ts` |
+
+**Exemplo de estrutura:**
+```
+backend/src/services/ai/
+├── aiService.ts
+├── __tests__/
+│   └── aiService.test.ts
+└── adapters/
+    ├── anthropic.adapter.ts
+    └── __tests__/
+        └── anthropic.adapter.test.ts
+```
+
+### 13.3 Ferramentas Padrão
+
+| Ferramenta | Uso |
+|------------|-----|
+| **Jest** | Framework de testes (backend e frontend) |
+| **@testing-library/react** | Testes de componentes React |
+| **supertest** | Testes de API HTTP |
+| **msw** | Mock de requisições HTTP |
+
+### 13.4 Cobertura Mínima
+
+| Tipo de Código | Cobertura Mínima |
+|----------------|------------------|
+| **Services críticos** | ≥70% |
+| **Controllers** | ≥50% |
+| **Utils/Helpers** | ≥80% |
+| **Components React** | ≥50% (lógica) |
+
+> **Nota:** Cobertura é um indicador, não um objetivo. Testes de qualidade > quantidade.
+
+### 13.5 Padrões de Mocking
+
 ```typescript
-// ❌ ANTES (400+ linhas)
-// backend/src/controllers/chatController.ts
-export async function sendMessage(req, res) {
-  // 50 linhas de validação
-  // 100 linhas de lógica de contexto
-  // 80 linhas de chamada à IA
-  // 50 linhas de processamento de resposta
-  // 40 linhas de salvamento no banco
-}
+// ✅ CORRETO - Mock explícito e tipado
+jest.mock('../services/aiService', () => ({
+  aiService: {
+    generate: jest.fn().mockResolvedValue({ content: 'mocked response' })
+  }
+}));
 
-// ✅ DEPOIS (150 linhas)
-// backend/src/controllers/chatController.ts
-export async function sendMessage(req, res) {
-  const context = await contextService.buildContext(req.body);
-  const response = await aiService.generate(context);
-  const saved = await chatService.saveMessage(response);
-  return res.json(jsend.success(saved));
-}
-
-// backend/src/services/chat/contextService.ts (100 linhas)
-// backend/src/services/ai/aiService.ts (120 linhas)
-// backend/src/services/chat/chatService.ts (80 linhas)
+// ❌ PROIBIDO - Mock genérico sem tipagem
+jest.mock('../services/aiService');
 ```
 
-#### 15.4.2 Services Grandes
+### 13.6 Checklist de Conformidade (Testes)
 
-**Problema:** Service com múltiplas responsabilidades
+- [ ] Testes em `__tests__/` ou `tests/`
+- [ ] Nome segue padrão `*.test.ts`
+- [ ] Mocks são explícitos e tipados
+- [ ] Testes não dependem de ordem de execução
+- [ ] Testes não dependem de estado externo (banco, API)
+- [ ] Cleanup após cada teste (`afterEach`)
 
-**Solução:**
-```typescript
-// ❌ ANTES (500+ linhas)
-// backend/src/services/ai/certificationService.ts
-class CertificationService {
-  async certifyModel() { /* 100 linhas */ }
-  async runTests() { /* 150 linhas */ }
-  async categorizeErrors() { /* 80 linhas */ }
-  async calculateRating() { /* 100 linhas */ }
-  async saveResults() { /* 70 linhas */ }
-}
+### 13.7 Referência
 
-// ✅ DEPOIS
-// backend/src/services/ai/certification/certification.service.ts (150 linhas)
-// backend/src/services/ai/certification/test-runner.ts (180 linhas)
-// backend/src/services/ai/certification/error-categorizer.ts (100 linhas)
-// backend/src/services/ai/rating/rating-calculator.ts (120 linhas)
-```
-
-#### 15.4.3 Components React Grandes
-
-**Problema:** Component com muita lógica e JSX
-
-**Solução:**
-```typescript
-// ❌ ANTES (600+ linhas)
-// frontend/src/features/settings/AWSProviderPanel.tsx
-export function AWSProviderPanel() {
-  // 100 linhas de useState/useEffect
-  // 200 linhas de handlers
-  // 300 linhas de JSX
-}
-
-// ✅ DEPOIS (180 linhas)
-// frontend/src/features/settings/AWSProviderPanel.tsx
-export function AWSProviderPanel() {
-  const logic = useAWSProviderLogic(); // Custom hook
-  return (
-    <>
-      <CredentialsSection {...logic.credentials} />
-      <RegionsSection {...logic.regions} />
-      <ModelsSection {...logic.models} />
-    </>
-  );
-}
-
-// frontend/src/features/settings/hooks/useAWSProviderLogic.ts (150 linhas)
-// frontend/src/features/settings/components/CredentialsSection.tsx (100 linhas)
-// frontend/src/features/settings/components/RegionsSection.tsx (120 linhas)
-// frontend/src/features/settings/components/ModelsSection.tsx (140 linhas)
-```
+Para guia completo de testes: **[testing/TESTING-GUIDE.md](./testing/TESTING-GUIDE.md)** *(a ser criado)*
 
 ---
 
-### 15.5 Análise Automatizada
-
-O projeto possui um script de análise que gera relatórios detalhados:
-
-**Executar Análise:**
-```bash
-cd backend
-npx tsx scripts/analyze-file-sizes.ts
-```
-
-**Output:**
-- Relatório completo em [`docs/FILE_SIZE_ANALYSIS_REPORT.md`](./FILE_SIZE_ANALYSIS_REPORT.md)
-- Estatísticas por tipo de arquivo
-- Top 10 maiores arquivos
-- Recomendações de refatoração priorizadas
-
-**Quando Executar:**
-- Antes de iniciar refatorações grandes
-- Após merge de features significativas
-- Mensalmente (para monitoramento)
-- Antes de releases
+# APÊNDICES
 
 ---
 
-### 15.6 Processo de Code Review
+## A. Glossário de Termos
 
-#### 15.6.1 Checklist para Reviewer
-
-Ao revisar PRs, verificar:
-
-- [ ] Nenhum arquivo novo excede 400 linhas
-- [ ] Arquivos modificados não cresceram significativamente (>50 linhas)
-- [ ] Se arquivo está entre 300-400 linhas, há justificativa no PR
-- [ ] Lógica complexa foi extraída para funções/services separados
-- [ ] Components grandes foram divididos em sub-components
-- [ ] Hooks grandes foram divididos em hooks menores
-
-#### 15.6.2 Justificativas Aceitáveis
-
-Arquivos entre 300-400 linhas são aceitáveis SE:
-
-1. **Arquivo de Configuração Complexo:**
-   - Exemplo: Registro de modelos com múltiplos providers
-   - Justificativa: Centralização necessária para manutenção
-
-2. **Component de Formulário Extenso:**
-   - Exemplo: Formulário com 20+ campos e validações
-   - Justificativa: Coesão de UX (usuário vê como uma única tela)
-
-3. **Service com Lógica de Domínio Coesa:**
-   - Exemplo: Service de certificação com múltiplos testes relacionados
-   - Justificativa: Lógica fortemente acoplada ao domínio
-
-**❌ Justificativas NÃO Aceitáveis:**
-- "Não tive tempo de refatorar"
-- "É mais fácil manter tudo junto"
-- "Vou refatorar depois" (sem issue criada)
+| Termo | Definição |
+|-------|-----------|
+| **JSend** | Especificação para respostas JSON padronizadas (success/fail/error) |
+| **Lean Storage** | Estratégia de armazenamento que evita duplicação de dados |
+| **Mapper** | Função pura que transforma dados entre camadas (ex: API → Frontend) |
+| **Zero-Trust** | Modelo de segurança que não confia em nenhuma entidade por padrão |
+| **Fail-Secure** | Princípio onde falhas resultam em negação de acesso |
+| **Prompt Trace** | Registro de auditoria do contexto enviado para inferência de IA |
+| **Factory Pattern** | Padrão de design para criação de objetos |
+| **Builder Pattern** | Padrão de design para construção de objetos complexos |
+| **Strategy Pattern** | Padrão de design para algoritmos intercambiáveis |
+| **Orquestrador** | Classe que coordena outras classes sem implementar lógica própria |
 
 ---
 
-### 15.7 Métricas de Qualidade
+## B. Links para Documentos Externos
 
-**Objetivo do Projeto:** Manter **>90%** dos arquivos abaixo de 250 linhas
-
-**Status Atual (2026-02-02):**
-- ✅ **93.1%** dos arquivos estão saudáveis (≤250 linhas)
-- ⚠️ **4.1%** precisam de atenção (251-400 linhas)
-- 🚨 **2.8%** são críticos (>400 linhas)
-
-**Meta para Q1 2026:**
-- ✅ **95%** dos arquivos abaixo de 250 linhas
-- ⚠️ **5%** entre 251-400 linhas
-- 🚨 **0%** acima de 400 linhas
+| Documento | Descrição |
+|-----------|-----------|
+| [SECURITY-STANDARDS.md](SECURITY-STANDARDS.md) | Padrões detalhados de segurança |
+| [VISUAL-IDENTITY-GUIDE.md](VISUAL-IDENTITY-GUIDE.md) | Guia completo de identidade visual |
+| [logging/LOGGING-SYSTEM.md](./logging/LOGGING-SYSTEM.md) | Sistema de logging detalhado |
+| [architecture/ADR-005-LOGGING-SYSTEM.md](./architecture/ADR-005-LOGGING-SYSTEM.md) | ADR do sistema de logging |
+| [FILE_SIZE_ANALYSIS_REPORT.md](./FILE_SIZE_ANALYSIS_REPORT.md) | Relatório de análise de tamanho de arquivos |
+| [.husky/check-file-size.sh](../.husky/check-file-size.sh) | Script de verificação de tamanho |
 
 ---
 
-### 15.8 Exceções e Casos Especiais
+## C. Changelog do STANDARDS.md
 
-#### 15.8.1 Arquivos de Teste
+### v2.1.5 (2026-02-07)
 
-Arquivos de teste (`*.test.ts`, `*.spec.ts`) têm limites mais flexíveis:
+**Novas Seções:**
+- Adicionada Seção 12.6: Arquivos Proibidos no Repositório
 
-- Recomendado: ≤400 linhas
-- Warning: >500 linhas
-- Bloqueado: >600 linhas
+**Melhorias:**
+- Seção 12.6: Documentados padrões de arquivos proibidos (*.backup, *.bak, *.old, *.orig)
+  - Tabela com padrões, motivos e alternativas
+  - Regra: usar `git stash` ou branches para preservar código temporariamente
+  - Exemplos de uso correto vs incorreto
+- [`.gitignore`](.gitignore): Adicionados padrões de backup (*.backup, *.bak, *.old, *.orig)
+- Índice: Adicionado link para Seção 12.6
 
-**Justificativa:** Testes podem ter múltiplos casos e fixtures, mas ainda devem ser organizados.
+**Arquivos Deletados:**
+- Removidos 8 arquivos `.backup` do repositório:
+  - `backend/src/controllers/providersController.ts.backup`
+  - `backend/src/controllers/certificationQueueController.ts.backup`
+  - `backend/src/services/ai/providers/bedrock.ts.backup`
+  - `backend/src/services/ai/registry/models/cohere.models.ts.backup`
+  - `backend/src/services/ai/registry/models/amazon.models.ts.backup`
+  - `backend/src/services/queue/CertificationQueueService.ts.backup`
+  - `docs/obsolete/start_interactive.sh.backup`
+  - `frontend/src/features/chat/components/ControlPanel/ModelTab.tsx.backup`
 
-#### 15.8.2 Arquivos Gerados
-
-Arquivos gerados automaticamente (ex: Prisma Client, GraphQL types) são **isentos** da verificação.
-
-**Identificação:**
-- Comentário `@generated` no topo do arquivo
-- Localização em diretórios `generated/` ou `.generated/`
-
----
-
-### 15.9 Checklist de Conformidade
-
-Antes de commitar código:
-
-- [ ] Nenhum arquivo novo excede 400 linhas
-- [ ] Arquivos modificados não cresceram >50 linhas sem justificativa
-- [ ] Pre-commit hook passou sem erros
-- [ ] Se warning apareceu, considerei refatoração
-- [ ] Lógica complexa foi extraída para módulos separados
-- [ ] Components grandes foram divididos
-- [ ] Hooks grandes foram divididos
-- [ ] Issue de refatoração criada para arquivos legados (se aplicável)
+**Justificativa:**
+- Previne poluição do repositório com arquivos de backup
+- Padroniza uso de `git stash` e branches para preservar código
+- Melhora higiene do repositório e histórico do Git
+- Reduz tamanho do repositório e facilita navegação
 
 ---
 
-### 15.10 Referências
+### v2.1.4 (2026-02-07)
 
-- **Relatório de Análise:** [`docs/FILE_SIZE_ANALYSIS_REPORT.md`](./FILE_SIZE_ANALYSIS_REPORT.md)
-- **Script de Análise:** [`backend/scripts/analyze-file-sizes.ts`](../backend/scripts/analyze-file-sizes.ts)
-- **Pre-Commit Hook:** [`.husky/check-file-size.sh`](../.husky/check-file-size.sh)
+**Novas Seções:**
+- Adicionada Seção 12.4.1: ESLint Enforcement
 
-**Estudos e Boas Práticas:**
-- Clean Code (Robert C. Martin) - Recomenda funções/classes pequenas
-- Google Style Guides - Limita arquivos a ~500 linhas
-- Airbnb JavaScript Style Guide - Recomenda componentes pequenos
-- Microsoft TypeScript Guidelines - Sugere módulos coesos e pequenos
+**Melhorias:**
+- Seção 12.4: Documentado enforcement automático de padrões via ESLint
+  - Rules rigorosas: `no-console`, `no-restricted-imports`, `no-restricted-syntax`
+  - Exceções documentadas para scripts, testes e seeds
+  - Configuração específica para backend e frontend
+  - Comandos de lint e lint:fix
+  - Tabela de rules com severidade e exceções
 
+**Arquivos Modificados:**
+- Criado [`backend/.eslintrc.cjs`](../backend/.eslintrc.cjs) com rules específicas do backend
+- Criado [`backend/.eslintignore`](../backend/.eslintignore) para ignorar dist/
+- Atualizado [`.eslintrc.json`](./.eslintrc.json) com rules do frontend
+- Adicionados scripts `lint` e `lint:fix` no [`backend/package.json`](../backend/package.json)
+
+**Justificativa:**
+- Automatiza enforcement de padrões (console.log, cores hardcoded, imports profundos)
+- Reduz revisões manuais de código
+- Melhora qualidade e consistência do código
+- Detecta violações antes do commit
+
+---
+
+### v2.1.3 (2026-02-07)
+
+**Novas Seções:**
+- Adicionada Seção 6.5: Workers e Filas (Bull/Redis)
+- Adicionada Seção 9.5: Server-Sent Events (SSE)
+
+**Melhorias:**
+- Seção 6: Documentada arquitetura de workers com Bull/Redis (~80 linhas)
+  - Estrutura de diretórios e responsabilidades
+  - Configuração Redis e variáveis de ambiente
+  - Padrão de jobs (CertificationQueueService)
+  - Retry strategies com backoff exponencial
+  - Monitoramento com Bull Board
+  - Checklist de conformidade para workers
+- Seção 9: Documentado padrão de Server-Sent Events (~50 linhas)
+  - Quando usar SSE vs WebSockets vs REST
+  - Formato de eventos e tipos padronizados
+  - Implementação backend (headers, streaming)
+  - Implementação frontend (EventSource, fetch)
+  - Tratamento de erros em stream
+  - Timeout, heartbeat e reconexão automática
+  - Checklist de conformidade para SSE
+- Índice: Adicionados links para Seções 6.5 e 9.5
+
+**Justificativa:**
+- Documenta tecnologias críticas não documentadas (Bull/Redis, SSE)
+- Padroniza implementação de workers e streaming
+- Melhora onboarding de desenvolvedores em features assíncronas
+- Resolve gap de documentação identificado na tarefa T4
+
+---
+
+### v2.1.2 (2026-02-07)
+
+**Novas Seções:**
+- Adicionada Seção 5.5: Estrutura de Features (Frontend)
+- Adicionada Seção 5.6: Services Frontend
+
+**Melhorias:**
+- Seção 5: Documentada estrutura padrão de `features/` com regras de organização
+- Seção 5.5: Regras de extração de hooks (>3 useState), divisão de componentes (>100 linhas)
+- Seção 5.5: Regras de importação entre features (proibido importar diretamente)
+- Seção 5.6: Padrão de singleton exports (não classes) para services
+- Seção 5.6: Tratamento de erros (propagar, não silenciar)
+- Seção 5.6: Cache de promises para deduplicação de requests
+- Seção 5.6: Estrutura de `api.ts` com interceptors
+- Índice: Adicionados links para Seções 5.5 e 5.6
+
+**Justificativa:**
+- Padroniza organização de código frontend
+- Resolve falta de documentação sobre estrutura de features
+- Define padrões claros para services e comunicação com API
+- Melhora manutenibilidade e consistência do código frontend
+
+---
+
+### v2.1.1 (2026-02-07)
+
+**Novas Seções:**
+- Adicionada Seção 11.8: Exceções Permitidas (console.log)
+
+**Melhorias:**
+- Seção 11: Documentadas exceções para uso de `console.*` em scripts, testes e frontend dev
+- Índice: Adicionado link para Seção 11.8
+
+**Justificativa:**
+- Resolve inconsistência entre regra estrita (linha 794) e realidade do projeto (300+ ocorrências)
+- Permite uso pragmático de `console.*` em contextos apropriados
+- Mantém rigor para código de produção (backend e frontend)
+
+---
+
+### v2.1.0 (2026-02-07)
+
+**Novas Seções:**
+- Adicionada Seção 5.4: Mappers (Transformação de Dados)
+- Adicionada Seção 13: Testes
+
+**Melhorias:**
+- Seção 1.2: Adicionado formato curto de header para scripts/testes
+- Glossário: Adicionado termo "Mapper"
+
+---
+
+### v2.0.0 (2026-02-07)
+
+**Reestruturação Completa:**
+- Reorganizado em 7 partes temáticas (vs 15 seções soltas)
+- Adicionada Seção 4: Princípios de Modularização (nova)
+- Unificadas regras de cores (antigas Seções 3.2 e 10)
+- Consolidada arquitetura backend (antigas Seções 4, 5, 7, 11)
+- Checklist pré-commit unificado (Seção 12.4)
+- Adicionados Apêndices (Glossário, Links, Changelog)
+
+**Mudanças Conceituais:**
+- Tamanho de arquivo agora é "sinalizador", não regra primária
+- Responsabilidade única é a regra primária
+- Tabela de padrões de design para navegação semântica
+- Anti-padrões de modularização documentados
+
+### v1.0.0 (Original)
+
+- Versão inicial com 15 seções

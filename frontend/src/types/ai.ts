@@ -177,11 +177,21 @@ export const AWS_REGIONS: AWSRegion[] = ['us-east-1', 'us-west-2', 'eu-west-1', 
  * Certificação regional de um modelo
  */
 export interface RegionalCertification {
-  region: AWSRegion;
-  status: CertificationStatus | 'not_tested';
+  id: string;
+  modelId: string;
+  region: string;
+  vendor?: string;
+  status: CertificationStatus;
+  certifiedAt?: string;
+  expiresAt?: string;
+  certifiedBy?: string;
   lastTestedAt?: string;
-  attempts?: number;
-  error?: string;
-  errorCategory?: ErrorCategory;
-  successRate?: number;
+  testsPassed: number;
+  testsFailed: number;
+  successRate: number;
+  avgLatencyMs?: number;
+  lastError?: string;
+  failureReasons?: any;
+  createdAt: string;
+  updatedAt: string;
 }

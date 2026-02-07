@@ -2,90 +2,45 @@
 
 ## Visão Geral
 
-MyIA é um hub de IA multi-provider com chat persistente, auditoria e analytics. Stack: React 18 + Vite (frontend), Express + Prisma + PostgreSQL (backend).
+**MyIA** é um hub de IA multi-provider com chat persistente, auditoria e analytics.
 
-## Regra #1: STANDARDS.md é a Constituição
+**Stack:**
+- Frontend: React 18 + Vite + MUI v6
+- Backend: Express + Prisma + PostgreSQL
+- IA: Multi-provider (Groq, AWS Bedrock, OpenAI, etc)
 
-**SEMPRE leia [docs/STANDARDS.md](../docs/STANDARDS.md) antes de modificar qualquer arquivo.** Este documento define regras imutáveis de arquitetura e codificação que devem ser seguidas estritamente.
+## 🔴 Regra #1: Sempre leia STANDARDS.md
 
-## Padrões de Código Obrigatórios
+**[docs/STANDARDS.md](../docs/STANDARDS.md)** é a constituição do projeto. Contém:
+- Headers obrigatórios
+- Naming conventions
+- Separação view/logic
+- Cores via tema
+- Validação, segurança, logging
+- Limites de arquivos (≤400 linhas)
 
-### Header de Arquivo (OBRIGATÓRIO em todo arquivo)
-```typescript
-// backend/src/services/ai/index.ts  <-- caminho relativo
-// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
-```
+**Leia antes de modificar qualquer código.**
 
-### Naming Convention
-- **Arquivos TS/JS (lógica):** `camelCase` → `chatController.ts`
-- **Componentes React:** `PascalCase` → `ChatInput.tsx`
-- **Hooks:** `camelCase` com prefixo `use` → `useChatLogic.ts`
-- **Interfaces:** `PascalCase` **SEM** prefixo "I" → `User`, não `IUser`
-- **Prisma Models:** `PascalCase`, tabelas `snake_case`
-
-## Arquitetura Frontend (React + MUI v6)
-
-### Separação View/Logic (CRÍTICO)
-- **`.tsx` (View):** Apenas JSX e estilos, sem `useState`/`useEffect` complexos
-- **`useX.ts` (Lógica):** Custom hooks contêm toda lógica de negócio
-
-Exemplo: `ChatInput.tsx` usa `useChatInput.ts` para lógica
-
-### Cores e Temas
-```typescript
-// ❌ PROIBIDO - cores hardcoded
-<Box sx={{ color: '#00FF41' }} />
-
-// ✅ CORRETO - usar tokens do tema
-<Box sx={{ color: 'primary.main' }} />
-<Box sx={{ color: theme.palette.custom.matrix }} />
-```
-
-Adicionar cores novas em [frontend/src/theme.ts](../frontend/src/theme.ts)
-
-### Scroll e Layout
-- **`MainContentWrapper`** é o ÚNICO responsável pelo scroll vertical
-- Páginas **NUNCA** controlam scroll global (`overflow`, `height: 100vh` proibidos)
-- Páginas observáveis complexas (audit, prompt-trace) devem usar `ObservabilityPageLayout`
-
-## Arquitetura Backend (Express + Prisma)
-
-### Factory Pattern para Providers de IA
-```typescript
-// ✅ CORRETO - usar factory
-const provider = await AIProviderFactory.getProviderInstance('groq');
-```
-
-Configuração de providers é **database-driven** (tabela `ai_providers`). Para adicionar nova IA: INSERT no banco, não código.
-
-### Validação com Zod
-Usar middleware `validateRequest(schema)` para validar requests:
-```typescript
-router.post('/chat', authMiddleware, validateRequest(chatSchema), chatController.sendMessage);
-```
-
-### Auditoria (Regra Arquitetural Imutável)
-- **Backend é a única fonte de verdade** para IDs auditáveis
-- ❌ PROIBIDO gerar IDs de mensagens/inferências no frontend
-- ✅ Frontend sempre consome IDs retornados pelo backend
-- Builder pattern: `AuditRecordBuilder.build(input)` para criar registros
-
-## Variáveis de Ambiente Críticas
+## Variáveis de Ambiente
 
 Arquivo: `backend/.env` (copiar de `.env.example`)
 
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
-| `DATABASE_URL` | ✅ Sim | Connection string PostgreSQL |
-| `JWT_SECRET` | ✅ Sim | Secret para tokens JWT (inseguro se ausente) |
-| `CORS_ORIGIN` | Não | Origens permitidas (ex: `http://localhost:3000,http://localhost:5173`) |
+| `DATABASE_URL` | ✅ | Connection string PostgreSQL |
+| `JWT_SECRET` | ✅ | Secret para tokens JWT |
+| `REDIS_HOST` | Não | Host Redis (padrão: localhost) |
+| `REDIS_PORT` | Não | Porta Redis (padrão: 6379) |
+| `USE_NEW_ADAPTERS` | Não | `true` para Claude 4.x (Inference Profiles) |
+| `CORS_ORIGIN` | Não | Origens permitidas (separadas por vírgula) |
+| `CERTIFICATION_SIMULATION` | Não | `true` para simular certificações (dev) |
 
-Chaves de API dos providers são armazenadas **criptografadas no banco** (tabela `user_settings`), não em `.env`.
+Chaves de API dos providers: **criptografadas no banco** (`user_settings`), não em `.env`.
 
 ## Comandos de Desenvolvimento
 
 ```bash
-# Iniciar tudo (backend + frontend)
+# Iniciar tudo
 ./start.sh start both
 
 # Backend apenas
@@ -98,64 +53,102 @@ cd frontend && npm run dev
 cd backend
 npm run prisma:migrate    # aplicar migrations
 npm run prisma:studio     # GUI do banco
+
+# Validação (obrigatória após modificar TS/TSX)
+cd backend && npm run type-check && npm run lint
+cd frontend && npm run type-check && npm run lint
 ```
 
-## Estrutura de Diretórios Chave
+## Estrutura de Diretórios
 
 ```
 backend/
   src/
-    services/ai/providers/  # Factory + drivers de IA
-    audit/                  # Domain, builders, mappers (DDD-like)
+    services/ai/providers/  # Factory + adapters de IA
+    audit/                  # Builders, mappers (DDD-like)
     controllers/            # Route handlers
     middleware/             # Auth, validation, error handling
-  prisma/schema.prisma      # Single source of truth do schema
+  prisma/schema.prisma      # Schema do banco
 
 frontend/
   src/
-    features/               # Feature folders (chat/, audit/, etc)
+    features/               # chat/, audit/, settings/, etc
       chat/
-        components/         # .tsx views
-        hooks/              # useX.ts logic
-    components/Layout/      # MainLayout, MainHeader, MainContentWrapper
+        components/         # .tsx (views)
+        hooks/              # useX.ts (lógica)
+    components/Layout/      # MainLayout, MainContentWrapper
     theme.ts                # Design tokens centralizados
 ```
 
-## Fluxo de Dados Crítico
+## Fluxos Críticos do Sistema
 
-1. **Chat com IA:** Frontend → `POST /api/chat/send` (SSE streaming) → `AIProviderFactory` → Provider específico
-2. **Providers dinâmicos:** Frontend consulta `GET /api/ai/providers` (database-driven)
-3. **Auditoria:** Mensagens → `AuditRecordBuilder` → Persistência → Audit Viewer (modal read-only)
+### 1. Chat com IA (SSE Streaming)
 
-## Sistema RAG Híbrido (Contexto Inteligente)
+```
+Frontend → POST /api/chat/send
+         → chatController.sendMessage()
+         → AIProviderFactory.getProviderInstance(provider)
+         → Adapter específico (groq, bedrock, openai)
+         → SSE streaming de volta
+         → Frontend renderiza chunks em tempo real
+```
 
-O `contextService` ([backend/src/services/chat/contextService.ts](../backend/src/services/chat/contextService.ts)) combina três estratégias com prioridade:
+### 2. Sistema RAG Híbrido (Contexto Inteligente)
 
-1. **📌 Mensagens Pinadas (Prioridade Máxima):** Sempre incluídas, independente do budget
-2. **Busca Semântica (RAG):** `ragService.findSimilarMessages()` encontra mensagens semanticamente relevantes via embeddings
-3. **Memória Recente (Fast):** Últimas 10 mensagens do chat
+**Arquivo:** `backend/src/services/chat/contextService.ts`
 
-### Algoritmo de Orçamento de Tokens
+**Estratégia com prioridade:**
+
+1. **📌 Mensagens Pinadas** — Sempre incluídas (prioridade máxima)
+2. **🧠 Busca Semântica (RAG)** — `ragService.findSimilarMessages()` via embeddings
+3. **🕐 Memória Recente** — Últimas N mensagens do chat
+
+**Algoritmo de orçamento de tokens:**
 ```typescript
-const MAX_CONTEXT_TOKENS = 6000;
 // FASE 1: Inclui TODAS as mensagens pinadas (obrigatório)
-// FASE 2: Combina RAG + Recentes, remove duplicatas
-// FASE 3: Preenche com RAG/Recentes até estourar o budget
+// FASE 2: Combina RAG + Recentes (remove duplicatas)
+// FASE 3: Preenche até MAX_CONTEXT_TOKENS (padrão: 4000-6000)
 ```
 
-### Sistema de Pins (Mensagens Fixadas)
-- **Backend:** Campo `isPinned` na tabela `messages`, endpoint `PATCH /api/chat-history/message/:messageId/pin`
-- **Frontend:** Botão de pin em cada mensagem, aba "Fixadas" no Painel de Controle
-- **Prompt Trace:** Mostra ícone 📌 em steps de mensagens pinadas
+**Endpoints relacionados:**
+- `PATCH /api/chat-history/message/:id/pin` — Fixar/desafixar mensagem
+- Frontend envia eventos SSE de debug (`type: 'debug'`) mostrando construção do contexto
 
-### Fluxo no Chat Controller
+### 3. Auditoria e Prompt Trace
+
+**Regra arquitetural:** Backend é fonte única de verdade para IDs auditáveis.
+
+**Fluxo:**
+```
+Mensagem enviada → chatController
+                 → AuditRecordBuilder.build()
+                 → Salva sentContext (metadados + messageIds, NÃO conteúdo duplicado)
+                 → Frontend consulta via modal read-only
+```
+
+**Campo `sentContext` na tabela `messages`:**
 ```typescript
-// Modo automático (padrão) - inclui pinned automaticamente
-const report = await contextService.getHybridRagHistory(chatId, userMessage, writeSSE);
-historyMessages = report.finalContext; // Já contém pinnedMessages
-
-// Modo manual (usuário seleciona mensagens específicas)
-if (selectedMessageIds?.length > 0) { ... }
+{
+  config_V47: { mode, model, provider, timestamp },
+  systemPrompt: "...",        // Único que se repete (não está no banco)
+  messageIds: ["uuid1"...],   // Ponteiros, não conteúdo
+  pinnedStepIndices: [0, 2],
+  stepOrigins: { "0": "pinned", "1": "rag" },
+  preflightTokenCount: 1500
+}
 ```
 
-O frontend recebe eventos SSE de debug (`type: 'debug'`) mostrando o progresso da construção do contexto.
+### 4. Providers Dinâmicos (Database-Driven)
+
+Configurações de IA vêm do banco (`ai_providers`), não código.
+
+**Para adicionar nova IA:**
+1. INSERT na tabela `ai_providers`
+2. Criar adapter em `backend/src/services/ai/adapters/`
+3. Registrar no Factory
+
+Frontend consulta `GET /api/ai/providers` para listar dinamicamente.
+
+---
+
+**Leia também:** [docs/copilot_ai/standards_ai.md](../docs/copilot_ai/standards_ai.md) — Regras de comportamento para IA.

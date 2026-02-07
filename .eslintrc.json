@@ -21,11 +21,41 @@
   ],
   "settings": { "react": { "version": "detect" } },
   "ignorePatterns": ["observability/data/**"],
+  "rules": {
+    "import/order": "warn",
+    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": ["../**/.."]
+      }
+    ]
+  },
   "overrides": [
     { "files": ["*.ts", "*.tsx"] },
     { "files": ["backend/**"], "env": { "node": true, "browser": false } },
-    { "files": ["frontend/**"], "env": { "browser": true, "node": false } },
-    { "files": ["frontend-admin/**"], "env": { "browser": true, "node": false } }
-  ],
-  "rules": { "import/order": "warn" }
+    {
+      "files": ["frontend/**", "frontend-admin/**"],
+      "env": { "browser": true, "node": false },
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Literal[value=/#[0-9a-fA-F]{3,6}/]",
+            "message": "Cores hardcoded proibidas. Use tokens do theme.ts"
+          },
+          {
+            "selector": "CallExpression[callee.name='rgba']",
+            "message": "rgba() proibido. Use tokens do theme.ts com opacity"
+          }
+        ]
+      }
+    },
+    {
+      "files": ["scripts/**/*.ts", "scripts/**/*.mjs", "**/*.test.ts", "**/*.spec.ts", "**/seed.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ]
 }
