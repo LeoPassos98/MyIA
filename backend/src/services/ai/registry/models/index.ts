@@ -9,7 +9,7 @@
  */
 
 import './ai21.models';
-import './amazon.models';
+import './amazon'; // Importa amazon/index.ts automaticamente
 import './anthropic.models';
 import './cohere.models';
 import './google.models';
@@ -24,7 +24,7 @@ import './twelvelabs.models';
 
 // Re-export for convenience
 export * from './ai21.models';
-export * from './amazon.models';
+export * from './amazon'; // Re-exporta amazonModels
 export * from './anthropic.models';
 export * from './cohere.models';
 export * from './google.models';

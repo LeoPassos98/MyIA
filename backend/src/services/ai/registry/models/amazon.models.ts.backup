@@ -652,6 +652,28 @@ const amazonModels: ModelMetadata[] = [
       maxTokens: 2048,
     },
   },
+
+  {
+    modelId: 'amazon.titan-tg1-large',
+    vendor: 'amazon',
+    displayName: 'Titan Text Large',
+    description: 'Auto-generated model configuration',
+    capabilities: {
+      streaming: true,
+      vision: false,
+      functionCalling: false,
+      maxContextWindow: 128000,
+      maxOutputTokens: 4096,
+    },
+    supportedPlatforms: ['bedrock'],
+    adapterClass: 'AmazonAdapter',
+    recommendedParams: {
+      temperature: 0.7,
+      topP: 0.9,
+      topK: 250,
+      maxTokens: 2048,
+    },
+  },
 ];
 
 // Auto-register all models
