@@ -43,6 +43,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - [GET /api/chat-history/:chatId](#get-apichat-historychatid) - Mensagens de uma conversa
 - [DELETE /api/chat-history/:chatId](#delete-apichat-historychatid) - Deletar conversa
 
+### Certificação
+- [GET /api/certification-queue/history](#get-apicertification-queuehistory) - Histórico de jobs de certificação
+- [GET /api/certification-queue/certifications](#get-apicertification-queuecertifications) - Certificações de modelos
+
+### Logs
+- [GET /api/logs](#get-apilogs) - Buscar logs com filtros e paginação
+
 ### Configurações
 - [GET /api/settings](#get-apisettings) - Buscar configurações do usuário
 - [PUT /api/settings](#put-apisettings) - Atualizar configurações
@@ -511,6 +518,310 @@ Atualiza o nome do usuário.
 
 ---
 
+## 📋 Endpoints com Paginação
+
+### GET /api/certification-queue/history
+
+Lista histórico de jobs de certificação com paginação.
+
+#### Request
+
+**Headers:**
+```http
+Authorization: Bearer <seu-token-jwt>
+```
+
+#### Query Parameters
+
+| Parâmetro | Tipo | Obrigatório | Padrão | Descrição |
+|-----------|------|-------------|--------|-----------|
+| `page` | integer | Não | 1 | Número da página (mínimo: 1) |
+| `limit` | integer | Não | 20 | Itens por página (mínimo: 1, **máximo: 100**) |
+| `status` | string | Não | - | Filtrar por status: `pending`, `active`, `completed`, `failed` |
+| `modelId` | string | Não | - | Filtrar por ID do modelo |
+
+**Nota:** O parâmetro `limit` é limitado a **100 itens por requisição**. Valores acima de 100 resultarão em erro 400.
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "status": "success",
+  "data": {
+    "jobs": [
+      {
+        "id": "uuid-1",
+        "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "region": "us-east-1",
+        "status": "completed",
+        "createdAt": "2026-02-08T10:00:00.000Z",
+        "completedAt": "2026-02-08T10:05:30.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 45,
+      "totalPages": 3
+    }
+  }
+}
+```
+
+#### Possíveis Erros
+
+| Código | Descrição |
+|--------|-----------|
+| 400 | Parâmetros inválidos (ex: `limit` > 100 ou < 1) |
+| 401 | Token ausente ou inválido |
+| 500 | Erro interno do servidor |
+
+**Exemplo de Erro (limit inválido):**
+```json
+{
+  "status": "fail",
+  "data": {
+    "limit": "limit must be a positive integer between 1 and 100"
+  }
+}
+```
+
+#### Exemplo cURL
+
+```bash
+curl http://localhost:3001/api/certification-queue/history?page=1&limit=20 \
+  -H "Authorization: Bearer <seu-token-jwt>"
+```
+
+---
+
+### GET /api/certification-queue/certifications
+
+Lista certificações de modelos com paginação.
+
+#### Request
+
+**Headers:**
+```http
+Authorization: Bearer <seu-token-jwt>
+```
+
+#### Query Parameters
+
+| Parâmetro | Tipo | Obrigatório | Padrão | Descrição |
+|-----------|------|-------------|--------|-----------|
+| `page` | integer | Não | 1 | Número da página (mínimo: 1) |
+| `limit` | integer | Não | 20 | Itens por página (mínimo: 1, **máximo: 100**) |
+| `modelId` | string | Não | - | Filtrar por ID do modelo |
+| `region` | string | Não | - | Filtrar por região AWS |
+| `passed` | boolean | Não | - | Filtrar por status: `true` (passou), `false` (falhou) |
+
+**Nota:** O parâmetro `limit` é limitado a **100 itens por requisição**. Valores acima de 100 resultarão em erro 400.
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "status": "success",
+  "data": {
+    "certifications": [
+      {
+        "id": "uuid-1",
+        "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "region": "us-east-1",
+        "passed": true,
+        "score": 95,
+        "rating": "A+",
+        "testsPassed": 6,
+        "testsFailed": 0,
+        "createdAt": "2026-02-08T10:05:30.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 120,
+      "totalPages": 6
+    }
+  }
+}
+```
+
+#### Possíveis Erros
+
+| Código | Descrição |
+|--------|-----------|
+| 400 | Parâmetros inválidos (ex: `limit` > 100 ou < 1) |
+| 401 | Token ausente ou inválido |
+| 500 | Erro interno do servidor |
+
+**Exemplo de Erro (limit inválido):**
+```json
+{
+  "status": "fail",
+  "data": {
+    "limit": "limit must be a positive integer between 1 and 100"
+  }
+}
+```
+
+#### Exemplo cURL
+
+```bash
+curl http://localhost:3001/api/certification-queue/certifications?page=1&limit=50&passed=true \
+  -H "Authorization: Bearer <seu-token-jwt>"
+```
+
+---
+
+### GET /api/logs
+
+Busca logs com filtros, paginação e ordenação.
+
+#### Request
+
+**Headers:**
+```http
+Authorization: Bearer <seu-token-jwt>
+```
+
+#### Query Parameters
+
+| Parâmetro | Tipo | Obrigatório | Padrão | Descrição |
+|-----------|------|-------------|--------|-----------|
+| `page` | integer | Não | 1 | Número da página (mínimo: 1) |
+| `limit` | integer | Não | 20 | Itens por página (mínimo: 1, **máximo: 100**) |
+| `level` | string | Não | - | Filtrar por nível: `info`, `warn`, `error`, `debug` |
+| `startDate` | string | Não | - | Data inicial (ISO 8601) |
+| `endDate` | string | Não | - | Data final (ISO 8601) |
+| `sort` | string | Não | `desc` | Ordenação: `asc` (mais antigos), `desc` (mais recentes) |
+
+**Nota:** O parâmetro `limit` é limitado a **100 itens por requisição**. Valores acima de 100 resultarão em erro 400.
+
+#### Response
+
+**Sucesso (200 OK):**
+```json
+{
+  "status": "success",
+  "data": {
+    "logs": [
+      {
+        "id": "uuid-1",
+        "level": "info",
+        "message": "User logged in",
+        "timestamp": "2026-02-08T10:00:00.000Z",
+        "requestId": "req-123",
+        "userId": "user-456"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 1500,
+      "totalPages": 75
+    }
+  }
+}
+```
+
+#### Possíveis Erros
+
+| Código | Descrição |
+|--------|-----------|
+| 400 | Parâmetros inválidos (ex: `limit` > 100 ou < 1) |
+| 401 | Token ausente ou inválido |
+| 500 | Erro interno do servidor |
+
+**Exemplo de Erro (limit inválido):**
+```json
+{
+  "status": "fail",
+  "data": {
+    "limit": "limit must be a positive integer between 1 and 100"
+  }
+}
+```
+
+#### Exemplo cURL
+
+```bash
+curl "http://localhost:3001/api/logs?level=error&page=1&limit=20&sort=desc" \
+  -H "Authorization: Bearer <seu-token-jwt>"
+```
+
+---
+
+## 📖 Boas Práticas de Paginação
+
+### Limites de Paginação
+
+- **Padrão:** 20 itens por página
+- **Máximo:** 100 itens por página
+- **Mínimo:** 1 item por página
+
+### Recomendações
+
+1. **Use o padrão (20)** para listagens gerais
+2. **Use valores menores (10-20)** para dados complexos ou pesados
+3. **Use valores maiores (50-100)** apenas quando necessário
+4. **Implemente paginação automática** se precisar de mais de 100 itens:
+
+```typescript
+async function getAllItems() {
+  let allItems = [];
+  let page = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const response = await api.get('/endpoint', {
+      params: { page, limit: 100 }
+    });
+    
+    allItems.push(...response.data.items);
+    hasMore = response.data.pagination.page < response.data.pagination.totalPages;
+    page++;
+  }
+  
+  return allItems;
+}
+```
+
+### Performance
+
+- Requisições com `limit` alto (>50) podem ser mais lentas
+- Considere usar cache para dados que não mudam frequentemente
+- Use filtros (`status`, `modelId`, `level`, etc.) para reduzir o volume de dados
+
+### Estrutura de Resposta Paginada
+
+Todos os endpoints com paginação seguem o padrão JSend com estrutura de paginação:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [...],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 100,
+      "totalPages": 5
+    }
+  }
+}
+```
+
+**Campos de paginação:**
+- `page`: Página atual
+- `limit`: Itens por página
+- `totalItems`: Total de itens disponíveis
+- `totalPages`: Total de páginas
+
+---
+
 ## ⚕️ Health Check
 
 ### GET /health
@@ -546,7 +857,7 @@ curl http://localhost:3001/health
 |--------|-------------|---------------|
 | **200** | OK | Requisição bem-sucedida |
 | **201** | Created | Recurso criado (registro) |
-| **400** | Bad Request | Dados inválidos ou validação falhou |
+| **400** | Bad Request | Dados inválidos, validação falhou ou parâmetros de paginação inválidos (ex: `limit` > 100) |
 | **401** | Unauthorized | Token ausente, inválido ou expirado |
 | **404** | Not Found | Rota não existe |
 | **500** | Internal Server Error | Erro no servidor |
