@@ -13,8 +13,46 @@ export interface PayloadValidationResult {
 }
 
 /**
+ * Payload para certificação de modelo único
+ */
+interface CertifyModelPayload {
+  modelId?: string;
+  region?: string;
+}
+
+/**
+ * Payload para certificação de múltiplos modelos
+ */
+interface MultipleModelsPayload {
+  modelIds?: unknown[];
+  regions?: unknown[];
+}
+
+/**
+ * Payload para certificação de todos os modelos
+ */
+interface AllModelsPayload {
+  regions?: unknown[];
+}
+
+/**
+ * Parâmetros de URL com jobId
+ */
+interface JobIdParams {
+  jobId?: string;
+}
+
+/**
+ * Parâmetros de paginação
+ */
+interface PaginationQuery {
+  page?: string;
+  limit?: string;
+}
+
+/**
  * Validador de payloads de requisições de certificação
- * 
+ *
  * Responsabilidades:
  * - Validar payloads de requisições de certificação
  * - Validar parâmetros de URL (jobId, etc.)
@@ -23,11 +61,11 @@ export interface PayloadValidationResult {
 export class PayloadValidator {
   /**
    * Valida payload para certificação de modelo único
-   * 
+   *
    * @param body - Corpo da requisição
    * @returns Resultado da validação
    */
-  validateCertifyModelPayload(body: any): PayloadValidationResult {
+  validateCertifyModelPayload(body: CertifyModelPayload | null | undefined): PayloadValidationResult {
     logger.debug('[PayloadValidator] Validando payload de certifyModel', { body });
 
     if (!body) {
@@ -63,7 +101,7 @@ export class PayloadValidator {
    * @param body - Corpo da requisição
    * @returns Resultado da validação
    */
-  validateMultipleModelsPayload(body: any): PayloadValidationResult {
+  validateMultipleModelsPayload(body: MultipleModelsPayload | null | undefined): PayloadValidationResult {
     logger.debug('[PayloadValidator] Validando payload de certifyMultipleModels', { body });
 
     if (!body) {
@@ -91,7 +129,7 @@ export class PayloadValidator {
     }
 
     // Validar que todos os elementos são strings
-    const invalidModelIds = body.modelIds.filter((id: any) => typeof id !== 'string');
+    const invalidModelIds = body.modelIds.filter((id: unknown) => typeof id !== 'string');
     if (invalidModelIds.length > 0) {
       return {
         valid: false,
@@ -117,7 +155,7 @@ export class PayloadValidator {
     }
 
     // Validar que todas as regiões são strings
-    const invalidRegions = body.regions.filter((r: any) => typeof r !== 'string');
+    const invalidRegions = body.regions.filter((r: unknown) => typeof r !== 'string');
     if (invalidRegions.length > 0) {
       return {
         valid: false,
@@ -135,7 +173,7 @@ export class PayloadValidator {
    * @param body - Corpo da requisição
    * @returns Resultado da validação
    */
-  validateAllModelsPayload(body: any): PayloadValidationResult {
+  validateAllModelsPayload(body: AllModelsPayload | null | undefined): PayloadValidationResult {
     logger.debug('[PayloadValidator] Validando payload de certifyAllModels', { body });
 
     if (!body) {
@@ -163,7 +201,7 @@ export class PayloadValidator {
     }
 
     // Validar que todas as regiões são strings
-    const invalidRegions = body.regions.filter((r: any) => typeof r !== 'string');
+    const invalidRegions = body.regions.filter((r: unknown) => typeof r !== 'string');
     if (invalidRegions.length > 0) {
       return {
         valid: false,
@@ -181,7 +219,7 @@ export class PayloadValidator {
    * @param params - Parâmetros da URL
    * @returns Resultado da validação
    */
-  validateJobIdParam(params: any): PayloadValidationResult {
+  validateJobIdParam(params: JobIdParams | null | undefined): PayloadValidationResult {
     logger.debug('[PayloadValidator] Validando parâmetro jobId', { params });
 
     if (!params || !params.jobId) {
@@ -213,14 +251,32 @@ export class PayloadValidator {
    * @param query - Query parameters
    * @returns Resultado da validação com valores parseados
    */
-  validatePaginationParams(query: any): {
+  validatePaginationParams(query: PaginationQuery): {
     valid: boolean;
     error?: string;
     page?: number;
     limit?: number;
   } {
+    // 🔍 DEBUG: Log dos valores recebidos
+    logger.debug('[PayloadValidator] 🔍 DEBUG validatePaginationParams', {
+      rawQuery: query,
+      rawPage: query.page,
+      rawLimit: query.limit,
+      typeOfPage: typeof query.page,
+      typeOfLimit: typeof query.limit
+    });
+    
     const page = parseInt(query.page || '1');
     const limit = parseInt(query.limit || '20');
+
+    // 🔍 DEBUG: Log dos valores parseados
+    logger.debug('[PayloadValidator] 🔍 DEBUG valores parseados', {
+      parsedPage: page,
+      parsedLimit: limit,
+      isNaNPage: isNaN(page),
+      isNaNLimit: isNaN(limit),
+      limitCheck: { lessThan1: limit < 1, greaterThan100: limit > 100 }
+    });
 
     if (isNaN(page) || page < 1) {
       return {
@@ -230,6 +286,12 @@ export class PayloadValidator {
     }
 
     if (isNaN(limit) || limit < 1 || limit > 100) {
+      logger.warn('[PayloadValidator] ⚠️ Validação de limit falhou', {
+        limit,
+        isNaN: isNaN(limit),
+        lessThan1: limit < 1,
+        greaterThan100: limit > 100
+      });
       return {
         valid: false,
         error: 'limit must be a positive integer between 1 and 100'

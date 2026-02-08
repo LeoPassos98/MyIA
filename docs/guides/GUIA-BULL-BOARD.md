@@ -1,263 +1,386 @@
-# 📊 Guia do Bull Board - Interface de Monitoramento de Filas
+# Guia de Uso do Bull Board
 
-## 🔗 Acesso
-
+**Data:** 2026-02-08  
+**Status:** ✅ Integrado ao Server  
 **URL:** http://localhost:3001/admin/queues
-
-## 📋 O Que Você Deveria Ver
-
-### 1. Dashboard Principal
-
-Ao acessar o Bull Board, você verá uma interface web com:
-
-#### Fila: `model-certification`
-
-**Visão Geral:**
-```
-┌─────────────────────────────────────────────┐
-│  model-certification                         │
-├─────────────────────────────────────────────┤
-│  Waiting:    0                              │
-│  Active:     0                              │
-│  Completed:  6                              │
-│  Failed:     0                              │
-│  Delayed:    0                              │
-│  Paused:     0                              │
-└─────────────────────────────────────────────┘
-```
-
-### 2. Abas Disponíveis
-
-#### 📊 **Waiting** (Aguardando)
-- Jobs que estão na fila esperando para serem processados
-- **Esperado:** 0 (todos já foram processados)
-
-#### ⚙️ **Active** (Ativos)
-- Jobs que estão sendo processados no momento
-- **Esperado:** 0 (processamento já concluído)
-
-#### ✅ **Completed** (Completos)
-- Jobs que foram processados com sucesso
-- **Esperado:** 6 jobs (os 6 modelos certificados)
-
-**Exemplo de job completo:**
-```json
-{
-  "id": "09f8bafd-b82e-4647-aed8-c18bc71196c3",
-  "name": "certify-model",
-  "data": {
-    "modelId": "a8bd96c2-cb4d-4870-9da9-1e0df4a93aef",
-    "region": "us-east-1",
-    "jobId": "09f8bafd-b82e-4647-aed8-c18bc71196c3"
-  },
-  "opts": {
-    "attempts": 3,
-    "backoff": {
-      "type": "exponential",
-      "delay": 5000
-    },
-    "removeOnComplete": false,
-    "removeOnFail": false
-  },
-  "progress": 100,
-  "returnvalue": {
-    "status": "COMPLETED",
-    "modelId": "a8bd96c2-cb4d-4870-9da9-1e0df4a93aef",
-    "region": "us-east-1"
-  },
-  "finishedOn": 1738533021819,
-  "processedOn": 1738533021817
-}
-```
-
-#### ❌ **Failed** (Falhados)
-- Jobs que falharam durante o processamento
-- **Esperado:** 0 (nenhuma falha)
-
-#### ⏰ **Delayed** (Atrasados)
-- Jobs agendados para execução futura
-- **Esperado:** 0
-
-#### ⏸️ **Paused** (Pausados)
-- Jobs pausados manualmente
-- **Esperado:** 0
-
-### 3. Detalhes de um Job
-
-Ao clicar em um job completo, você verá:
-
-```
-┌─────────────────────────────────────────────┐
-│  Job Details                                 │
-├─────────────────────────────────────────────┤
-│  ID: 09f8bafd-b82e-4647-aed8-c18bc71196c3   │
-│  Name: certify-model                        │
-│  State: completed                           │
-│  Progress: 100%                             │
-│                                             │
-│  Data:                                      │
-│  {                                          │
-│    "modelId": "a8bd96c2-...",              │
-│    "region": "us-east-1",                  │
-│    "jobId": "09f8bafd-..."                 │
-│  }                                          │
-│                                             │
-│  Return Value:                              │
-│  {                                          │
-│    "status": "COMPLETED",                   │
-│    "modelId": "a8bd96c2-...",              │
-│    "region": "us-east-1"                   │
-│  }                                          │
-│                                             │
-│  Timestamps:                                │
-│  - Created: 2026-02-02 21:50:21            │
-│  - Processed: 2026-02-02 21:50:21          │
-│  - Finished: 2026-02-02 21:50:21           │
-│  - Duration: ~1s                           │
-└─────────────────────────────────────────────┘
-```
-
-### 4. Ações Disponíveis
-
-Para cada job, você pode:
-
-- 🔍 **Ver Detalhes** - Clique no job para ver informações completas
-- 🔄 **Retry** - Reprocessar um job falhado
-- 🗑️ **Remove** - Remover um job da fila
-- ⏸️ **Pause Queue** - Pausar toda a fila
-- ▶️ **Resume Queue** - Retomar processamento
-- 🧹 **Clean** - Limpar jobs antigos
-
-### 5. Gráficos e Estatísticas
-
-O Bull Board também mostra:
-
-#### Taxa de Processamento
-```
-Jobs/min: ~360 (6 jobs em ~1 segundo)
-```
-
-#### Distribuição de Status
-```
-Completed: ████████████████████ 100% (6)
-Failed:    ░░░░░░░░░░░░░░░░░░░░   0% (0)
-```
-
-#### Timeline
-```
-21:50:21 ━━━━━━━━━━━━━━━━━━━━ 6 jobs processados
-```
-
-## 🎯 O Que Procurar
-
-### ✅ Sinais de Sucesso
-
-1. **Completed = 6** - Todos os modelos foram certificados
-2. **Failed = 0** - Nenhuma falha
-3. **Active = 0** - Processamento concluído
-4. **Waiting = 0** - Fila vazia
-
-### ⚠️ Sinais de Problema
-
-1. **Failed > 0** - Algum modelo falhou
-   - Clique no job falhado para ver o erro
-   - Use "Retry" para tentar novamente
-
-2. **Active > 0 por muito tempo** - Job travado
-   - Pode indicar timeout ou erro no worker
-   - Verifique logs do backend
-
-3. **Waiting crescendo** - Fila acumulando
-   - Worker pode estar parado
-   - Verifique se o backend está rodando
-
-## 📸 Screenshots Esperados
-
-### Dashboard Principal
-```
-╔═══════════════════════════════════════════╗
-║  Bull Board                                ║
-║  ─────────────────────────────────────────║
-║                                           ║
-║  📊 Queues                                ║
-║                                           ║
-║  ┌─ model-certification ─────────────┐   ║
-║  │  Waiting:    0                    │   ║
-║  │  Active:     0                    │   ║
-║  │  Completed:  6  ✅                │   ║
-║  │  Failed:     0                    │   ║
-║  └───────────────────────────────────┘   ║
-║                                           ║
-║  [Waiting] [Active] [Completed] [Failed] ║
-║                                           ║
-║  ┌─ Completed Jobs ──────────────────┐   ║
-║  │  09f8bafd... | certify-model | ✅ │   ║
-║  │  5fd6f9bc... | certify-model | ✅ │   ║
-║  │  c5480475... | certify-model | ✅ │   ║
-║  │  7a218c3b... | certify-model | ✅ │   ║
-║  │  1c814547... | certify-model | ✅ │   ║
-║  │  f2a445b8... | certify-model | ✅ │   ║
-║  └───────────────────────────────────┘   ║
-╚═══════════════════════════════════════════╝
-```
-
-## 🔧 Troubleshooting
-
-### Problema: Página não carrega
-
-**Solução:**
-```bash
-# Verificar se backend está rodando
-./start.sh status backend
-
-# Se não estiver, iniciar
-./start.sh start backend
-```
-
-### Problema: Fila vazia mas deveria ter jobs
-
-**Possíveis causas:**
-1. Jobs já foram processados e removidos
-2. Configuração `removeOnComplete: true` está ativa
-3. Limpeza automática de jobs antigos
-
-**Solução:**
-```bash
-# Criar novo job de teste
-cd backend && npx tsx scripts/certify-all-models-direct.ts
-
-# Verificar no Bull Board imediatamente
-```
-
-### Problema: Jobs falhando
-
-**Investigar:**
-1. Clicar no job falhado
-2. Ver "Stack Trace" ou "Error Message"
-3. Verificar logs do backend:
-   ```bash
-   tail -f logs/backend.out.log
-   ```
-
-## 📚 Recursos Adicionais
-
-- **Documentação Bull:** https://github.com/OptimalBits/bull
-- **Bull Board:** https://github.com/felixmosh/bull-board
-- **Logs do Backend:** `logs/backend.out.log`
-- **API de Estatísticas:** http://localhost:3001/api/certification-queue/stats
-
-## ✨ Resumo
-
-No Bull Board você deveria ver:
-
-✅ **6 jobs completos** na aba "Completed"  
-✅ **0 jobs falhados** na aba "Failed"  
-✅ **Fila vazia** (Waiting = 0, Active = 0)  
-✅ **Interface web limpa e funcional**  
-
-Se você ver isso, significa que a certificação foi 100% bem-sucedida! 🎉
 
 ---
 
-**Data:** 2026-02-02 19:06 BRT  
-**Autor:** Kilo Code (Code Mode)
+## 📊 O Que é o Bull Board?
+
+Bull Board é um dashboard visual para monitorar e gerenciar filas Bull (Redis). Ele fornece uma interface web para visualizar jobs, estatísticas e realizar operações administrativas.
+
+---
+
+## 🚀 Acesso
+
+### URL
+```
+http://localhost:3001/admin/queues
+```
+
+### Autenticação
+Configurada via variáveis de ambiente no `.env`:
+
+```env
+BULL_BOARD_PATH=/admin/queues
+BULL_BOARD_USERNAME=admin
+BULL_BOARD_PASSWORD=admin123
+```
+
+**⚠️ IMPORTANTE:** Altere as credenciais padrão em produção!
+
+---
+
+## 🎯 Funcionalidades
+
+### 1. Visualização de Filas
+
+**Filas Disponíveis:**
+- `certification-queue` - Fila de certificação de modelos
+
+**Informações Exibidas:**
+- Nome da fila
+- Total de jobs (waiting, active, completed, failed, delayed)
+- Taxa de processamento
+- Tempo médio de processamento
+
+---
+
+### 2. Monitoramento de Jobs
+
+#### Estados dos Jobs
+- **Waiting** 🟡 - Aguardando processamento
+- **Active** 🔵 - Em processamento
+- **Completed** 🟢 - Concluídos com sucesso
+- **Failed** 🔴 - Falharam
+- **Delayed** 🟠 - Agendados para o futuro
+
+#### Detalhes do Job
+Ao clicar em um job, você verá:
+- **ID do Job**
+- **Payload (data):** Dados enviados ao job
+- **Progress:** Progresso atual (0-100%)
+- **Attempts:** Tentativas realizadas
+- **Timestamp:** Quando foi criado
+- **Processed On:** Quando começou a processar
+- **Finished On:** Quando terminou
+- **Return Value:** Resultado do processamento
+- **Failed Reason:** Motivo da falha (se aplicável)
+- **Stack Trace:** Stack trace do erro (se aplicável)
+
+---
+
+### 3. Ações Disponíveis
+
+#### Ações por Job
+- **Retry** 🔄 - Reprocessar job falhado
+- **Remove** 🗑️ - Remover job da fila
+- **Promote** ⬆️ - Promover job delayed para waiting
+
+#### Ações por Fila
+- **Pause** ⏸️ - Pausar processamento da fila
+- **Resume** ▶️ - Retomar processamento
+- **Clean** 🧹 - Limpar jobs completados/falhados
+- **Empty** 🗑️ - Esvaziar fila completamente
+
+---
+
+## 📈 Casos de Uso
+
+### 1. Monitorar Certificações em Tempo Real
+
+**Cenário:** Você iniciou certificação de múltiplos modelos
+
+**Como Usar:**
+1. Acesse http://localhost:3001/admin/queues
+2. Veja quantos jobs estão em cada estado
+3. Acompanhe o progresso em tempo real
+4. Identifique se há jobs travados (stalled)
+
+---
+
+### 2. Debugar Jobs que Falharam
+
+**Cenário:** Alguns modelos falharam na certificação
+
+**Como Usar:**
+1. Clique na aba "Failed"
+2. Selecione um job falhado
+3. Veja o **Failed Reason** e **Stack Trace**
+4. Identifique o problema (ex: credenciais AWS, timeout, modelo não disponível)
+5. Corrija o problema
+6. Clique em "Retry" para reprocessar
+
+**Exemplo de Erro Comum:**
+```json
+{
+  "failedReason": "AccessDeniedException: User is not authorized to perform: bedrock:InvokeModel",
+  "stack": "..."
+}
+```
+**Solução:** Verificar permissões IAM da AWS
+
+---
+
+### 3. Limpar Jobs Antigos
+
+**Cenário:** Muitos jobs completados acumulados
+
+**Como Usar:**
+1. Clique em "Clean"
+2. Selecione o tipo (Completed/Failed)
+3. Defina o período (ex: jobs mais antigos que 1 hora)
+4. Confirme a limpeza
+
+---
+
+### 4. Pausar Fila Temporariamente
+
+**Cenário:** Manutenção no sistema ou AWS
+
+**Como Usar:**
+1. Clique em "Pause"
+2. A fila para de processar novos jobs
+3. Jobs ativos continuam até completar
+4. Clique em "Resume" quando estiver pronto
+
+---
+
+## 🔍 Exemplos de Payload
+
+### Job de Certificação Individual
+```json
+{
+  "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+  "region": "us-east-1",
+  "createdBy": "user-uuid-123"
+}
+```
+
+### Job de Certificação em Lote
+```json
+{
+  "modelIds": [
+    "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "anthropic.claude-3-haiku-20240307-v1:0"
+  ],
+  "regions": ["us-east-1", "us-west-2"],
+  "createdBy": "user-uuid-123"
+}
+```
+
+---
+
+## 📊 Métricas e Estatísticas
+
+### Métricas Exibidas
+- **Total Jobs:** Total de jobs na fila
+- **Waiting:** Jobs aguardando processamento
+- **Active:** Jobs sendo processados agora
+- **Completed:** Jobs concluídos com sucesso
+- **Failed:** Jobs que falharam
+- **Delayed:** Jobs agendados
+
+### Taxa de Sucesso
+```
+Taxa de Sucesso = (Completed / (Completed + Failed)) * 100%
+```
+
+### Tempo Médio de Processamento
+Calculado automaticamente pelo Bull Board baseado nos jobs completados.
+
+---
+
+## ⚙️ Configuração Avançada
+
+### Limites de Processamento
+
+Configurado em [`CertificationQueueService.ts`](backend/src/services/queue/CertificationQueueService.ts:60):
+
+```typescript
+limiter: {
+  max: 5,        // Máximo 5 jobs por segundo
+  duration: 1000 // Duração em ms
+}
+```
+
+### Concorrência
+
+```typescript
+concurrency: parseInt(config.certificationConcurrency, 10)
+```
+
+Configurado via `.env`:
+```env
+CERTIFICATION_CONCURRENCY=2  # Processar 2 jobs simultaneamente
+```
+
+### Tentativas e Backoff
+
+```typescript
+attempts: 3,  // Máximo 3 tentativas
+backoff: {
+  type: 'exponential',
+  delay: 2000  // Delay inicial de 2s (2s, 4s, 8s)
+}
+```
+
+---
+
+## 🔒 Segurança
+
+### Autenticação Básica
+
+O Bull Board usa autenticação HTTP Basic. Configure credenciais fortes:
+
+```env
+BULL_BOARD_USERNAME=admin_producao
+BULL_BOARD_PASSWORD=senha_forte_aqui_123!@#
+```
+
+### Restrição de Acesso
+
+**Recomendações para Produção:**
+
+1. **Usar HTTPS:** Sempre acessar via HTTPS
+2. **Firewall:** Restringir acesso ao IP do admin
+3. **VPN:** Acessar apenas via VPN corporativa
+4. **Autenticação Adicional:** Integrar com sistema de auth existente
+
+**Exemplo de Middleware de Autenticação:**
+
+```typescript
+// Em server.ts
+import { authMiddleware } from './middleware/authMiddleware';
+
+app.use('/admin/queues', authMiddleware, bullBoardRouter.getRouter());
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Problema: Bull Board não carrega
+
+**Sintomas:**
+- Erro 404 ao acessar /admin/queues
+- Página em branco
+
+**Soluções:**
+1. Verificar se Redis está rodando:
+   ```bash
+   redis-cli ping
+   # Deve retornar: PONG
+   ```
+
+2. Verificar logs do servidor:
+   ```bash
+   # Procurar por:
+   📊 Bull Board configurado em /admin/queues
+   ```
+
+3. Verificar se a fila foi inicializada:
+   ```bash
+   # No Redis CLI:
+   redis-cli
+   KEYS myia:*
+   ```
+
+---
+
+### Problema: Jobs não processam
+
+**Sintomas:**
+- Jobs ficam em "Waiting" indefinidamente
+- Nenhum job passa para "Active"
+
+**Soluções:**
+1. Verificar se o worker está rodando:
+   ```bash
+   # Deve estar rodando:
+   npm run worker
+   ```
+
+2. Verificar se a fila está pausada:
+   - No Bull Board, verificar se há botão "Resume"
+   - Se sim, clicar em "Resume"
+
+3. Verificar logs do worker:
+   ```bash
+   # Procurar por erros
+   tail -f logs/worker.log
+   ```
+
+---
+
+### Problema: Jobs falham constantemente
+
+**Sintomas:**
+- Todos os jobs vão para "Failed"
+- Mesma mensagem de erro
+
+**Soluções:**
+1. Verificar credenciais AWS:
+   ```bash
+   # No .env:
+   AWS_ACCESS_KEY_ID=...
+   AWS_SECRET_ACCESS_KEY=...
+   AWS_REGION=us-east-1
+   ```
+
+2. Verificar permissões IAM:
+   - Necessário: `bedrock:InvokeModel`
+   - Necessário: `bedrock:ListFoundationModels`
+
+3. Verificar se o modelo existe na região:
+   ```bash
+   aws bedrock list-foundation-models --region us-east-1
+   ```
+
+---
+
+## 📚 Referências
+
+- **Bull Documentation:** https://github.com/OptimalBits/bull
+- **Bull Board Documentation:** https://github.com/felixmosh/bull-board
+- **Certification Queue Service:** [`backend/src/services/queue/CertificationQueueService.ts`](backend/src/services/queue/CertificationQueueService.ts:1)
+- **Queue Service:** [`backend/src/services/queue/QueueService.ts`](backend/src/services/queue/QueueService.ts:1)
+- **Bull Board Config:** [`backend/src/config/bullBoard.ts`](backend/src/config/bullBoard.ts:1)
+
+---
+
+## 🎯 Próximos Passos
+
+1. **Testar Acesso:**
+   ```bash
+   # Iniciar servidor
+   npm run dev
+   
+   # Acessar
+   http://localhost:3001/admin/queues
+   ```
+
+2. **Criar Job de Teste:**
+   ```bash
+   # Via API
+   curl -X POST http://localhost:3001/api/certification-queue/certify-model \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_TOKEN" \
+     -d '{
+       "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+       "region": "us-east-1"
+     }'
+   ```
+
+3. **Monitorar no Bull Board:**
+   - Acessar dashboard
+   - Ver job aparecer em "Waiting"
+   - Ver job passar para "Active"
+   - Ver job completar em "Completed"
+
+---
+
+**Status:** ✅ Integrado e Documentado  
+**Última Atualização:** 2026-02-08  
+**Responsável:** Time de Desenvolvimento

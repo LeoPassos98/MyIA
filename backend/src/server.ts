@@ -26,6 +26,8 @@ import modelsRoutes from './routes/modelsRoutes';
 import logsRoutes from './routes/logsRoutes';
 import certificationQueueRoutes from './routes/certificationQueueRoutes';
 import passport from './config/passport';
+import { setupBullBoard } from './config/bullBoard';
+import { queueService } from './services/queue/QueueService';
 
 
 const app = express();
@@ -113,6 +115,23 @@ app.use('/api/certification-queue', apiLimiter, certificationQueueRoutes);
 app.use('/api/models', apiLimiter, modelsRoutes);
 app.use('/api/logs', apiLimiter, logsRoutes);
 
+// 📊 Bull Board - Dashboard de Monitoramento de Filas
+// Acesso: http://localhost:3001/admin/queues
+// Autenticação: Configurada via BULL_BOARD_USERNAME e BULL_BOARD_PASSWORD no .env
+try {
+  const certificationQueue = queueService.getQueue({
+    name: config.certificationQueueName as string,
+    concurrency: 1
+  });
+  
+  const bullBoardRouter = setupBullBoard([certificationQueue]);
+  app.use('/admin/queues', bullBoardRouter.getRouter());
+  
+  logger.info(`📊 Bull Board configurado em /admin/queues`);
+} catch (error) {
+  logger.warn('⚠️  Bull Board não pôde ser inicializado:', error);
+}
+
 // Rota 404
 app.use((req, res) => {
   logger.info(`❌ [404] Rota não encontrada: ${req.method} ${req.path}`);
@@ -139,6 +158,7 @@ async function startServer() {
       logger.info('✅ Servidor rodando!');
       logger.info(`🚀 Backend disponível em http://localhost:${PORT}`);
       logger.info(`💚 Health check: http://localhost:${PORT}/api/health`);
+      logger.info(`📊 Bull Board: http://localhost:${PORT}/admin/queues`);
       logger.info(`🌍 CORS configurado para: ${allowedOrigins.join(', ')}`);
       logger.info(`📝 Ambiente: ${config.nodeEnv}`);
     });

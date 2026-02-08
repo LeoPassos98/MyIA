@@ -2,7 +2,7 @@
 // Standards: docs/STANDARDS.md
 
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { certificationQueueService } from '../services/queue/CertificationQueueService';
 import { logger } from '../utils/logger';
 import { ApiResponse } from '../utils/api-response';
@@ -16,6 +16,14 @@ import { errorHandler } from './certificationQueue/handlers/errorHandler';
 import { awsStatusHandler } from './certificationQueue/handlers/awsStatusHandler';
 
 const prisma = new PrismaClient();
+
+/**
+ * Interface para Request com propriedades customizadas
+ */
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+  requestId?: string;
+}
 
 /**
  * POST /api/certification-queue/certify-model
@@ -34,7 +42,7 @@ export async function certifyModel(req: Request, res: Response) {
     }
 
     const { modelId, region } = req.body;
-    const userId = (req as any).userId;
+    const userId = (req as AuthenticatedRequest).userId;
 
     // Validar modelo
     const modelValidation = await modelValidator.validateModelExists(modelId);
@@ -62,7 +70,7 @@ export async function certifyModel(req: Request, res: Response) {
         status: 'QUEUED'
       })
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'certifyModel',
       params: { modelId: req.body.modelId, region: req.body.region }
@@ -87,7 +95,7 @@ export async function certifyMultipleModels(req: Request, res: Response) {
     }
 
     const { modelIds, regions } = req.body;
-    const userId = (req as any).userId;
+    const userId = (req as AuthenticatedRequest).userId;
 
     // Criar job de certificação em lote
     const result = await certificationQueueService.certifyMultipleModels(
@@ -107,7 +115,7 @@ export async function certifyMultipleModels(req: Request, res: Response) {
         status: 'QUEUED'
       })
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'certifyMultipleModels',
       params: { modelIds: req.body.modelIds, regions: req.body.regions }
@@ -132,7 +140,7 @@ export async function certifyAllModels(req: Request, res: Response) {
     }
 
     const { regions } = req.body;
-    const userId = (req as any).userId;
+    const userId = (req as AuthenticatedRequest).userId;
 
     // Criar job de certificação de todos os modelos
     const result = await certificationQueueService.certifyAllModels(
@@ -150,7 +158,7 @@ export async function certifyAllModels(req: Request, res: Response) {
         status: 'QUEUED'
       })
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'certifyAllModels',
       params: { regions: req.body.regions }
@@ -186,7 +194,7 @@ export async function getJobStatus(req: Request, res: Response) {
     return res.status(200).json(
       ApiResponse.success(status)
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'getJobStatus',
       params: { jobId: req.params.jobId }
@@ -203,7 +211,7 @@ export async function getJobHistory(req: Request, res: Response) {
     logger.info('[getJobHistory] Requisição recebida');
 
     // Validar paginação
-    const paginationValidation = payloadValidator.validatePaginationParams(req.query);
+    const paginationValidation = payloadValidator.validatePaginationParams(req.query as { page?: string; limit?: string });
     if (!paginationValidation.valid) {
       return res.status(400).json(
         ApiResponse.error(paginationValidation.error!, 400)
@@ -214,10 +222,10 @@ export async function getJobHistory(req: Request, res: Response) {
     const { status, type } = req.query;
     const skip = (page! - 1) * limit!;
 
-    // Construir filtros
-    const where: any = {};
-    if (status) where.status = status;
-    if (type) where.type = type;
+    // Construir filtros usando tipo do Prisma
+    const where: Prisma.CertificationJobWhereInput = {};
+    if (status) where.status = status as Prisma.EnumJobStatusFilter;
+    if (type) where.type = type as Prisma.EnumCertificationJobTypeFilter;
 
     // Buscar jobs
     const [jobs, total] = await Promise.all([
@@ -246,7 +254,7 @@ export async function getJobHistory(req: Request, res: Response) {
         }
       })
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'getJobHistory',
       params: req.query
@@ -263,8 +271,16 @@ export async function getCertifications(req: Request, res: Response) {
     logger.info('[getCertifications] Requisição recebida');
 
     // Validar paginação
-    const paginationValidation = payloadValidator.validatePaginationParams(req.query);
+    const paginationValidation = payloadValidator.validatePaginationParams(req.query as { page?: string; limit?: string });
     if (!paginationValidation.valid) {
+      // 🔍 LOG EXPLÍCITO: Erro de validação para Grafana
+      logger.warn('[getCertifications] ❌ Erro de validação de paginação', {
+        error: paginationValidation.error,
+        query: req.query,
+        requestId: (req as AuthenticatedRequest).requestId,
+        userId: (req as AuthenticatedRequest).userId
+      });
+      
       return res.status(400).json(
         ApiResponse.error(paginationValidation.error!, 400)
       );
@@ -274,11 +290,11 @@ export async function getCertifications(req: Request, res: Response) {
     const { modelId, region, status } = req.query;
     const skip = (page! - 1) * limit!;
 
-    // Construir filtros
-    const where: any = {};
-    if (modelId) where.modelId = modelId;
-    if (region) where.region = region;
-    if (status) where.status = status;
+    // Construir filtros usando tipo do Prisma
+    const where: Prisma.ModelCertificationWhereInput = {};
+    if (modelId) where.modelId = modelId as string;
+    if (region) where.region = region as string;
+    if (status) where.status = status as Prisma.EnumCertificationStatusFilter;
 
     // Buscar certificações
     const [certifications, total] = await Promise.all([
@@ -305,7 +321,7 @@ export async function getCertifications(req: Request, res: Response) {
         }
       })
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'getCertifications',
       params: req.query
@@ -351,7 +367,7 @@ export async function getStats(_req: Request, res: Response) {
     return res.status(200).json(
       ApiResponse.success(transformedStats)
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'getStats'
     });
@@ -384,7 +400,7 @@ export async function cancelJob(req: Request, res: Response) {
     return res.status(200).json(
       ApiResponse.success({ jobId })
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'cancelJob',
       params: { jobId: req.params.jobId }
@@ -406,7 +422,7 @@ export async function getAvailableRegions(_req: Request, res: Response) {
     return res.status(200).json(
       ApiResponse.success(regions)
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'getAvailableRegions'
     });
@@ -427,7 +443,7 @@ export async function getAWSStatus(_req: Request, res: Response) {
     return res.status(200).json(
       ApiResponse.success(status)
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return errorHandler.handleControllerError(error, res, {
       operation: 'getAWSStatus'
     });
