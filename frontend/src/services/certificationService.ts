@@ -111,15 +111,18 @@ export const certificationService = {
       try {
         console.log('[certificationService] 📥 getCertifiedModels chamado', { forceRefresh });
 
+        // IMPORTANTE: Limite máximo é 100 (backend valida estritamente)
+        const params = {
+          status: 'CERTIFIED',  // ✅ Usar CERTIFIED (status do enum Prisma)
+          limit: 100,
+          _t: forceRefresh ? Date.now() : undefined // Cache busting
+        };
+        
+        console.log('[certificationService] 🔍 DEBUG: Params sendo enviados (getCertifiedModels)', params);
+        
         const response = await api.get(
           '/certification-queue/certifications',
-          {
-            params: {
-              status: 'CERTIFIED',  // ✅ Usar CERTIFIED (status do enum Prisma)
-              limit: 1000,
-              _t: forceRefresh ? Date.now() : undefined // Cache busting
-            }
-          }
+          { params }
         );
         
         console.log('[certificationService] 📦 Resposta recebida', {
@@ -192,15 +195,18 @@ export const certificationService = {
       try {
         console.log('[certificationService] 📥 getAllFailedModels chamado', { forceRefresh });
 
+        // IMPORTANTE: Limite máximo é 100 (backend valida estritamente)
+        const params = {
+          status: 'FAILED',
+          limit: 100,
+          _t: forceRefresh ? Date.now() : undefined // Cache busting
+        };
+        
+        console.log('[certificationService] 🔍 DEBUG: Params sendo enviados (getAllFailedModels)', params);
+        
         const response = await api.get(
           '/certification-queue/certifications',
-          {
-            params: {
-              status: 'FAILED',
-              limit: 1000,
-              _t: forceRefresh ? Date.now() : undefined // Cache busting
-            }
-          }
+          { params }
         );
         
         console.log('[certificationService] 📦 Resposta recebida (FAILED)', {
@@ -273,15 +279,18 @@ export const certificationService = {
       try {
         console.log('[certificationService] 📥 getQualityWarningModels chamado', { forceRefresh });
 
+        // IMPORTANTE: Limite máximo é 100 (backend valida estritamente)
+        const params = {
+          status: 'QUALITY_WARNING',
+          limit: 100,
+          _t: forceRefresh ? Date.now() : undefined // Cache busting
+        };
+        
+        console.log('[certificationService] 🔍 DEBUG: Params sendo enviados (getQualityWarningModels)', params);
+        
         const response = await api.get(
           '/certification-queue/certifications',
-          {
-            params: {
-              status: 'QUALITY_WARNING',
-              limit: 1000,
-              _t: forceRefresh ? Date.now() : undefined // Cache busting
-            }
-          }
+          { params }
         );
         
         console.log('[certificationService] 📦 Resposta recebida (QUALITY_WARNING)', {
