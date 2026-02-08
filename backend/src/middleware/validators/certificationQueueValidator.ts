@@ -2,6 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { z } from 'zod';
+import { PAGINATION_LIMITS } from '../../config/pagination';
 
 // Regiões AWS Bedrock válidas
 const AWS_REGIONS = [
@@ -127,13 +128,12 @@ export const paginationSchema = z.object({
       .refine(val => val >= 1, 'page must be a positive integer'),
     limit: z.string()
       .optional()
-      .default('20')
-      .transform(val => {
-        const parsed = parseInt(val, 10);
-        // Limitar a 100 mas não rejeitar, apenas ajustar
-        return parsed > 100 ? 100 : parsed;
-      })
-      .refine(val => val >= 1, 'limit must be at least 1'),
+      .default(String(PAGINATION_LIMITS.DEFAULT))
+      .transform(val => parseInt(val, 10))
+      .refine(
+        val => val >= PAGINATION_LIMITS.MIN && val <= PAGINATION_LIMITS.MAX,
+        `limit must be between ${PAGINATION_LIMITS.MIN} and ${PAGINATION_LIMITS.MAX}`
+      ),
     status: z.enum(JOB_STATUSES, {
       errorMap: () => ({ message: `Invalid status. Must be one of: ${JOB_STATUSES.join(', ')}` })
     }).optional(),
@@ -155,13 +155,12 @@ export const certificationsQuerySchema = z.object({
       .refine(val => val >= 1, 'page must be a positive integer'),
     limit: z.string()
       .optional()
-      .default('20')
-      .transform(val => {
-        const parsed = parseInt(val, 10);
-        // Limitar a 100 mas não rejeitar, apenas ajustar
-        return parsed > 100 ? 100 : parsed;
-      })
-      .refine(val => val >= 1, 'limit must be at least 1'),
+      .default(String(PAGINATION_LIMITS.DEFAULT))
+      .transform(val => parseInt(val, 10))
+      .refine(
+        val => val >= PAGINATION_LIMITS.MIN && val <= PAGINATION_LIMITS.MAX,
+        `limit must be between ${PAGINATION_LIMITS.MIN} and ${PAGINATION_LIMITS.MAX}`
+      ),
     modelId: z.string().min(1, 'modelId cannot be empty').optional(),  // ✅ CORRIGIDO: Aceita apiModelId (ID da AWS) ao invés de apenas UUID
     region: z.enum(AWS_REGIONS, {
       errorMap: () => ({ message: 'Invalid AWS region' })
