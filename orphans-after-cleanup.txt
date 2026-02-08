@@ -1,0 +1,19 @@
+- Finding files
+Processed 230 files (1.3s) 
+
+config/bullBoard.ts
+middleware/__tests__/httpLogger.test.ts
+middleware/__tests__/requestId.test.ts
+server.ts
+services/ai/adapters/__tests__/adapter-factory.test.ts
+services/ai/adapters/inference-profile/__tests__/amazon-profile.adapter.test.ts
+services/ai/adapters/inference-profile/__tests__/anthropic-profile.adapter.test.ts
+services/ai/adapters/on-demand/__tests__/anthropic-on-demand.adapter.test.ts
+services/ai/certification/__tests__/certification-rating.test.ts
+services/ai/certification/__tests__/test-runner-retry.test.ts
+services/ai/providers/__tests__/bedrock-region.test.ts
+services/ai/rating/__tests__/rating-calculator.test.ts
+types/express/index.d.ts
+utils/__tests__/logger.test.ts
+workers/index.ts
+
