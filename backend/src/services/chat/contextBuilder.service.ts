@@ -2,8 +2,8 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { prisma } from '../../lib/prisma';
-import { contextService } from './contextService';
 import { StreamChunk } from '../ai/types';
+import { contextService } from './contextService';
 
 /**
  * Interface para mensagem do histórico
@@ -101,7 +101,7 @@ class ContextBuilderService {
 
     // Modo manual: todas as mensagens têm origem 'manual'
     const origins: Record<string, 'manual'> = {};
-    messages.forEach(msg => {
+    messages.forEach((msg: HistoryMessage) => {
       origins[msg.id] = 'manual';
     });
 

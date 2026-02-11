@@ -1,10 +1,10 @@
 // backend/src/services/chat/contextService.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
+import { get_encoding } from 'tiktoken';
 import { prisma } from '../../lib/prisma';
 import { ragService } from '../ragService';
 import { StreamChunk } from '../ai/types';
-import { get_encoding } from 'tiktoken';
 
 const encoding = get_encoding('cl100k_base');
 
@@ -188,7 +188,7 @@ export const contextService = {
     const cleanMessages = (msgs: Message[]): Message[] => {
       return msgs.map(msg => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { sentContext, ...cleanedMsg } = msg as any;
+        const { sentContext, ...cleanedMsg } = msg as Message & { sentContext?: unknown };
         return cleanedMsg as Message;
       });
     };

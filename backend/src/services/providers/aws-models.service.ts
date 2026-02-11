@@ -1,16 +1,19 @@
 // backend/src/services/providers/aws-models.service.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
-import { prisma } from '../../lib/prisma';
 import { BedrockProvider } from '../ai/providers/bedrock';
-import { ModelRegistry } from '../ai/registry';
-import logger from '../../utils/logger';
+import { logger } from '../../utils/logger';
+import { modelCacheService } from '../models/modelCacheService';
+import { EnrichedModel, AWSModel } from '../../types/providers';
 import { AWSCredentialsService } from './aws-credentials.service';
-import { EnrichedModel, AWSModel, DBModel } from '../../types/providers';
 
 /**
  * Service para busca e enriquecimento de modelos AWS disponíveis
- * Responsabilidade: Buscar modelos AWS, enriquecer com dados do banco e registry
+ * Responsabilidade: Buscar modelos AWS, enriquecer com dados do banco
+ *
+ * Clean Slate v2:
+ * - Usa modelCacheService.getAllActiveDeployments() como fonte primária
+ * - Usa BaseModel e ModelDeployment do schema v2
  */
 export class AWSModelsService {
   private credentialsService: AWSCredentialsService;
@@ -23,8 +26,8 @@ export class AWSModelsService {
    * Busca modelos disponíveis na conta AWS do usuário
    * - Recupera credenciais
    * - Chama AWS Bedrock API
-   * - Filtra por suportados (ModelRegistry)
-   * - Enriquece com dados do banco
+   * - Filtra por suportados (ModelRegistry ou deployments do banco)
+   * - Enriquece com dados do banco e registry
    * - Filtra por modalidades e compatibilidade
    * 
    * @param userId - ID do usuário
@@ -56,21 +59,25 @@ export class AWSModelsService {
     
     const awsModels = await bedrockProvider.getAvailableModels(apiKey);
     
+    // 3. Buscar deployments do banco via cache (Clean Slate v2)
+    const cachedDeployments = await modelCacheService.getAllActiveDeployments(true, true);
+    const deploymentCount = cachedDeployments.length;
+    
     logger.info('Modelos AWS Bedrock obtidos', {
       requestId,
       userId,
       region: credentials.region,
       totalModels: awsModels.length,
-      registryModels: ModelRegistry.count()
+      cachedDeployments: deploymentCount
     });
 
-    // 3. Filtrar apenas modelos suportados (no registry)
-    const supportedModels = this.filterSupportedModels(awsModels, requestId);
+    // 4. Filtrar apenas modelos suportados (no registry ou no banco)
+    const supportedModels = this.filterSupportedModels(awsModels, cachedDeployments, requestId);
 
-    // 4. Enriquecer com dados do banco e registry
-    const enrichedModels = await this.enrichModels(supportedModels, requestId);
+    // 5. Enriquecer com dados do banco e registry
+    const enrichedModels = await this.enrichModels(supportedModels, cachedDeployments, requestId);
 
-    // 5. Filtrar apenas modelos de chat (TEXT input/output)
+    // 6. Filtrar apenas modelos de chat (TEXT input/output)
     const chatModels = this.filterChatModels(enrichedModels, requestId);
 
     logger.info('AWS Bedrock models fetched', {
@@ -87,89 +94,107 @@ export class AWSModelsService {
   }
 
   /**
-   * Filtra apenas modelos suportados (presentes no ModelRegistry)
-   * 
+   * Filtra apenas modelos suportados (presentes no banco)
+   *
+   * Clean Slate v2:
+   * - Verifica no cache de deployments
+   *
    * @param awsModels - Modelos retornados pela AWS
+   * @param cachedDeployments - Deployments do cache
    * @param requestId - ID da requisição
    * @returns Modelos suportados
    */
   private filterSupportedModels(
     awsModels: AWSModel[],
+    cachedDeployments: Awaited<ReturnType<typeof modelCacheService.getAllActiveDeployments>>,
     requestId?: string
   ): AWSModel[] {
+    // Criar set de deploymentIds do banco para lookup rápido
+    const deploymentIds = new Set(cachedDeployments.map(d => d.deploymentId));
+    
     return awsModels.filter(model => {
-      const isSupported = ModelRegistry.isSupported(model.modelId);
-      if (!isSupported) {
-        logger.debug('Modelo não está no registry', {
+      // Verificar no banco (Clean Slate v2)
+      const isInDatabase = deploymentIds.has(model.modelId);
+      
+      if (!isInDatabase) {
+        logger.debug('Modelo não está no banco', {
           requestId,
           modelId: model.modelId
         });
       }
-      return isSupported;
+      return isInDatabase;
     });
   }
 
   /**
-   * Enriquece modelos AWS com dados do banco e registry
-   * 
+   * Enriquece modelos AWS com dados do banco
+   *
+   * Clean Slate v2:
+   * - Usa ModelDeployment e BaseModel do cache
+   *
    * @param awsModels - Modelos AWS filtrados
+   * @param cachedDeployments - Deployments do cache
    * @param requestId - ID da requisição
    * @returns Modelos enriquecidos
    */
   private async enrichModels(
     awsModels: AWSModel[],
+    cachedDeployments: Awaited<ReturnType<typeof modelCacheService.getAllActiveDeployments>>,
     requestId?: string
   ): Promise<EnrichedModel[]> {
-    // Buscar modelos cadastrados no banco
-    const dbModels = await prisma.aIModel.findMany({
-      where: {
-        provider: {
-          slug: 'bedrock',
-          isActive: true
-        },
-        isActive: true
-      },
-      select: {
-        apiModelId: true,
-        name: true,
-        costPer1kInput: true,
-        costPer1kOutput: true,
-        contextWindow: true
-      }
-    });
-
-    // Criar mapa de modelos do banco para lookup rápido
-    const dbModelsMap = new Map<string, DBModel>(
-      dbModels.map(m => [m.apiModelId, m])
+    // Criar mapa de deployments do banco para lookup rápido
+    const deploymentsMap = new Map(
+      cachedDeployments.map(d => [d.deploymentId, d])
     );
 
     logger.debug('Enriquecendo modelos', {
       requestId,
       awsModelsCount: awsModels.length,
-      dbModelsCount: dbModels.length
+      deploymentsCount: cachedDeployments.length
     });
 
-    // Combinar informações da AWS com informações do banco e registry
+    // Combinar informações da AWS com informações do banco
     return awsModels.map(awsModel => {
-      const dbModel = dbModelsMap.get(awsModel.modelId);
-      const registryMetadata = ModelRegistry.getModel(awsModel.modelId);
+      const deployment = deploymentsMap.get(awsModel.modelId);
+      
+      // Extrair capabilities do BaseModel (Clean Slate v2)
+      const baseModelCapabilities = deployment?.baseModel?.capabilities as {
+        maxContextWindow?: number;
+        maxOutputTokens?: number;
+        vision?: boolean;
+        functionCalling?: boolean;
+        streaming?: boolean;
+      } | undefined;
+      
+      // Custos: usar do deployment (1M tokens) convertido para 1k tokens para compatibilidade
+      // Schema v2 usa costPer1MInput/Output, interface antiga usa costPer1kInput/Output
+      const costPer1kInput = deployment
+        ? deployment.costPer1MInput / 1000
+        : 0;
+      const costPer1kOutput = deployment
+        ? deployment.costPer1MOutput / 1000
+        : 0;
       
       return {
         id: awsModel.modelId,
         apiModelId: awsModel.modelId,
-        name: dbModel?.name || registryMetadata?.displayName || awsModel.modelName,
+        name: deployment?.baseModel?.name || awsModel.modelName,
         providerName: awsModel.providerName,
-        vendor: registryMetadata?.vendor,
-        description: registryMetadata?.description,
-        costPer1kInput: dbModel?.costPer1kInput || 0,
-        costPer1kOutput: dbModel?.costPer1kOutput || 0,
-        contextWindow: dbModel?.contextWindow || registryMetadata?.capabilities.maxContextWindow || 0,
+        vendor: deployment?.baseModel?.vendor,
+        description: deployment?.baseModel?.description,
+        costPer1kInput,
+        costPer1kOutput,
+        contextWindow: baseModelCapabilities?.maxContextWindow || 0,
         inputModalities: awsModel.inputModalities,
         outputModalities: awsModel.outputModalities,
         responseStreamingSupported: awsModel.responseStreamingSupported,
-        capabilities: registryMetadata?.capabilities,
-        isInDatabase: !!dbModel,
-        isInRegistry: !!registryMetadata
+        capabilities: {
+          maxContextWindow: baseModelCapabilities?.maxContextWindow,
+          maxOutputTokens: baseModelCapabilities?.maxOutputTokens,
+          vision: baseModelCapabilities?.vision,
+          functionCalling: baseModelCapabilities?.functionCalling
+        },
+        isInDatabase: !!deployment
       };
     });
   }

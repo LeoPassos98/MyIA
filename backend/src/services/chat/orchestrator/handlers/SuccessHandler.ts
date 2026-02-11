@@ -9,6 +9,35 @@ import { telemetryCollectorService } from '../../telemetryCollector.service';
 import { auditBuilderService } from '../../auditBuilder.service';
 
 /**
+ * Tipo para mensagem de payload
+ */
+interface PayloadMessage {
+  role: string;
+  content: string;
+}
+
+/**
+ * Tipo para mensagem do usuário
+ */
+interface UserMessage {
+  id: string;
+  content: string;
+}
+
+/**
+ * Tipo para mensagem do assistente salva
+ */
+interface SavedAssistantMessage {
+  id: string;
+  content: string;
+}
+
+/**
+ * Tipo para objeto de auditoria (compatível com auditBuilderService)
+ */
+type AuditObjectType = Parameters<typeof auditBuilderService.stringify>[0];
+
+/**
  * Parâmetros para processamento de sucesso
  */
 export interface SuccessHandlingParams {
@@ -16,13 +45,13 @@ export interface SuccessHandlingParams {
   metrics: TelemetryMetrics | null;
   chat: Chat;
   payloadResult: {
-    payload: any[];
+    payload: PayloadMessage[];
     totalTokens: number;
     pinnedStepIndices: number[];
     stepOrigins: Record<number, 'pinned' | 'rag' | 'recent' | 'rag+recent' | 'manual'>;
   };
-  auditObject: any;
-  userMessage: any;
+  auditObject: AuditObjectType;
+  userMessage: UserMessage;
   isNewChat: boolean;
   messageContent: string;
   userId: string;
@@ -35,7 +64,7 @@ export interface SuccessHandlingParams {
  * Resultado do processamento de sucesso
  */
 export interface SuccessHandlingResult {
-  assistantMessage: any;
+  assistantMessage: SavedAssistantMessage;
   telemetry: TelemetryMetrics;
 }
 
@@ -74,7 +103,7 @@ export class SuccessHandler {
     // 1. Calcula métricas fallback se necessário
     let finalMetrics = metrics;
     if (responseFormatterService.needsRecalculation(metrics)) {
-      finalMetrics = responseFormatterService.calculateFallbackMetrics({
+      finalMetrics = await responseFormatterService.calculateFallbackMetrics({
         payload: payloadResult.payload,
         fullContent: content,
         provider: chat.provider,
@@ -83,7 +112,9 @@ export class SuccessHandler {
       });
       
       // Envia métricas recalculadas via SSE
-      writeSSE({ type: 'telemetry', metrics: finalMetrics });
+      if (finalMetrics) {
+        writeSSE({ type: 'telemetry', metrics: finalMetrics });
+      }
     }
 
     // Garante que finalMetrics não é null

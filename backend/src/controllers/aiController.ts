@@ -14,25 +14,45 @@ export const aiController = {
    */
   async listProviders(_req: Request, res: Response, next: NextFunction) {
     try {
-      // Busca providers ativos e seus modelos ativos
-      const providers = await prisma.aIProvider.findMany({
-        where: { 
-          isActive: true 
+      // Schema v2: Busca providers ativos com deployments (não mais AIProvider + models)
+      const providersRaw = await prisma.provider.findMany({
+        where: {
+          isActive: true
         },
         include: {
-          models: {
+          deployments: {
             where: { isActive: true },
-            select: {
-              id: true,
-              name: true,
-              apiModelId: true,
-              contextWindow: true,
-            },
-            orderBy: { contextWindow: 'desc' } // Mostra os mais potentes primeiro
+            include: {
+              baseModel: {
+                select: {
+                  id: true,
+                  name: true,
+                  capabilities: true
+                }
+              }
+            }
           }
         },
         orderBy: { name: 'asc' }
       });
+      
+      // Mapear para formato compatível com frontend
+      const providers = providersRaw.map(p => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        type: p.type,
+        isActive: p.isActive,
+        models: p.deployments.map(d => {
+          const capabilities = d.baseModel.capabilities as Record<string, unknown> | null;
+          return {
+            id: d.id,
+            name: d.baseModel.name,
+            apiModelId: d.deploymentId,
+            contextWindow: (capabilities?.maxContextWindow as number) || 200000
+          };
+        }).sort((a, b) => b.contextWindow - a.contextWindow) // Mostra os mais potentes primeiro
+      }));
       
       logger.info(`Providers list requested. Found: ${providers.length}`);
       
@@ -50,9 +70,9 @@ export const aiController = {
     try {
       const { provider: providerSlug } = req.params;
 
-      // 1. Validação via Banco de Dados (Modular)
-      // Não usamos mais lista fixa ['openai', 'groq'] aqui.
-      const providerExists = await prisma.aIProvider.findUnique({
+      // Schema v2: AIProvider → Provider
+      // Validação via Banco de Dados (Modular)
+      const providerExists = await prisma.provider.findUnique({
         where: { slug: providerSlug }
       });
 

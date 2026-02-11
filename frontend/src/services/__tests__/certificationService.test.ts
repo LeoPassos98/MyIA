@@ -60,8 +60,8 @@ describe('certificationService', () => {
 
   describe('getAllRegionalCertifications', () => {
     it('deve buscar certificações de todas as regiões', async () => {
-      // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      // Arrange - O service espera { certifications: [...] } no response.data
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       const result = await certificationService.getAllRegionalCertifications(
@@ -72,11 +72,12 @@ describe('certificationService', () => {
       // Assert
       expect(result).toEqual(mockCertifications);
       expect(api.get).toHaveBeenCalledWith(
-        '/api/certification-queue/certifications',
+        '/certification-queue/certifications',
         {
           params: {
             modelId: 'anthropic:claude-3-5-sonnet',
-            providerId: 'aws-bedrock'
+            providerId: 'aws-bedrock',
+            limit: 100
           }
         }
       );
@@ -85,7 +86,7 @@ describe('certificationService', () => {
 
     it('deve retornar array vazio quando não há certificações', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: [] });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: [] } });
 
       // Act
       const result = await certificationService.getAllRegionalCertifications(
@@ -114,7 +115,7 @@ describe('certificationService', () => {
 
     it('deve passar parâmetros corretos na query string', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       await certificationService.getAllRegionalCertifications(
@@ -124,11 +125,12 @@ describe('certificationService', () => {
 
       // Assert
       expect(api.get).toHaveBeenCalledWith(
-        '/api/certification-queue/certifications',
+        '/certification-queue/certifications',
         expect.objectContaining({
           params: {
             modelId: 'test-model-id',
-            providerId: 'test-provider-id'
+            providerId: 'test-provider-id',
+            limit: 100
           }
         })
       );
@@ -136,7 +138,7 @@ describe('certificationService', () => {
 
     it('deve retornar certificações com todos os campos esperados', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       const result = await certificationService.getAllRegionalCertifications(
@@ -164,7 +166,7 @@ describe('certificationService', () => {
           errorCategory: 'UNAVAILABLE'
         }
       ];
-      vi.mocked(api.get).mockResolvedValue({ data: certWithError });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: certWithError } });
 
       // Act
       const result = await certificationService.getAllRegionalCertifications(
@@ -181,13 +183,13 @@ describe('certificationService', () => {
   describe('getRegionalCertification', () => {
     it('deve buscar certificação de região específica', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       const result = await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'us-east-1'
+        'us-east-1',
+        'aws-bedrock'
       );
 
       // Assert
@@ -198,13 +200,13 @@ describe('certificationService', () => {
 
     it('deve retornar null para região não encontrada', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       const result = await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'ap-northeast-1' as AWSRegion
+        'ap-northeast-1' as AWSRegion,
+        'aws-bedrock'
       );
 
       // Assert
@@ -213,13 +215,13 @@ describe('certificationService', () => {
 
     it('deve retornar null quando não há certificações', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: [] });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: [] } });
 
       // Act
       const result = await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'us-east-1'
+        'us-east-1',
+        'aws-bedrock'
       );
 
       // Assert
@@ -228,13 +230,13 @@ describe('certificationService', () => {
 
     it('deve buscar certificação com status failed', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       const result = await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'eu-west-1'
+        'eu-west-1',
+        'aws-bedrock'
       );
 
       // Assert
@@ -245,13 +247,13 @@ describe('certificationService', () => {
 
     it('deve buscar certificação com status quality_warning', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       const result = await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'ap-southeast-1'
+        'ap-southeast-1',
+        'aws-bedrock'
       );
 
       // Assert
@@ -269,8 +271,8 @@ describe('certificationService', () => {
       await expect(
         certificationService.getRegionalCertification(
           'anthropic:claude-3-5-sonnet',
-          'aws-bedrock',
-          'us-east-1'
+          'us-east-1',
+          'aws-bedrock'
         )
       ).rejects.toThrow('API Error: Timeout');
     });
@@ -279,37 +281,37 @@ describe('certificationService', () => {
   describe('Integração entre métodos', () => {
     it('getRegionalCertification deve usar getAllRegionalCertifications internamente', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'us-east-1'
+        'us-east-1',
+        'aws-bedrock'
       );
 
       // Assert - Deve ter chamado a API uma vez
       expect(api.get).toHaveBeenCalledTimes(1);
       expect(api.get).toHaveBeenCalledWith(
-        '/api/certification-queue/certifications',
+        '/certification-queue/certifications',
         expect.any(Object)
       );
     });
 
     it('múltiplas chamadas para mesma região devem fazer múltiplas requisições', async () => {
       // Arrange
-      vi.mocked(api.get).mockResolvedValue({ data: mockCertifications });
+      vi.mocked(api.get).mockResolvedValue({ data: { certifications: mockCertifications } });
 
       // Act
       await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'us-east-1'
+        'us-east-1',
+        'aws-bedrock'
       );
       await certificationService.getRegionalCertification(
         'anthropic:claude-3-5-sonnet',
-        'aws-bedrock',
-        'us-east-1'
+        'us-east-1',
+        'aws-bedrock'
       );
 
       // Assert - Sem cache no serviço, deve chamar 2 vezes

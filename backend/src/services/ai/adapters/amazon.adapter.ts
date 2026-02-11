@@ -1,6 +1,19 @@
 // backend/src/services/ai/adapters/amazon.adapter.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
+/**
+ * REFATORADO: Clean Slate v2 - Fase 7 (Cleanup)
+ * - Removido ModelRegistry completamente
+ * - Usa adapterParamsService.getRecommendedParams() para buscar parâmetros do banco
+ * - Fallback para valores hardcoded específicos do vendor Amazon
+ * 
+ * REFATORADO: Resolução de dependência circular
+ * - Substituído import de AdapterFactory por adapterParamsService
+ */
+
+import { InferenceType } from '../types';
+import { logger } from '../../../utils/logger';
+import { adapterParamsService } from './adapter-params.service';
 import {
   BaseModelAdapter,
   Message,
@@ -8,9 +21,6 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
-import { InferenceType } from '../types';
-import { ModelRegistry } from '../registry/model-registry';
-import logger from '../../../utils/logger';
 
 /**
  * Adapter for Amazon Titan and Nova models (Legacy - ON_DEMAND)
@@ -45,6 +55,11 @@ export class AmazonAdapter extends BaseModelAdapter {
   ];
 
   /**
+   * Cache de parâmetros para evitar múltiplas buscas assíncronas
+   */
+  private paramsCache: Map<string, { temperature?: number; topP?: number; maxTokens?: number }> = new Map();
+
+  /**
    * Detect if model is Nova (uses Converse API) or Titan (uses legacy format)
    */
   private isNovaModel(modelId?: string): boolean {
@@ -56,6 +71,39 @@ export class AmazonAdapter extends BaseModelAdapter {
    */
   private isTitanModel(modelId?: string): boolean {
     return modelId?.includes('titan') ?? false;
+  }
+
+  /**
+   * Busca parâmetros recomendados do banco (com cache)
+   *
+   * Prioridade:
+   * 1. Cache local
+   * 2. Banco de dados (via adapterParamsService)
+   * 3. Valores hardcoded para Amazon
+   */
+  private async getRecommendedParams(modelId: string): Promise<{ temperature?: number; topP?: number; maxTokens?: number }> {
+    // 1. Verificar cache local
+    if (this.paramsCache.has(modelId)) {
+      return this.paramsCache.get(modelId)!;
+    }
+
+    // 2. Tentar buscar do banco via adapterParamsService
+    try {
+      const params = await adapterParamsService.getRecommendedParams(modelId, this.vendor);
+      this.paramsCache.set(modelId, params);
+      return params;
+    } catch {
+      logger.debug(`[AmazonAdapter] Failed to get params from adapterParamsService for ${modelId}`);
+    }
+
+    // 3. Valores hardcoded padrão para Amazon
+    const defaultParams = {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    };
+    this.paramsCache.set(modelId, defaultParams);
+    return defaultParams;
   }
 
   formatRequest(messages: Message[], options: UniversalOptions): AdapterPayload {
@@ -90,16 +138,28 @@ export class AmazonAdapter extends BaseModelAdapter {
       content: [{ text: m.content }],
     }));
 
-    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
-    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
-    const recommendedParams = modelDef?.recommendedParams;
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams
+    // NOTA: Como formatRequest é síncrono, usamos cache ou valores padrão
+    let recommendedParams: { temperature?: number; topP?: number; maxTokens?: number } | undefined;
+    
+    if (options.modelId) {
+      // Verificar cache primeiro (síncrono)
+      if (this.paramsCache.has(options.modelId)) {
+        recommendedParams = this.paramsCache.get(options.modelId);
+      } else {
+        // Popular cache em background (não bloqueia)
+        this.getRecommendedParams(options.modelId).catch(() => {
+          // Ignorar erros - já temos fallback hardcoded
+        });
+      }
+    }
 
     // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
     const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.7;
     const topP = options.topP ?? recommendedParams?.topP ?? 0.9;
     const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
 
-    const body: any = {
+    const body: Record<string, unknown> = {
       messages: formattedMessages,
       inferenceConfig: {
         maxTokens: maxTokens,
@@ -115,7 +175,7 @@ export class AmazonAdapter extends BaseModelAdapter {
 
     // Add stop sequences if provided
     if (options.stopSequences && options.stopSequences.length > 0) {
-      body.inferenceConfig.stopSequences = options.stopSequences;
+      (body.inferenceConfig as Record<string, unknown>).stopSequences = options.stopSequences;
     }
 
     logger.info(`[AmazonAdapter] Nova request format:`, {
@@ -150,16 +210,28 @@ export class AmazonAdapter extends BaseModelAdapter {
       inputText = `System: ${systemMessage.content}\n\n${inputText}`;
     }
 
-    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
-    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
-    const recommendedParams = modelDef?.recommendedParams;
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams
+    // NOTA: Como formatRequest é síncrono, usamos cache ou valores padrão
+    let recommendedParams: { temperature?: number; topP?: number; maxTokens?: number } | undefined;
+    
+    if (options.modelId) {
+      // Verificar cache primeiro (síncrono)
+      if (this.paramsCache.has(options.modelId)) {
+        recommendedParams = this.paramsCache.get(options.modelId);
+      } else {
+        // Popular cache em background (não bloqueia)
+        this.getRecommendedParams(options.modelId).catch(() => {
+          // Ignorar erros - já temos fallback hardcoded
+        });
+      }
+    }
 
     // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
     const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.7;
     const topP = options.topP ?? recommendedParams?.topP ?? 0.9;
     const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
 
-    const body: any = {
+    const body: Record<string, unknown> = {
       inputText,
       textGenerationConfig: {
         maxTokenCount: maxTokens,
@@ -169,7 +241,7 @@ export class AmazonAdapter extends BaseModelAdapter {
     };
 
     if (options.stopSequences && options.stopSequences.length > 0) {
-      body.textGenerationConfig.stopSequences = options.stopSequences;
+      (body.textGenerationConfig as Record<string, unknown>).stopSequences = options.stopSequences;
     }
 
     logger.info(`[AmazonAdapter] Titan request format:`, {
@@ -185,29 +257,34 @@ export class AmazonAdapter extends BaseModelAdapter {
     };
   }
 
-  parseChunk(chunk: any): AdapterChunk {
+  parseChunk(chunk: Record<string, unknown>): AdapterChunk {
     // Nova format (Converse API) - content block delta
-    if (chunk.contentBlockDelta?.delta?.text) {
-      return {
-        type: 'chunk',
-        content: chunk.contentBlockDelta.delta.text,
-      };
+    const contentBlockDelta = chunk.contentBlockDelta as Record<string, unknown> | undefined;
+    if (contentBlockDelta) {
+      const delta = contentBlockDelta.delta as Record<string, unknown> | undefined;
+      if (delta?.text) {
+        return {
+          type: 'chunk',
+          content: delta.text as string,
+        };
+      }
     }
 
     // Titan format (legacy) - output text chunk
     if (chunk.outputText) {
       return {
         type: 'chunk',
-        content: chunk.outputText,
+        content: chunk.outputText as string,
       };
     }
     
     // Nova format - message stop
     if (chunk.messageStop) {
+      const messageStop = chunk.messageStop as Record<string, unknown>;
       return {
         type: 'done',
         metadata: {
-          stopReason: chunk.messageStop.stopReason,
+          stopReason: messageStop.stopReason,
         },
       };
     }
@@ -223,10 +300,11 @@ export class AmazonAdapter extends BaseModelAdapter {
     }
 
     // Error handling
-    if (chunk.error || chunk.message?.includes('error')) {
+    const message = chunk.message as string | undefined;
+    if (chunk.error || message?.includes('error')) {
       return {
         type: 'error',
-        error: chunk.error || chunk.message || 'Unknown error',
+        error: (chunk.error as string) || message || 'Unknown error',
       };
     }
 

@@ -5,14 +5,17 @@
  * useCostComparison Hook
  *
  * Hook para comparar custos entre múltiplos modelos.
- * Útil para escolher modelo mais econômico.
+ * Versão v2 que busca preços da API v2 (custos em 1M tokens).
  *
  * @module hooks/cost/useCostComparison
  */
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { CostEstimate } from './useCostEstimate';
-import { getModelPricing } from './data/modelPricing';
+import { 
+  getActiveDeployments, 
+  Deployment
+} from '../../services/deploymentPricingService';
 import { CostCalculator } from './calculators/CostCalculator';
 import { CostFormatter } from './formatters/CostFormatter';
 
@@ -46,10 +49,40 @@ export interface CostComparisonResult extends CostEstimate {
 export type SortBy = 'cost' | 'name' | 'provider';
 
 /**
+ * Encontra deployment correspondente ao modelo
+ */
+function findDeploymentForModel(
+  model: ModelForComparison,
+  deployments: Deployment[]
+): Deployment | null {
+  return deployments.find(d => {
+    // Match exato pelo deploymentId
+    if (d.deploymentId === model.modelId) {
+      return true;
+    }
+    
+    // Match pelo provider slug + deploymentId contém modelId
+    if (d.provider?.slug === model.provider && d.deploymentId.includes(model.modelId)) {
+      return true;
+    }
+    
+    // Match pelo nome do modelo base
+    if (d.baseModel?.name.toLowerCase().includes(model.modelId.toLowerCase())) {
+      return true;
+    }
+    
+    return false;
+  }) || null;
+}
+
+/**
  * Hook para comparar custos entre modelos
  * 
  * Calcula custo para cada modelo e retorna array ordenado.
  * Por padrão, ordena por custo (menor primeiro).
+ * 
+ * Os preços são buscados da API v2 (/api/v2/deployments) e são
+ * expressos em custo por 1M tokens (padrão da indústria).
  * 
  * @param models - Array de modelos para comparar
  * @param inputTokens - Tokens de entrada
@@ -61,9 +94,8 @@ export type SortBy = 'cost' | 'name' | 'provider';
  * ```typescript
  * const comparison = useCostComparison(
  *   [
- *     { provider: 'anthropic', modelId: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
- *     { provider: 'anthropic', modelId: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
- *     { provider: 'openai', modelId: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+ *     { provider: 'bedrock', modelId: 'anthropic.claude-3-5-sonnet-20241022-v2:0', name: 'Claude 3.5 Sonnet' },
+ *     { provider: 'bedrock', modelId: 'anthropic.claude-3-haiku-20240307-v1:0', name: 'Claude 3 Haiku' },
  *   ],
  *   1000,
  *   2000
@@ -78,8 +110,8 @@ export type SortBy = 'cost' | 'name' | 'provider';
  * ```typescript
  * // Comparar modelos disponíveis
  * const availableModels = [
- *   { provider: 'anthropic', modelId: 'claude-3-5-sonnet-20241022' },
- *   { provider: 'anthropic', modelId: 'claude-3-haiku-20240307' }
+ *   { provider: 'bedrock', modelId: 'anthropic.claude-3-5-sonnet-20241022-v2:0' },
+ *   { provider: 'bedrock', modelId: 'anthropic.claude-3-haiku-20240307-v1:0' }
  * ];
  * 
  * const comparison = useCostComparison(
@@ -99,13 +131,52 @@ export function useCostComparison(
   outputTokens: number,
   sortBy: SortBy = 'cost'
 ): CostComparisonResult[] {
+  // Estado para deployments carregados da API
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Buscar deployments da API v2
+  useEffect(() => {
+    let cancelled = false;
+    
+    async function loadDeployments() {
+      setIsLoading(true);
+      
+      try {
+        const result = await getActiveDeployments();
+        if (!cancelled) {
+          setDeployments(result);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setDeployments([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+    
+    loadDeployments();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return useMemo(() => {
+    // Se está carregando, retornar array vazio
+    if (isLoading) {
+      return [];
+    }
+    
     // Calcular custo para cada modelo
     const estimates = models.map(model => {
-      const pricing = getModelPricing(model.provider, model.modelId);
+      const deployment = findDeploymentForModel(model, deployments);
       
       // Se não há preço, retornar estimativa vazia
-      if (!pricing) {
+      if (!deployment) {
         return {
           ...model,
           inputCost: 0,
@@ -117,11 +188,15 @@ export function useCostComparison(
         };
       }
       
-      // Calcular custos usando CostCalculator (elimina duplicação)
+      // Calcular custos usando CostCalculator
+      // Os preços da API v2 já estão em custo por 1M tokens
       const result = CostCalculator.calculate({
         inputTokens,
         outputTokens,
-        pricing
+        pricing: {
+          input: deployment.costPer1MInput,
+          output: deployment.costPer1MOutput
+        }
       });
       
       // Formatar usando CostFormatter
@@ -140,7 +215,7 @@ export function useCostComparison(
     
     // Ordenar baseado no critério
     return sortEstimates(estimates, sortBy);
-  }, [models, inputTokens, outputTokens, sortBy]);
+  }, [models, inputTokens, outputTokens, sortBy, deployments, isLoading]);
 }
 
 /**

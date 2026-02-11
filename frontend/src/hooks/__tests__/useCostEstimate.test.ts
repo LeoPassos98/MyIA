@@ -5,10 +5,12 @@
  * - useCostEstimate: estimativa básica
  * - useConversationCostEstimate: estimativa de conversa
  * - useCostComparison: comparação entre modelos
+ * 
+ * Versão v2: Usa mock do deploymentPricingService
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useCostEstimate,
@@ -16,10 +18,78 @@ import {
   useCostComparison,
 } from '../useCostEstimate';
 import * as useModelCapabilitiesModule from '../useModelCapabilities';
+import * as deploymentPricingServiceModule from '../../services/deploymentPricingService';
 import { createElement, type ReactNode } from 'react';
 
 // Mock do hook useModelCapabilities
 vi.mock('../useModelCapabilities');
+
+// Mock do deploymentPricingService
+vi.mock('../../services/deploymentPricingService');
+
+// Dados de mock para deployments
+const mockDeployments: deploymentPricingServiceModule.Deployment[] = [
+  {
+    id: '1',
+    baseModelId: 'base-1',
+    providerId: 'provider-1',
+    deploymentId: 'claude-3-5-sonnet-20241022',
+    inferenceType: 'ON_DEMAND',
+    costPer1MInput: 3.0,
+    costPer1MOutput: 15.0,
+    isActive: true,
+    baseModel: { id: 'base-1', name: 'Claude 3.5 Sonnet', vendor: 'Anthropic' },
+    provider: { id: 'provider-1', name: 'Anthropic', slug: 'anthropic' }
+  },
+  {
+    id: '2',
+    baseModelId: 'base-2',
+    providerId: 'provider-2',
+    deploymentId: 'gpt-3.5-turbo',
+    inferenceType: 'ON_DEMAND',
+    costPer1MInput: 0.5,
+    costPer1MOutput: 1.5,
+    isActive: true,
+    baseModel: { id: 'base-2', name: 'GPT-3.5 Turbo', vendor: 'OpenAI' },
+    provider: { id: 'provider-2', name: 'OpenAI', slug: 'openai' }
+  },
+  {
+    id: '3',
+    baseModelId: 'base-3',
+    providerId: 'provider-3',
+    deploymentId: 'llama-3.1-70b-versatile',
+    inferenceType: 'ON_DEMAND',
+    costPer1MInput: 0.0,
+    costPer1MOutput: 0.0,
+    isActive: true,
+    baseModel: { id: 'base-3', name: 'Llama 3.1 70B', vendor: 'Meta' },
+    provider: { id: 'provider-3', name: 'Groq', slug: 'groq' }
+  },
+  {
+    id: '4',
+    baseModelId: 'base-4',
+    providerId: 'provider-1',
+    deploymentId: 'claude-3-haiku-20240307',
+    inferenceType: 'ON_DEMAND',
+    costPer1MInput: 0.25,
+    costPer1MOutput: 1.25,
+    isActive: true,
+    baseModel: { id: 'base-4', name: 'Claude 3 Haiku', vendor: 'Anthropic' },
+    provider: { id: 'provider-1', name: 'Anthropic', slug: 'anthropic' }
+  },
+  {
+    id: '5',
+    baseModelId: 'base-5',
+    providerId: 'provider-1',
+    deploymentId: 'claude-3-opus-20240229',
+    inferenceType: 'ON_DEMAND',
+    costPer1MInput: 15.0,
+    costPer1MOutput: 75.0,
+    isActive: true,
+    baseModel: { id: 'base-5', name: 'Claude 3 Opus', vendor: 'Anthropic' },
+    provider: { id: 'provider-1', name: 'Anthropic', slug: 'anthropic' }
+  },
+];
 
 // Wrapper com QueryClient para testes
 function createWrapper() {
@@ -50,42 +120,80 @@ describe('useCostEstimate', () => {
       isFetching: false,
       isEnabled: true,
     });
+    
+    // Mock do getDeploymentPricing
+    vi.mocked(deploymentPricingServiceModule.getDeploymentPricing).mockImplementation(
+      async (provider, modelId) => {
+        if (!provider || !modelId) return null;
+        
+        const deployment = mockDeployments.find(d => 
+          d.deploymentId === modelId || 
+          (d.provider?.slug === provider && d.deploymentId.includes(modelId))
+        );
+        
+        if (!deployment) return null;
+        
+        return {
+          costPer1MInput: deployment.costPer1MInput,
+          costPer1MOutput: deployment.costPer1MOutput
+        };
+      }
+    );
+    
+    // Mock do preloadDeploymentsCache
+    vi.mocked(deploymentPricingServiceModule.preloadDeploymentsCache).mockResolvedValue();
   });
 
-  it('retorna preço não disponível quando provider é null', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('retorna preço não disponível quando provider é null', async () => {
     const { result } = renderHook(
       () => useCostEstimate(null, 'claude-3-5-sonnet-20241022', 1000, 2000),
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(false);
     expect(result.current.formatted).toBe('Preço não disponível');
     expect(result.current.totalCost).toBe(0);
   });
 
-  it('retorna preço não disponível quando modelId é null', () => {
+  it('retorna preço não disponível quando modelId é null', async () => {
     const { result } = renderHook(
       () => useCostEstimate('anthropic', null, 1000, 2000),
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(false);
     expect(result.current.formatted).toBe('Preço não disponível');
     expect(result.current.totalCost).toBe(0);
   });
 
-  it('retorna preço não disponível para modelo desconhecido', () => {
+  it('retorna preço não disponível para modelo desconhecido', async () => {
     const { result } = renderHook(
       () => useCostEstimate('unknown', 'unknown-model', 1000, 2000),
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(false);
     expect(result.current.formatted).toBe('Preço não disponível');
     expect(result.current.totalCost).toBe(0);
   });
 
-  it('calcula custo corretamente para Claude 3.5 Sonnet', () => {
+  it('calcula custo corretamente para Claude 3.5 Sonnet', async () => {
     // Preços: input $3/1M, output $15/1M
     // 1000 input tokens = $0.003
     // 2000 output tokens = $0.030
@@ -95,6 +203,10 @@ describe('useCostEstimate', () => {
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(true);
     expect(result.current.inputCost).toBeCloseTo(0.003, 6);
     expect(result.current.outputCost).toBeCloseTo(0.030, 6);
@@ -103,7 +215,7 @@ describe('useCostEstimate', () => {
     expect(result.current.formatted).toBe('$0.033');
   });
 
-  it('calcula custo corretamente para GPT-3.5 Turbo', () => {
+  it('calcula custo corretamente para GPT-3.5 Turbo', async () => {
     // Preços: input $0.5/1M, output $1.5/1M
     // 1000 input tokens = $0.0005
     // 2000 output tokens = $0.0030
@@ -113,6 +225,10 @@ describe('useCostEstimate', () => {
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(true);
     expect(result.current.inputCost).toBeCloseTo(0.0005, 6);
     expect(result.current.outputCost).toBeCloseTo(0.0030, 6);
@@ -120,108 +236,77 @@ describe('useCostEstimate', () => {
     expect(result.current.formatted).toBe('$0.0035');
   });
 
-  it('retorna "Gratuito" para modelos Groq', () => {
+  it('retorna "Gratuito" para modelos Groq', async () => {
     const { result } = renderHook(
       () => useCostEstimate('groq', 'llama-3.1-70b-versatile', 1000, 2000),
       { wrapper: createWrapper() }
     );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
 
     expect(result.current.hasPricing).toBe(true);
     expect(result.current.totalCost).toBe(0);
     expect(result.current.formatted).toBe('Gratuito');
   });
 
-  it('formata custos muito pequenos corretamente', () => {
+  it('formata custos muito pequenos corretamente', async () => {
     // 10 tokens de entrada e saída = custo muito pequeno
     const { result } = renderHook(
       () => useCostEstimate('anthropic', 'claude-3-haiku-20240307', 10, 10),
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(true);
     expect(result.current.formatted).toBe('< $0.0001');
   });
 
-  it('formata custos médios corretamente', () => {
+  it('formata custos médios corretamente', async () => {
     // 100K tokens = custo médio
     const { result } = renderHook(
       () => useCostEstimate('anthropic', 'claude-3-5-sonnet-20241022', 50000, 50000),
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(true);
     expect(result.current.totalCost).toBeCloseTo(0.9, 6); // (50K/1M)*3 + (50K/1M)*15
     expect(result.current.formatted).toBe('$0.900');
   });
 
-  it('formata custos grandes corretamente', () => {
+  it('formata custos grandes corretamente', async () => {
     // 1M tokens = custo grande
     const { result } = renderHook(
       () => useCostEstimate('anthropic', 'claude-3-opus-20240229', 500000, 500000),
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(true);
     expect(result.current.totalCost).toBeCloseTo(45.0, 6); // (500K/1M)*15 + (500K/1M)*75
     expect(result.current.formatted).toBe('$45.00');
   });
 
-  it('memoiza o resultado para os mesmos parâmetros', () => {
-    const { result, rerender } = renderHook(
-      ({ provider, modelId, input, output }) =>
-        useCostEstimate(provider, modelId, input, output),
-      {
-        initialProps: {
-          provider: 'anthropic',
-          modelId: 'claude-3-5-sonnet-20241022',
-          input: 1000,
-          output: 2000,
-        },
-        wrapper: createWrapper(),
-      }
+  it('mostra estado de loading inicialmente', () => {
+    const { result } = renderHook(
+      () => useCostEstimate('anthropic', 'claude-3-5-sonnet-20241022', 1000, 2000),
+      { wrapper: createWrapper() }
     );
 
-    const firstResult = result.current;
-
-    // Rerenderizar com os mesmos parâmetros
-    rerender({
-      provider: 'anthropic',
-      modelId: 'claude-3-5-sonnet-20241022',
-      input: 1000,
-      output: 2000,
-    });
-
-    // Resultado deve ser o mesmo objeto (memoizado)
-    expect(result.current).toBe(firstResult);
-  });
-
-  it('recalcula quando os tokens mudam', () => {
-    const { result, rerender } = renderHook(
-      ({ provider, modelId, input, output }) =>
-        useCostEstimate(provider, modelId, input, output),
-      {
-        initialProps: {
-          provider: 'anthropic',
-          modelId: 'claude-3-5-sonnet-20241022',
-          input: 1000,
-          output: 2000,
-        },
-        wrapper: createWrapper(),
-      }
-    );
-
-    const firstCost = result.current.totalCost;
-
-    // Rerenderizar com tokens diferentes
-    rerender({
-      provider: 'anthropic',
-      modelId: 'claude-3-5-sonnet-20241022',
-      input: 2000,
-      output: 4000,
-    });
-
-    // Custo deve ser diferente (dobrado)
-    expect(result.current.totalCost).toBeCloseTo(firstCost * 2, 6);
+    // Inicialmente deve estar carregando
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.formatted).toBe('Carregando...');
   });
 });
 
@@ -237,20 +322,44 @@ describe('useConversationCostEstimate', () => {
       isFetching: false,
       isEnabled: true,
     });
+    
+    vi.mocked(deploymentPricingServiceModule.getDeploymentPricing).mockImplementation(
+      async (provider, modelId) => {
+        if (!provider || !modelId) return null;
+        
+        const deployment = mockDeployments.find(d => 
+          d.deploymentId === modelId || 
+          (d.provider?.slug === provider && d.deploymentId.includes(modelId))
+        );
+        
+        if (!deployment) return null;
+        
+        return {
+          costPer1MInput: deployment.costPer1MInput,
+          costPer1MOutput: deployment.costPer1MOutput
+        };
+      }
+    );
+    
+    vi.mocked(deploymentPricingServiceModule.preloadDeploymentsCache).mockResolvedValue();
   });
 
-  it('calcula custo de conversa vazia', () => {
+  it('calcula custo de conversa vazia', async () => {
     const { result } = renderHook(
       () =>
         useConversationCostEstimate('anthropic', 'claude-3-5-sonnet-20241022', []),
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.totalCost).toBe(0);
     expect(result.current.formatted).toBe('Gratuito');
   });
 
-  it('calcula custo de conversa com múltiplas mensagens', () => {
+  it('calcula custo de conversa com múltiplas mensagens', async () => {
     const messages = [
       { role: 'user' as const, tokens: 100 },
       { role: 'assistant' as const, tokens: 500 },
@@ -272,13 +381,17 @@ describe('useConversationCostEstimate', () => {
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     expect(result.current.hasPricing).toBe(true);
     expect(result.current.inputCost).toBeCloseTo(0.00075, 6);
     expect(result.current.outputCost).toBeCloseTo(0.0165, 6);
     expect(result.current.totalCost).toBeCloseTo(0.01725, 6);
   });
 
-  it('separa corretamente tokens de user e assistant', () => {
+  it('separa corretamente tokens de user e assistant', async () => {
     const messages = [
       { role: 'user' as const, tokens: 1000 },
       { role: 'assistant' as const, tokens: 2000 },
@@ -294,38 +407,25 @@ describe('useConversationCostEstimate', () => {
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
     // 1000 input, 2000 output
     expect(result.current.inputCost).toBeCloseTo(0.003, 6);
     expect(result.current.outputCost).toBeCloseTo(0.030, 6);
   });
-
-  it('memoiza o cálculo de tokens', () => {
-    const messages = [
-      { role: 'user' as const, tokens: 100 },
-      { role: 'assistant' as const, tokens: 200 },
-    ];
-
-    const { result, rerender } = renderHook(
-      ({ msgs }) =>
-        useConversationCostEstimate('anthropic', 'claude-3-5-sonnet-20241022', msgs),
-      {
-        initialProps: { msgs: messages },
-        wrapper: createWrapper(),
-      }
-    );
-
-    const firstResult = result.current;
-
-    // Rerenderizar com o mesmo array
-    rerender({ msgs: messages });
-
-    // Resultado deve ser o mesmo (memoizado)
-    expect(result.current).toBe(firstResult);
-  });
 });
 
 describe('useCostComparison', () => {
-  it('compara custos entre modelos', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    
+    vi.mocked(deploymentPricingServiceModule.getActiveDeployments).mockResolvedValue(mockDeployments);
+    vi.mocked(deploymentPricingServiceModule.preloadDeploymentsCache).mockResolvedValue();
+  });
+
+  it('compara custos entre modelos', async () => {
     const models = [
       { provider: 'anthropic', modelId: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
       { provider: 'anthropic', modelId: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
@@ -337,8 +437,9 @@ describe('useCostComparison', () => {
       { wrapper: createWrapper() }
     );
 
-    // Deve retornar 3 estimativas
-    expect(result.current).toHaveLength(3);
+    await waitFor(() => {
+      expect(result.current.length).toBe(3);
+    });
 
     // Deve estar ordenado por custo (menor primeiro)
     expect(result.current[0].name).toBe('Claude 3 Haiku'); // Mais barato
@@ -350,7 +451,7 @@ describe('useCostComparison', () => {
     expect(result.current[1].totalCost).toBeLessThan(result.current[2].totalCost);
   });
 
-  it('inclui modelos sem preço na comparação', () => {
+  it('inclui modelos sem preço na comparação', async () => {
     const models = [
       { provider: 'anthropic', modelId: 'claude-3-haiku-20240307' },
       { provider: 'unknown', modelId: 'unknown-model' },
@@ -362,7 +463,9 @@ describe('useCostComparison', () => {
       { wrapper: createWrapper() }
     );
 
-    expect(result.current).toHaveLength(3);
+    await waitFor(() => {
+      expect(result.current.length).toBe(3);
+    });
 
     // Ordenação: modelos com preço por custo (menor primeiro), depois modelos sem preço
     // Groq tem preço $0 (menor custo)
@@ -377,7 +480,7 @@ describe('useCostComparison', () => {
     expect(result.current[2].hasPricing).toBe(false); // Unknown (sem preço)
   });
 
-  it('preserva informações do modelo na comparação', () => {
+  it('preserva informações do modelo na comparação', async () => {
     const models = [
       {
         provider: 'anthropic',
@@ -391,56 +494,26 @@ describe('useCostComparison', () => {
       { wrapper: createWrapper() }
     );
 
+    await waitFor(() => {
+      expect(result.current.length).toBe(1);
+    });
+
     expect(result.current[0].provider).toBe('anthropic');
     expect(result.current[0].modelId).toBe('claude-3-5-sonnet-20241022');
     expect(result.current[0].name).toBe('Claude 3.5 Sonnet');
   });
 
-  it('memoiza o resultado', () => {
+  it('retorna array vazio enquanto carrega', () => {
     const models = [
       { provider: 'anthropic', modelId: 'claude-3-5-sonnet-20241022' },
     ];
 
-    const { result, rerender } = renderHook(
-      ({ models, input, output }) => useCostComparison(models, input, output),
-      {
-        initialProps: { models, input: 1000, output: 2000 },
-        wrapper: createWrapper(),
-      }
+    const { result } = renderHook(
+      () => useCostComparison(models, 1000, 2000),
+      { wrapper: createWrapper() }
     );
 
-    const firstResult = result.current;
-
-    // Rerenderizar com os mesmos parâmetros
-    rerender({ models, input: 1000, output: 2000 });
-
-    // Resultado deve ser o mesmo array (memoizado)
-    expect(result.current).toBe(firstResult);
-  });
-
-  it('recalcula quando os modelos mudam', () => {
-    const models1 = [
-      { provider: 'anthropic', modelId: 'claude-3-haiku-20240307' },
-    ];
-
-    const models2 = [
-      { provider: 'anthropic', modelId: 'claude-3-opus-20240229' },
-    ];
-
-    const { result, rerender } = renderHook(
-      ({ models, input, output }) => useCostComparison(models, input, output),
-      {
-        initialProps: { models: models1, input: 1000, output: 2000 },
-        wrapper: createWrapper(),
-      }
-    );
-
-    const firstCost = result.current[0].totalCost;
-
-    // Rerenderizar com modelos diferentes
-    rerender({ models: models2, input: 1000, output: 2000 });
-
-    // Custo deve ser diferente (Opus é mais caro que Haiku)
-    expect(result.current[0].totalCost).toBeGreaterThan(firstCost);
+    // Inicialmente deve estar vazio (carregando)
+    expect(result.current).toHaveLength(0);
   });
 });

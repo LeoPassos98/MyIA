@@ -1,5 +1,14 @@
-// backend/prisma/schema.prisma
-// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
+// backend/prisma/schema-v2.prisma
+// Standards: docs/STANDARDS.md
+// 
+// Schema v2 - Clean Slate do Sistema de Modelos
+// Conforme: docs/CLEAN-SLATE-IMPLEMENTATION-PLAN.md
+// 
+// Objetivo: Banco de dados como Single Source of Truth para modelos AI
+// - Suporte a múltiplos providers por modelo
+// - Tipos de inferência (ON_DEMAND, INFERENCE_PROFILE, PROVISIONED)
+// - Certificação por deployment (não por modelo)
+// - Custos em 1M tokens (padrão da indústria)
 
 generator client {
   provider        = "prisma-client-js"
@@ -12,444 +21,389 @@ datasource db {
   extensions = [pgvector(map: "vector")]
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ============================================================================
+// ENUMS
+// ============================================================================
 
-  // --- ARQUITETURA NOVA ---
-
-  // Link para a tabela de configurações (Relação 1-para-1)
-  settings UserSettings?
-
-  // Link para os logs de chamadas (Relação 1-para-N)
-  apiCalls ApiCallLog[]
-
-  chats Chat[]
-
-  providerCredentials   UserProviderCredential[]
-  credentialValidations ProviderCredentialValidation[]
-
-  @@map("users")
+/// Tipo de provider de AI
+/// Nota: Pode ser expandido futuramente para incluir novos providers
+enum ProviderType {
+  AWS_BEDROCK    // Amazon Bedrock
+  AZURE_OPENAI   // Azure OpenAI Service
+  OPENAI_DIRECT  // OpenAI API direta
+  GOOGLE_VERTEX  // Google Vertex AI
 }
 
-// 2. ADICIONE ESTE NOVO MODELO (Configurações)
-model UserSettings {
-  id    String @id @default(uuid())
-  theme String @default("light") // "light" ou "dark"
-
-  // --- Aba 3: Chaves de API ---
-  // (IMPORTANTE: Você deve criptografar isso no backend antes de salvar!)
-  openaiApiKey     String?
-  groqApiKey       String?
-  claudeApiKey     String?
-  togetherApiKey   String?
-  perplexityApiKey String?
-  mistralApiKey    String?
-
-  // --- AWS Bedrock Configuration ---
-  awsAccessKey     String?
-  awsSecretKey     String?
-  awsRegion        String?  @default("us-east-1")
-  awsEnabledModels String[] @default([]) // Array de apiModelId habilitados
-
-  // --- O Link de volta ao User ---
-  userId String @unique // O '@unique' garante a relação 1-para-1
-  user   User   @relation(fields: [userId], references: [id])
-
-  @@map("user_settings")
+/// Tipo de inferência para deployments
+/// Nota: Enum pode ser expandido futuramente para novos tipos de inferência
+/// (ex: BATCH, FINE_TUNED, CUSTOM_ENDPOINT)
+enum InferenceType {
+  ON_DEMAND          // Modelo direto, sem prefixo regional
+  INFERENCE_PROFILE  // Requer prefixo regional (us., eu., apac.)
+  PROVISIONED        // ARN dedicado com throughput reservado
 }
 
-// Validação de Credenciais de Providers
-model ProviderCredentialValidation {
-  id              String    @id @default(uuid())
-  userId          String
-  provider        String // 'bedrock', 'azure', etc
-  status          String // 'not_configured', 'validating', 'valid', 'invalid', 'expired'
-  lastValidatedAt DateTime?
-  lastError       String? // Mensagem de erro detalhada
-  errorCode       String? // AWS error code (ex: InvalidAccessKeyId)
-  validatedModels String[]  @default([]) // Quais modelos foram testados
-  latencyMs       Int? // Tempo de resposta do teste
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@unique([userId, provider])
-  @@map("provider_credential_validations")
+/// Status de certificação de deployment
+enum CertificationStatus {
+  PENDING   // Aguardando processamento
+  RUNNING   // Em execução
+  PASSED    // Todos os testes passaram
+  FAILED    // Falhou em testes críticos
+  ERROR     // Erro durante execução (não relacionado ao modelo)
+  SKIPPED   // Pulado (ex: modelo deprecated)
 }
 
-// 3. ADICIONE ESTE NOVO MODELO (Analytics)
-model ApiCallLog {
-  id        String   @id @default(uuid())
-  timestamp DateTime @default(now())
-  provider  String
-  model     String? // <-- O "fiscal" não vê este
+// ============================================================================
+// MODELOS PRINCIPAIS
+// ============================================================================
 
-  tokensIn  Int   @default(0) // <-- O "fiscal" não vê este
-  tokensOut Int   @default(0) // <-- O "fiscal" não vê este
-  costInUSD Float @default(0.0) // <-- O "fiscal" não vê este
-
-  wordsIn  Int @default(0)
-  wordsOut Int @default(0)
-  bytesIn  Int @default(0)
-  bytesOut Int @default(0)
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  @@map("api_call_logs")
-}
-
-// Modelo 1: A Conversa (Um "título" para o chat)
-model Chat {
-  id        String   @id @default(uuid())
-  title     String   @default("Nova Conversa") // Título (ex: "Resumo sobre IA")
-  provider  String   @default("groq") // Provider travado para este chat
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  messages Message[] // Link para as mensagens
-
-  @@map("chats")
-}
-
-// Modelo 2: A Mensagem (O "Histórico Inteligente")
-model Message {
-  id        String   @id @default(uuid())
-  role      String
-  content   String
-  createdAt DateTime @default(now())
-  isPinned  Boolean  @default(false)
-
-  chatId String
-  chat   Chat   @relation(fields: [chatId], references: [id])
-
-  // --- TELEMETRIA "INTELIGENTE" (só para 'assistant') ---
-  provider  String?
-  model     String?
-  tokensIn  Int?
-  tokensOut Int?
-  costInUSD Float?
-
-  // --- A "CAIXA PRETA" (A V13) ---
-  sentContext String?
-
-  // --- O "ARQUIVO" V9 (RAG) ---
-  vector Unsupported("vector(1536)")?
-
-  @@map("messages")
-}
-
-// --- SISTEMA MODULAR DE IA ---
-
-// 1. O Provedor (ex: OpenAI, Groq, Anthropic)
-model AIProvider {
-  id         String  @id @default(uuid())
-  name       String // Ex: "OpenAI", "Groq"
-  slug       String  @unique // Ex: "openai", "groq" (usado no código para carregar o driver)
-  isActive   Boolean @default(true) // O "Disjuntor" Geral
-  websiteUrl String?
-  logoUrl    String?
-
-  // Configurações técnicas
-  baseUrl String? // Caso precise sobrescrever (ex: proxies locais)
-
-  models      AIModel[]
-  credentials UserProviderCredential[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("ai_providers")
-}
-
-// 2. Os Modelos (ex: gpt-4, llama-3-70b)
-model AIModel {
-  id            String @id @default(uuid())
-  name          String // Nome visível: "GPT-4 Turbo"
-  apiModelId    String // ID técnico: "gpt-4-0125-preview"
-  contextWindow Int    @default(4096)
-
-  // Custos (para cálculo de telemetria)
-  costPer1kInput  Float @default(0)
-  costPer1kOutput Float @default(0)
-
-  isActive Boolean @default(true) // Pode desativar só um modelo específico
-
-  providerId String
-  provider   AIProvider @relation(fields: [providerId], references: [id])
-
-  // Relacionamento com certificações de jobs
-  jobCertifications JobCertification[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("ai_models")
-}
-
-// 3. Credenciais do Usuário (Para o sistema BYOK - Bring Your Own Key)
-// Isso substitui as colunas soltas no UserSettings a longo prazo
-model UserProviderCredential {
-  id     String @id @default(uuid())
-  apiKey String // Criptografar antes de salvar!
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  providerId String
-  provider   AIProvider @relation(fields: [providerId], references: [id])
-
-  @@unique([userId, providerId]) // Um usuário só tem uma chave por provider
-  @@map("user_provider_credentials")
-}
-
-// 4. Certificação de Modelos (Sistema de Validação Automática)
-// LEGACY: Mantido para compatibilidade - será migrado para ModelCertification regional
-model ModelCertificationLegacy {
-  id      String @id @default(cuid())
-  modelId String @unique
-  vendor  String // anthropic, cohere, amazon
-  status  String // certified, failed, untested, testing, quality_warning
-
-  // Certificação
-  certifiedAt DateTime?
-  expiresAt   DateTime?
-  certifiedBy String? // 'system' ou userId
-
-  // Testes
-  lastTestedAt DateTime?
-  testsPassed  Int       @default(0)
-  testsFailed  Int       @default(0)
-  successRate  Float     @default(0)
-
-  // Performance
-  avgLatencyMs   Int?
-  lastError      String?
-  failureReasons Json? // Array de erros
-
-  // Categorização de Erros
-  errorCategory String? // UNAVAILABLE, PERMISSION_ERROR, etc
-  errorSeverity String? // CRITICAL, HIGH, MEDIUM, LOW
-
-  // Sistema de Rating (Fase 2)
-  rating           Float?    // 0-5.0
-  badge            String?   // PREMIUM, RECOMENDADO, FUNCIONAL, etc
-  metrics          Json?     // ModelMetrics (successRate, averageRetries, etc.)
-  scores           Json?     // ModelScores (success, resilience, performance, stability)
-  ratingUpdatedAt  DateTime? // Timestamp da última atualização do rating
-
-  // Metadados
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ✅ OTIMIZAÇÃO: Índices para queries comuns (70% mais rápido)
-  @@index([status]) // Para getCertifiedModels()
-  @@index([status, expiresAt]) // Para query com OR
-  @@index([vendor]) // Para certifyVendor()
-  @@index([lastTestedAt]) // Para ordenação por data
-  @@index([expiresAt]) // Para queries de expiração
-  @@index([errorCategory]) // Para filtrar por categoria de erro
-  @@index([errorSeverity]) // Para filtrar por severidade
-  @@index([rating]) // Para ordenação por rating
-  @@index([badge]) // Para filtros por badge
-  @@index([ratingUpdatedAt]) // Para cache de rating
-  @@map("model_certifications_legacy")
-}
-
-// 4.1. Certificação Regional de Modelos (Fase 3: Certificação por Região AWS)
-model ModelCertification {
-  id        String   @id @default(uuid())
-  modelId   String
-  region    String   // AWS region: us-east-1, us-west-2, etc.
-  vendor    String?  // anthropic, cohere, amazon, meta, etc.
+/// Provider de AI (AWS Bedrock, Azure OpenAI, etc.)
+/// Representa onde os modelos são hospedados/executados
+model Provider {
+  id        String       @id @default(uuid())
+  
+  // Identificação
+  name      String       // "AWS Bedrock", "Azure OpenAI", "OpenAI"
+  slug      String       @unique // "bedrock", "azure", "openai"
+  type      ProviderType // Tipo do provider
+  
+  // Configuração
+  baseUrl   String?      // URL base da API (se aplicável)
+  authType  String?      // "aws_credentials", "api_key", "oauth"
   
   // Status
-  status    CertificationStatus @default(PENDING)
+  isActive  Boolean      @default(true)
   
-  // Certificação
-  certifiedAt DateTime?
-  expiresAt   DateTime?
-  certifiedBy String? // 'system' ou userId
+  // Relacionamentos
+  deployments ModelDeployment[]
   
-  // Testes
-  lastTestedAt DateTime?
-  testsPassed  Int       @default(0)
-  testsFailed  Int       @default(0)
-  successRate  Float     @default(0)
+  // Timestamps
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
   
-  // Performance
-  avgLatencyMs   Int?
-  lastError      String?
-  failureReasons Json? // Array de erros
-  
-  // Resultados detalhados
-  passed    Boolean?
-  score     Float?
-  testResults Json?   // Resultados detalhados dos testes
-  errorMessage String?
-  errorCategory String? // UNAVAILABLE, PERMISSION_ERROR, etc
-  errorSeverity String? // CRITICAL, HIGH, MEDIUM, LOW
-  
-  // Sistema de Rating (Fase 2)
-  rating           Float?    // 0-5.0
-  badge            String?   // PREMIUM, RECOMENDADO, FUNCIONAL, etc
-  metrics          Json?     // ModelMetrics (successRate, averageRetries, etc.)
-  scores           Json?     // ModelScores (success, resilience, performance, stability)
-  ratingUpdatedAt  DateTime? // Timestamp da última atualização do rating
-  
-  // Metadados
-  jobId     String?  // Bull Queue job ID
-  startedAt DateTime?
-  completedAt DateTime?
-  duration  Int?     // Duração em ms
-  
-  // Auditoria
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?  // User ID que iniciou
-  
-  // Relacionamentos - REMOVIDO: FK para ai_models causava conflito
-  // O modelId aqui é o apiModelId do registry (ex: "anthropic.claude-3-sonnet")
-  // não o UUID do banco. Certificações podem existir para modelos não cadastrados.
-  
-  // Índices
-  @@unique([modelId, region])
-  @@index([status])
-  @@index([region])
-  @@index([jobId])
-  @@index([createdAt])
-  @@index([vendor])
-  @@index([badge])
-  @@index([rating])
-  @@index([errorCategory])
-  @@index([modelId]) // Adicionado para buscas por modelo
-  @@map("model_certifications")
-}
-
-// 4.2. Jobs de Certificação (Fase 3: Processamento Assíncrono)
-model CertificationJob {
-  id        String   @id @default(uuid())
-  
-  // Configuração do job
-  type      CertificationJobType
-  regions   String[] // Regiões a certificar
-  modelIds  String[] // IDs dos modelos (vazio = todos)
-  
-  // Status
-  status    JobStatus @default(PENDING)
-  
-  // Progresso
-  totalModels     Int @default(0)
-  processedModels Int @default(0)
-  successCount    Int @default(0)
-  failureCount    Int @default(0)
-  
-  // Metadados
-  bullJobId String?  // Bull Queue job ID
-  startedAt DateTime?
-  completedAt DateTime?
-  duration  Int?     // Duração em ms
-  
-  // Configurações
-  config    Json?    // Configurações adicionais
-  
-  // Auditoria
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String?  // User ID que iniciou
-  
-  // Relação com certificações individuais
-  certifications JobCertification[]
-  
-  // Índices
-  @@index([status])
   @@index([type])
-  @@index([bullJobId])
-  @@index([createdAt])
-  @@map("certification_jobs")
+  @@index([isActive])
+  @@map("providers")
 }
 
-// Certificações individuais por job
-model JobCertification {
+/// Modelo base de AI (Claude, GPT, Llama, etc.)
+/// Definição do modelo, independente de provider
+model BaseModel {
   id            String   @id @default(uuid())
-  jobId         String
-  job           CertificationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   
-  modelId       String
-  model         AIModel  @relation(fields: [modelId], references: [id])
+  // Identificação
+  name          String   @unique // "Claude 3.5 Sonnet", "GPT-4", "Llama 3.1 70B"
+  vendor        String   // "Anthropic", "OpenAI", "Meta"
+  family        String?  // "Claude", "GPT", "Llama"
+  version       String?  // "3.5", "4", "3.1"
   
-  region        String
-  status        String   // PASSED, FAILED, WARNING, PENDING, PROCESSING
+  // Capabilities (inerentes ao modelo)
+  // Estrutura esperada: { streaming: boolean, vision: boolean, functionCalling: boolean, 
+  //                       maxContextWindow: number, maxOutputTokens: number }
+  capabilities  Json
   
-  startedAt     DateTime?
-  completedAt   DateTime?
-  duration      Int?     // Duração em ms
+  // Parâmetros recomendados (padrão do modelo)
+  // Estrutura esperada: { temperature: number, topP: number, maxTokens: number }
+  defaultParams Json?
   
-  error         String?  @db.Text
-  details       Json?    // Detalhes adicionais (testes, métricas, etc)
+  // Metadados
+  description   String?
+  releaseDate   DateTime?
+  deprecated    Boolean  @default(false)
+  replacedBy    String?  // Nome do modelo substituto (se deprecated)
   
+  // Relacionamentos
+  deployments   ModelDeployment[]
+  
+  // Timestamps
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
-  @@index([jobId])
-  @@index([modelId])
+  @@index([vendor])
+  @@index([family])
+  @@index([deprecated])
+  @@map("base_models")
+}
+
+/// Deployment de modelo em um provider específico
+/// Representa a instância de um modelo em um provider (com custos específicos)
+model ModelDeployment {
+  id              String        @id @default(uuid())
+  
+  // Relacionamentos
+  baseModelId     String
+  baseModel       BaseModel     @relation(fields: [baseModelId], references: [id])
+  providerId      String
+  provider        Provider      @relation(fields: [providerId], references: [id])
+  
+  // ID específico do provider
+  // Exemplos:
+  // - Bedrock: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  // - OpenAI: "gpt-4-turbo-2024-04-09"
+  // - Azure: "gpt-4-deployment-name"
+  deploymentId    String
+  
+  // Tipo de inferência
+  inferenceType   InferenceType @default(ON_DEMAND)
+  
+  // Configuração específica do provider
+  // Estrutura esperada: { arn?: string, profileFormat?: string, region?: string, ... }
+  providerConfig  Json?
+  
+  // Custos em USD por 1 MILHÃO de tokens (padrão da indústria)
+  // IMPORTANTE: Não usar costPer1k - sempre 1M tokens
+  costPer1MInput  Float         // Custo por 1M tokens de entrada
+  costPer1MOutput Float         // Custo por 1M tokens de saída
+  costPerHour     Float?        // Para provisioned throughput (opcional)
+  
+  // Parâmetros específicos (override do modelo base)
+  customParams    Json?
+  
+  // Validação de capabilities
+  capabilitiesVerifiedAt DateTime?
+  capabilitiesSource     String?  // "manual", "auto_test"
+  
+  // Status
+  isActive        Boolean       @default(true)
+  
+  // Relacionamentos
+  certifications  ModelCertification[]
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Constraints
+  @@unique([providerId, deploymentId])
+  
+  // Índices para queries comuns
+  @@index([baseModelId])
+  @@index([providerId])
+  @@index([inferenceType])
+  @@index([isActive])
+  @@map("model_deployments")
+}
+
+/// Certificação de deployment por região
+/// IMPORTANTE: Certificação é por deployment (FK), não por modelId string
+model ModelCertification {
+  id              String              @id @default(uuid())
+  
+  // FK para deployment (não string modelId!)
+  deploymentId    String
+  deployment      ModelDeployment     @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  
+  // Região AWS/Azure/etc
+  region          String              // "us-east-1", "us-west-2", "eastus", etc.
+  
+  // Status
+  status          CertificationStatus @default(PENDING)
+  
+  // Certificação
+  certifiedAt     DateTime?
+  expiresAt       DateTime?
+  certifiedBy     String?             // 'system' ou userId
+  
+  // Testes
+  lastTestedAt    DateTime?
+  testsPassed     Int                 @default(0)
+  testsFailed     Int                 @default(0)
+  successRate     Float               @default(0)
+  
+  // Performance
+  avgLatencyMs    Int?
+  lastError       String?
+  failureReasons  Json?               // Array de erros detalhados
+  
+  // Resultados detalhados
+  passed          Boolean?
+  score           Float?              // 0-100
+  testResults     Json?               // Resultados detalhados dos testes
+  errorMessage    String?
+  errorCategory   String?             // UNAVAILABLE, PERMISSION_ERROR, etc.
+  errorSeverity   String?             // CRITICAL, HIGH, MEDIUM, LOW
+  
+  // Sistema de Rating
+  rating          Float?              // 0-5.0
+  badge           String?             // PREMIUM, RECOMENDADO, FUNCIONAL, etc.
+  metrics         Json?               // ModelMetrics (successRate, averageRetries, etc.)
+  scores          Json?               // ModelScores (success, resilience, performance, stability)
+  ratingUpdatedAt DateTime?
+  
+  // Metadados de execução
+  jobId           String?             // Bull Queue job ID
+  startedAt       DateTime?
+  completedAt     DateTime?
+  duration        Int?                // Duração em ms
+  
+  // Timestamps
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdBy       String?             // User ID que iniciou
+  
+  // Constraints
+  @@unique([deploymentId, region])
+  
+  // Índices para queries comuns
   @@index([status])
-  @@unique([jobId, modelId, region])
-  @@map("job_certifications")
+  @@index([region])
+  @@index([jobId])
+  @@index([rating])
+  @@index([badge])
+  @@index([errorCategory])
+  @@index([createdAt])
+  @@map("model_certifications")
 }
 
-// Enums para Certificação Regional
-enum CertificationStatus {
-  PENDING         // Aguardando processamento
-  QUEUED          // Na fila Bull
-  PROCESSING      // Sendo processado
-  COMPLETED       // Concluído com sucesso
-  FAILED          // Falhou
-  CANCELLED       // Cancelado
-  CERTIFIED       // Certificado (modelo aprovado)
-  QUALITY_WARNING // Funcional mas com problemas de qualidade
+/// Métricas do sistema
+/// Para observabilidade e monitoramento
+model SystemMetric {
+  id            String    @id @default(uuid())
+  
+  // Referência opcional ao deployment
+  // Nota: Pode ser null para métricas globais do sistema
+  // Consideração do Architect: FK opcional para deploymentId
+  deploymentId  String?
+  
+  // Tipo de métrica
+  metricType    String    // "latency", "error_rate", "usage", "certification", "cost"
+  
+  // Valor
+  value         Float
+  
+  // Timestamp
+  timestamp     DateTime  @default(now())
+  
+  // Metadados adicionais
+  // Estrutura esperada: { region?: string, provider?: string, ... }
+  metadata      Json?
+  
+  // Índices para queries de séries temporais
+  @@index([deploymentId, metricType, timestamp])
+  @@index([metricType, timestamp])
+  @@index([timestamp])
+  @@map("system_metrics")
 }
 
-enum CertificationJobType {
-  SINGLE_MODEL    // Certificar um modelo específico
-  MULTIPLE_MODELS // Certificar múltiplos modelos
-  ALL_MODELS      // Certificar todos os modelos
-  RECERTIFY       // Re-certificar modelos existentes
+// ============================================================================
+// MODELOS DE USUÁRIO (mantidos do schema original)
+// ============================================================================
+
+/// Usuário do sistema
+model User {
+  id        String        @id @default(uuid())
+  email     String        @unique
+  password  String
+  name      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  
+  // Relacionamentos
+  settings  UserSettings?
+  chats     Chat[]
+  
+  @@map("users")
 }
 
-enum JobStatus {
-  PENDING      // Aguardando processamento
-  QUEUED       // Na fila Bull
-  PROCESSING   // Sendo processado
-  COMPLETED    // Concluído
-  FAILED       // Falhou
-  CANCELLED    // Cancelado
-  PAUSED       // Pausado
+/// Configurações do usuário
+model UserSettings {
+  id               String   @id @default(uuid())
+  
+  // Preferências
+  theme            String   @default("light") // "light" ou "dark"
+  
+  // AWS Bedrock Configuration
+  // IMPORTANTE: Criptografar antes de salvar!
+  awsAccessKey     String?
+  awsSecretKey     String?
+  awsRegion        String?  @default("us-east-1")
+  awsEnabledModels String[] @default([]) // Array de deploymentIds habilitados
+  
+  // Relacionamento
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  
+  @@map("user_settings")
 }
 
-// 5. Sistema de Logging Estruturado (Fase 2: PostgreSQL)
+// ============================================================================
+// MODELO DE LOGS (mantido do schema original)
+// ============================================================================
+
+/// Sistema de Logging Estruturado
 model Log {
   id          String   @id @default(uuid())
   timestamp   DateTime @default(now())
-  level       String // 'info' | 'warn' | 'error' | 'debug'
+  level       String   // 'info' | 'warn' | 'error' | 'debug'
   message     String
   requestId   String?
   userId      String?
   inferenceId String?
-  metadata    Json? // JSONB para contexto adicional
-  error       Json? // JSONB para stack traces e detalhes de erro
-
+  metadata    Json?    // JSONB para contexto adicional
+  error       Json?    // JSONB para stack traces e detalhes de erro
+  
   // Índices de performance para queries comuns
-  @@index([timestamp(sort: Desc)]) // Queries temporais (logs recentes)
-  @@index([level]) // Filtro por nível de severidade
-  @@index([userId]) // Filtro por usuário
-  @@index([requestId]) // Correlação de logs por requisição
+  @@index([timestamp(sort: Desc)])
+  @@index([level])
+  @@index([userId])
+  @@index([requestId])
   @@map("logs")
+}
+
+// ============================================================================
+// MODELOS DE CHAT (Clean Slate - Subtarefa 7.7/7.8)
+// ============================================================================
+
+/// Conversa de chat do usuário
+model Chat {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String?   // Título pode ser gerado automaticamente
+  provider  String    @default("groq") // Provider padrão
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relacionamentos
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("chats")
+}
+
+/// Mensagem dentro de um chat
+model Message {
+  id          String   @id @default(uuid())
+  chatId      String
+  role        String   // 'user' | 'assistant' | 'system'
+  content     String   @db.Text
+  
+  // Metadados de IA (apenas para role='assistant')
+  provider    String?
+  model       String?
+  tokensIn    Int?
+  tokensOut   Int?
+  costInUSD   Float?
+  
+  // Contexto enviado para a IA (JSON stringificado)
+  sentContext String?  @db.Text
+  
+  // Funcionalidade de pin
+  isPinned    Boolean  @default(false)
+  
+  // Embedding para RAG (vetor pgvector) - Unsupported para Prisma
+  // vector      Unsupported("vector(1536)")?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relacionamentos
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  @@index([chatId])
+  @@index([isPinned])
+  @@index([createdAt])
+  @@map("messages")
 }

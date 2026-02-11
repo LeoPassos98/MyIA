@@ -1,34 +1,36 @@
 // backend/src/controllers/certificationQueue/validators/modelValidator.ts
 // Standards: docs/STANDARDS.md
 
-import { PrismaClient, AIModel } from '@prisma/client';
+import { PrismaClient, ModelDeployment } from '@prisma/client';
 import { logger } from '../../../utils/logger';
 
 const prisma = new PrismaClient();
 
 /**
  * Resultado da validação de modelo
+ * Schema v2: Usa ModelDeployment em vez de AIModel
  */
 export interface ModelValidationResult {
   exists: boolean;
-  model?: AIModel;
-  searchedBy: 'apiModelId' | 'uuid' | 'both';
+  model?: ModelDeployment;
+  searchedBy: 'deploymentId' | 'uuid' | 'both';
 }
 
 /**
  * Validador de modelos para certificação
+ * Schema v2: Usa ModelDeployment em vez de AIModel
  * 
  * Responsabilidades:
- * - Validar existência de modelos por apiModelId ou UUID
- * - Buscar modelos com fallback entre apiModelId e UUID
+ * - Validar existência de modelos por deploymentId ou UUID
+ * - Buscar modelos com fallback entre deploymentId e UUID
  * - Fornecer informações detalhadas sobre o resultado da busca
  */
 export class ModelValidator {
   /**
    * Valida se um modelo existe no banco de dados
-   * Tenta primeiro por apiModelId, depois por UUID como fallback
+   * Tenta primeiro por deploymentId, depois por UUID como fallback
    * 
-   * @param modelId - ID do modelo (pode ser apiModelId ou UUID)
+   * @param modelId - ID do modelo (pode ser deploymentId ou UUID)
    * @returns Resultado da validação com informações do modelo se encontrado
    */
   async validateModelExists(modelId: string): Promise<ModelValidationResult> {
@@ -37,32 +39,32 @@ export class ModelValidator {
       modelIdType: typeof modelId
     });
 
-    // Primeiro, tentar buscar por apiModelId (ex: "amazon.nova-lite-v1:0")
-    const modelByApiId = await this.validateModelByApiId(modelId);
+    // Primeiro, tentar buscar por deploymentId (ex: "anthropic.claude-3-5-sonnet-20241022-v2:0")
+    const modelByDeploymentId = await this.validateModelByDeploymentId(modelId);
     
-    if (modelByApiId) {
-      logger.debug('[ModelValidator] Modelo encontrado por apiModelId', {
+    if (modelByDeploymentId) {
+      logger.debug('[ModelValidator] Modelo encontrado por deploymentId', {
         modelId,
-        foundModelId: modelByApiId.id,
-        foundApiModelId: modelByApiId.apiModelId
+        foundModelId: modelByDeploymentId.id,
+        foundDeploymentId: modelByDeploymentId.deploymentId
       });
       
       return {
         exists: true,
-        model: modelByApiId,
-        searchedBy: 'apiModelId'
+        model: modelByDeploymentId,
+        searchedBy: 'deploymentId'
       };
     }
 
     // Fallback: tentar buscar por UUID
-    logger.debug('[ModelValidator] Não encontrado por apiModelId, tentando por UUID');
+    logger.debug('[ModelValidator] Não encontrado por deploymentId, tentando por UUID');
     const modelByUUID = await this.validateModelByUUID(modelId);
     
     if (modelByUUID) {
       logger.debug('[ModelValidator] Modelo encontrado por UUID', {
         modelId,
         foundModelId: modelByUUID.id,
-        foundApiModelId: modelByUUID.apiModelId
+        foundDeploymentId: modelByUUID.deploymentId
       });
       
       return {
@@ -75,7 +77,7 @@ export class ModelValidator {
     // Modelo não encontrado
     logger.warn('[ModelValidator] Modelo não encontrado', {
       modelId,
-      searchedBy: 'apiModelId e uuid'
+      searchedBy: 'deploymentId e uuid'
     });
     
     return {
@@ -85,22 +87,24 @@ export class ModelValidator {
   }
 
   /**
-   * Busca modelo por apiModelId (ID da AWS)
+   * Busca modelo por deploymentId (ID do provider)
+   * Schema v2: Usa deploymentId em vez de apiModelId
    * 
-   * @param apiModelId - ID do modelo na AWS (ex: "amazon.nova-lite-v1:0")
+   * @param deploymentId - ID do modelo no provider (ex: "anthropic.claude-3-5-sonnet-20241022-v2:0")
    * @returns Modelo encontrado ou null
    */
-  async validateModelByApiId(apiModelId: string): Promise<AIModel | null> {
+  async validateModelByDeploymentId(deploymentId: string): Promise<ModelDeployment | null> {
     try {
-      const model = await prisma.aIModel.findFirst({
-        where: { apiModelId }
+      const model = await prisma.modelDeployment.findFirst({
+        where: { deploymentId }
       });
       
       return model;
-    } catch (error: any) {
-      logger.error('[ModelValidator] Erro ao buscar por apiModelId', {
-        apiModelId,
-        error: error.message
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('[ModelValidator] Erro ao buscar por deploymentId', {
+        deploymentId,
+        error: errorMessage
       });
       throw error;
     }
@@ -112,7 +116,7 @@ export class ModelValidator {
    * @param uuid - UUID do modelo no banco de dados
    * @returns Modelo encontrado ou null
    */
-  async validateModelByUUID(uuid: string): Promise<AIModel | null> {
+  async validateModelByUUID(uuid: string): Promise<ModelDeployment | null> {
     try {
       // Validar formato de UUID antes de consultar
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -122,15 +126,16 @@ export class ModelValidator {
         return null;
       }
       
-      const model = await prisma.aIModel.findUnique({
+      const model = await prisma.modelDeployment.findUnique({
         where: { id: uuid }
       });
       
       return model;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('[ModelValidator] Erro ao buscar por UUID', {
         uuid,
-        error: error.message
+        error: errorMessage
       });
       throw error;
     }

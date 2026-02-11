@@ -6,7 +6,8 @@ import { AnyZodObject, ZodError, ZodEffects } from 'zod';
 import { ApiResponse } from '../utils/api-response';
 import { logger } from '../utils/logger';
 
-export const validateRequest = (schema: AnyZodObject | ZodEffects<any>) => 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const validateRequest = (schema: AnyZodObject | ZodEffects<AnyZodObject>) =>
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       // 🔍 LOG: Dados recebidos ANTES da validação
@@ -15,16 +16,24 @@ export const validateRequest = (schema: AnyZodObject | ZodEffects<any>) =>
         query: req.query,
         params: req.params,
         headers: {
-          contentType: req.headers['content-type'],
           authorization: req.headers.authorization ? 'Bearer ***' : 'none'
         }
       });
       
-      await schema.parseAsync({
+      // Parsear e transformar os dados
+      const result = await schema.parseAsync({
         body: req.body,
         query: req.query,
         params: req.params,
       });
+      
+      // Atribuir valores transformados de volta ao request
+      // Isso é necessário para que transforms do Zod (ex: string -> number) funcionem
+      if (result.body) req.body = result.body;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (result.query) req.query = result.query as Record<string, any>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (result.params) req.params = result.params as Record<string, any>;
       
       logger.info(`[validateRequest] ✅ Validação passou para ${req.method} ${req.path}`);
       return next();

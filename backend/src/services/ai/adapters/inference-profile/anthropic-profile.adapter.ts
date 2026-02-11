@@ -1,7 +1,18 @@
+// backend/src/services/ai/adapters/inference-profile/anthropic-profile.adapter.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+
 /**
  * @file anthropic-profile.adapter.ts
  * @description Adapter especializado para modelos Anthropic Claude via Inference Profile
  * @module services/ai/adapters/inference-profile
+ *
+ * REFATORADO: Clean Slate v2 - Fase 7 (Cleanup)
+ * - Removido ModelRegistry completamente
+ * - Usa adapterParamsService.getRecommendedParams() para buscar parâmetros do banco
+ * - Fallback para valores hardcoded específicos do vendor Anthropic
+ * 
+ * REFATORADO: Resolução de dependência circular
+ * - Substituído import de AdapterFactory por adapterParamsService
  */
 
 import {
@@ -12,6 +23,7 @@ import {
   AdapterChunk,
 } from '../base.adapter';
 import { InferenceType } from '../../types';
+import { adapterParamsService } from '../adapter-params.service';
 import { logger } from '../../../../utils/logger';
 
 /**
@@ -37,6 +49,11 @@ export class AnthropicProfileAdapter extends BaseModelAdapter {
   ];
 
   /**
+   * Cache de parâmetros para evitar múltiplas buscas assíncronas
+   */
+  private paramsCache: Map<string, { temperature?: number; topP?: number; maxTokens?: number }> = new Map();
+
+  /**
    * Verifica se este adapter suporta o modelo
    * 
    * @param modelId - ID do modelo a verificar
@@ -51,6 +68,51 @@ export class AnthropicProfileAdapter extends BaseModelAdapter {
     const basePattern = /^anthropic\.claude-(sonnet|opus|haiku)-4/;
     
     return profilePattern.test(modelId) || basePattern.test(modelId);
+  }
+
+  /**
+   * Busca parâmetros recomendados do banco (com cache)
+   *
+   * Prioridade:
+   * 1. Cache local
+   * 2. Banco de dados (via adapterParamsService)
+   * 3. Valores hardcoded para Anthropic Claude 4.x
+   */
+  private async getRecommendedParams(modelId: string): Promise<{ temperature?: number; topP?: number; maxTokens?: number }> {
+    // 1. Verificar cache local
+    if (this.paramsCache.has(modelId)) {
+      return this.paramsCache.get(modelId)!;
+    }
+
+    // 2. Tentar buscar do banco via adapterParamsService
+    // Nota: Para inference profile, o modelId pode ter prefixo regional
+    // Tentamos buscar com e sem o prefixo
+    const baseModelId = modelId.replace(/^(us|eu|apac)\./, '');
+    
+    try {
+      // Primeiro tenta com o modelId completo
+      let params = await adapterParamsService.getRecommendedParams(modelId, this.vendor);
+      if (params.temperature !== undefined || params.topP !== undefined || params.maxTokens !== undefined) {
+        this.paramsCache.set(modelId, params);
+        return params;
+      }
+      
+      // Se não encontrou, tenta sem o prefixo regional
+      params = await adapterParamsService.getRecommendedParams(baseModelId, this.vendor);
+      this.paramsCache.set(modelId, params);
+      return params;
+    } catch {
+      logger.debug(`[AnthropicProfileAdapter] Failed to get params from adapterParamsService for ${modelId}`);
+    }
+
+    // 3. Valores hardcoded padrão para Anthropic Claude 4.x
+    const defaultParams = {
+      temperature: 0.7,
+      topP: undefined, // Claude 4.x prefere temperature sobre topP
+      maxTokens: 4096,
+    };
+    this.paramsCache.set(modelId, defaultParams);
+    return defaultParams;
   }
 
   /**
@@ -76,10 +138,26 @@ export class AnthropicProfileAdapter extends BaseModelAdapter {
         content: m.content,
       }));
 
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams
+    // NOTA: Como formatRequest é síncrono, usamos cache ou valores padrão
+    let recommendedParams: { temperature?: number; topP?: number; maxTokens?: number } | undefined;
+    
+    if (options.modelId) {
+      // Verificar cache primeiro (síncrono)
+      if (this.paramsCache.has(options.modelId)) {
+        recommendedParams = this.paramsCache.get(options.modelId);
+      } else {
+        // Popular cache em background (não bloqueia)
+        this.getRecommendedParams(options.modelId).catch(() => {
+          // Ignorar erros - já temos fallback hardcoded
+        });
+      }
+    }
+
     // Construir body da requisição
-    const body: any = {
+    const body: Record<string, unknown> = {
       anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: options.maxTokens || 4096,
+      max_tokens: options.maxTokens ?? recommendedParams?.maxTokens ?? 4096,
       messages: conversationMessages,
     };
 
@@ -88,6 +166,10 @@ export class AnthropicProfileAdapter extends BaseModelAdapter {
       body.temperature = options.temperature;
     } else if (options.topP !== undefined) {
       body.top_p = options.topP;
+    } else if (recommendedParams?.temperature !== undefined) {
+      body.temperature = recommendedParams.temperature;
+    } else if (recommendedParams?.topP !== undefined) {
+      body.top_p = recommendedParams.topP;
     } else {
       // Valores padrão
       body.temperature = 0.7;
@@ -116,7 +198,7 @@ export class AnthropicProfileAdapter extends BaseModelAdapter {
    * @param chunk - Chunk bruto do Bedrock
    * @returns Chunk parseado no formato universal
    */
-  parseChunk(chunk: any): AdapterChunk {
+  parseChunk(chunk: Record<string, unknown>): AdapterChunk {
     // Handle null/undefined chunks
     if (!chunk) {
       return {
@@ -126,11 +208,14 @@ export class AnthropicProfileAdapter extends BaseModelAdapter {
     }
 
     // Content block delta (text streaming)
-    if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
-      return {
-        type: 'chunk',
-        content: chunk.delta.text,
-      };
+    if (chunk.type === 'content_block_delta') {
+      const delta = chunk.delta as Record<string, unknown> | undefined;
+      if (delta?.text) {
+        return {
+          type: 'chunk',
+          content: delta.text as string,
+        };
+      }
     }
 
     // Message stop (end of stream)
@@ -142,9 +227,10 @@ export class AnthropicProfileAdapter extends BaseModelAdapter {
 
     // Error handling
     if (chunk.type === 'error' || chunk.error) {
+      const error = chunk.error as Record<string, unknown> | undefined;
       return {
         type: 'error',
-        error: chunk.error?.message || chunk.message || 'Unknown error',
+        error: (error?.message as string) || (chunk.message as string) || 'Unknown error',
       };
     }
 

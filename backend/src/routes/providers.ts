@@ -15,7 +15,8 @@ const router = Router();
 
 router.get('/bedrock/models', protect, async (_req, res: Response, next: NextFunction) => {
   try {
-    const models = await prisma.aIModel.findMany({
+    // Schema v2: Usar modelDeployment com join para baseModel e provider
+    const deployments = await prisma.modelDeployment.findMany({
       where: {
         provider: {
           slug: 'bedrock',
@@ -23,15 +24,29 @@ router.get('/bedrock/models', protect, async (_req, res: Response, next: NextFun
         },
         isActive: true
       },
-      select: {
-        id: true,
-        name: true,
-        apiModelId: true,
-        costPer1kInput: true,
-        costPer1kOutput: true,
-        contextWindow: true
+      include: {
+        baseModel: {
+          select: {
+            id: true,
+            name: true,
+            capabilities: true
+          }
+        }
       },
-      orderBy: { name: 'asc' }
+      orderBy: { baseModel: { name: 'asc' } }
+    });
+
+    // Mapear para formato compatível com frontend
+    const models = deployments.map(d => {
+      const capabilities = d.baseModel.capabilities as Record<string, unknown> | null;
+      return {
+        id: d.id,
+        name: d.baseModel.name,
+        apiModelId: d.deploymentId, // deploymentId é o equivalente ao apiModelId
+        costPer1kInput: d.costPer1MInput / 1000, // Converter de 1M para 1k
+        costPer1kOutput: d.costPer1MOutput / 1000,
+        contextWindow: (capabilities?.maxContextWindow as number) || 200000
+      };
     });
 
     res.json(jsend.success({ models }));
@@ -43,13 +58,14 @@ router.get('/bedrock/models', protect, async (_req, res: Response, next: NextFun
 // Endpoint para buscar modelos disponíveis na AWS do usuário
 router.get('/bedrock/available-models', protect, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await providersController.getAvailableModels(req as any, res);
+    await providersController.getAvailableModels(req, res);
   } catch (error) {
     next(error);
   }
 });
 
 // Endpoint para listar providers configurados pelo usuário
+// Schema v2: Usa Provider + ModelDeployment (não mais AIProvider + AIModel)
 router.get('/configured', protect, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
@@ -64,53 +80,99 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
     logger.info(`📊 [Settings] awsEnabledModels:`, settings?.awsEnabledModels);
     logger.info(`📊 [Settings] awsRegion:`, settings?.awsRegion);
 
-    // Buscar validação AWS
-    const awsValidation = await prisma.providerCredentialValidation.findUnique({
-      where: { userId_provider: { userId, provider: 'bedrock' } }
-    });
+    // Schema v2: ProviderCredentialValidation foi removido
+    // Verificar credenciais AWS diretamente nas settings
+    const hasAwsCredentials = !!(settings?.awsAccessKey && settings?.awsSecretKey);
+    const hasEnabledModels = (settings?.awsEnabledModels?.length ?? 0) > 0;
 
-    logger.info(`🔐 [Validation] status:`, awsValidation?.status);
-    logger.info(`🔐 [Validation] lastValidatedAt:`, awsValidation?.lastValidatedAt);
+    logger.info(`🔐 [Validation] hasAwsCredentials:`, hasAwsCredentials);
+    logger.info(`🔐 [Validation] hasEnabledModels:`, hasEnabledModels);
 
-    // Buscar todos os providers ativos
-    const allProviders = await prisma.aIProvider.findMany({
+    // Schema v2: Buscar providers ativos com deployments
+    const allProviders = await prisma.provider.findMany({
       where: { isActive: true },
-      include: { models: { where: { isActive: true } } },
+      include: {
+        deployments: {
+          where: { isActive: true },
+          include: {
+            baseModel: {
+              select: {
+                id: true,
+                name: true,
+                capabilities: true
+              }
+            }
+          }
+        }
+      },
       orderBy: { name: 'asc' }
     });
 
     logger.info(`📦 [Providers] Total ativos: ${allProviders.length}`);
 
-    // Filtrar providers baseado em configuração
-    const configuredProviders = allProviders.filter(provider => {
-      // Providers padrão (sempre disponíveis)
-      if (['openai', 'groq', 'together'].includes(provider.slug)) {
-        logger.info(`✅ [${provider.slug}] Provider padrão incluído`);
-        return true;
-      }
+    // Transformar para formato compatível com frontend
+    const configuredProviders = allProviders
+      .filter(provider => {
+        // Providers padrão (sempre disponíveis)
+        if (['openai', 'groq', 'together'].includes(provider.slug)) {
+          logger.info(`✅ [${provider.slug}] Provider padrão incluído`);
+          return true;
+        }
 
-      // AWS Bedrock: só mostrar se validado
-      if (provider.slug === 'bedrock') {
-        logger.info(`\n🔍 [Bedrock] Verificando condições...`);
-        logger.info(`   - Validação válida: ${awsValidation?.status === 'valid'}`);
-        logger.info(`   - Modelos habilitados: ${settings?.awsEnabledModels?.length || 0}`);
-        
-        if (awsValidation?.status === 'valid' && settings?.awsEnabledModels?.length) {
-          // Criar modelos dinâmicos para IDs que não existem no banco
-          const existingModels = provider.models.filter(m =>
-            settings.awsEnabledModels.includes(m.apiModelId)
-          );
+        // AWS Bedrock: só mostrar se tem credenciais e modelos habilitados
+        if (provider.slug === 'bedrock') {
+          logger.info(`\n🔍 [Bedrock] Verificando condições...`);
+          logger.info(`   - Credenciais AWS: ${hasAwsCredentials}`);
+          logger.info(`   - Modelos habilitados: ${settings?.awsEnabledModels?.length || 0}`);
           
-          // Para modelos que não estão no banco, criar objetos dinâmicos
+          if (hasAwsCredentials && hasEnabledModels) {
+            logger.info('✅ [Bedrock] Condições atendidas');
+            return true;
+          }
+          logger.info('❌ [Bedrock] Condições não atendidas, provider excluído');
+          return false;
+        }
+
+        return true;
+      })
+      .map(provider => {
+        // Mapear deployments para formato de models (compatibilidade com frontend)
+        const models = provider.deployments
+          .filter(d => {
+            // Para Bedrock, filtrar apenas modelos habilitados pelo usuário
+            if (provider.slug === 'bedrock' && settings?.awsEnabledModels) {
+              return settings.awsEnabledModels.includes(d.deploymentId);
+            }
+            return true;
+          })
+          .map(d => {
+            const capabilities = d.baseModel.capabilities as Record<string, unknown> | null;
+            return {
+              id: d.id,
+              name: d.baseModel.name,
+              apiModelId: d.deploymentId,
+              contextWindow: (capabilities?.maxContextWindow as number) || 200000,
+              costPer1kInput: d.costPer1MInput / 1000,
+              costPer1kOutput: d.costPer1MOutput / 1000,
+              isActive: d.isActive,
+              providerId: d.providerId,
+              createdAt: d.createdAt,
+              updatedAt: d.updatedAt
+            };
+          });
+
+        // Para Bedrock, adicionar modelos dinâmicos que não estão no banco
+        if (provider.slug === 'bedrock' && settings?.awsEnabledModels) {
+          const existingModelIds = models.map(m => m.apiModelId);
           const missingModelIds = settings.awsEnabledModels.filter(
-            (modelId: string) => !provider.models.some(m => m.apiModelId === modelId)
+            (modelId: string) => !existingModelIds.includes(modelId)
           );
           
           const dynamicModels = missingModelIds.map((apiModelId: string) => ({
             id: `dynamic-${apiModelId}`,
             name: apiModelId.split('.').pop()?.replace(/-/g, ' ').toUpperCase() || apiModelId,
             apiModelId,
-            contextWindow: 200000, // Default para modelos novos
+            contextWindow: 200000,
             costPer1kInput: 0,
             costPer1kOutput: 0,
             isActive: true,
@@ -119,21 +181,22 @@ router.get('/configured', protect, async (req: Request, res: Response, next: Nex
             updatedAt: new Date()
           }));
           
-          provider.models = [...existingModels, ...dynamicModels];
+          models.push(...dynamicModels);
           
-          logger.info('✅ [Bedrock] Modelos configurados:', provider.models.length);
-          logger.info('  - Do banco:', existingModels.length);
+          logger.info('✅ [Bedrock] Modelos configurados:', models.length);
+          logger.info('  - Do banco:', models.length - dynamicModels.length);
           logger.info('  - Dinâmicos:', dynamicModels.length);
-          logger.info('  - IDs:', provider.models.map(m => m.apiModelId));
-          
-          return provider.models.length > 0;
         }
-        logger.info('❌ [Bedrock] Condições não atendidas, provider excluído');
-        return false;
-      }
 
-      return true;
-    });
+        return {
+          id: provider.id,
+          name: provider.name,
+          slug: provider.slug,
+          type: provider.type,
+          isActive: provider.isActive,
+          models
+        };
+      });
 
     logger.info(`\n✅ [Final] Providers configurados: ${configuredProviders.length}`);
     logger.info(`   Slugs: ${configuredProviders.map(p => p.slug).join(', ')}\n`);
@@ -151,7 +214,7 @@ router.get(
   apiLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await providersController.getModelsWithRating(req as any, res);
+      await providersController.getModelsWithRating(req, res);
     } catch (error) {
       next(error);
     }
@@ -165,7 +228,7 @@ router.get(
   apiLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await providersController.getByVendor(req as any, res);
+      await providersController.getByVendor(req, res);
     } catch (error) {
       next(error);
     }

@@ -29,6 +29,7 @@ class AuditController {
 
     try {
       // Construir filtros
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const where: any = {
         chat: { userId },
         role: 'assistant', // Somente respostas da IA têm métricas
@@ -46,6 +47,7 @@ class AuditController {
       }
 
       // Construir ordenação
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const orderByClause: any = {};
       if (orderBy === 'cost') orderByClause.costInUSD = order;
       else if (orderBy === 'tokens') orderByClause.tokensOut = order;
@@ -62,7 +64,8 @@ class AuditController {
       });
 
       // Construir AuditRecords
-      const auditRecords = messages.map(message =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const auditRecords = messages.map((message: any) =>
         AuditRecordBuilder.build({ message, userId: userId! })
       );
 
@@ -109,7 +112,7 @@ class AuditController {
       // 3️⃣ Construir AuditRecord
       const auditRecord = AuditRecordBuilder.build({
         message,
-        userId,
+        userId: userId!,
       });
 
       // 4️⃣ Retornar auditoria

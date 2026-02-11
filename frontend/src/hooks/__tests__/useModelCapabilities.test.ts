@@ -87,16 +87,25 @@ describe('useModelCapabilities', () => {
     vi.clearAllMocks();
   });
 
-  it('deve retornar null quando provider é null', () => {
+  it('deve fazer fetch mesmo quando provider é null (usa apenas modelId)', async () => {
+    // O hook agora ignora o provider e usa apenas o modelId
+    vi.mocked(modelsApi.fetchModelCapabilities).mockResolvedValue(mockCapabilities);
+    
     const { result } = renderHook(
       () => useModelCapabilities(null, 'claude-3-5-sonnet-20241022'),
       { wrapper: createWrapper() }
     );
 
-    expect(result.current.capabilities).toBeNull();
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.error).toBeNull();
-    expect(result.current.isEnabled).toBe(false);
+    // Como modelId está presente, a query é habilitada
+    expect(result.current.isEnabled).toBe(true);
+    expect(result.current.isLoading).toBe(true);
+
+    // Aguardar fetch completar
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.capabilities).toEqual(mockCapabilities);
   });
 
   it('deve retornar null quando modelId é null', () => {
@@ -144,7 +153,8 @@ describe('useModelCapabilities', () => {
     // Verificar que capabilities foram carregadas
     expect(result.current.capabilities).toEqual(mockCapabilities);
     expect(result.current.error).toBeNull();
-    expect(modelsApi.fetchModelCapabilities).toHaveBeenCalledWith('anthropic:claude-3-5-sonnet-20241022');
+    // O hook agora usa modelId diretamente, sem prefixo provider:
+    expect(modelsApi.fetchModelCapabilities).toHaveBeenCalledWith('claude-3-5-sonnet-20241022');
   });
 
   it('deve retornar capabilities do cache em chamadas subsequentes', async () => {
@@ -322,8 +332,9 @@ describe('useModelCapabilities', () => {
       { wrapper: createWrapper() }
     );
 
+    // O hook agora usa modelId diretamente, sem prefixo provider:
     await waitFor(() => {
-      expect(modelsApi.fetchModelCapabilities).toHaveBeenCalledWith('amazon:nova-pro-v1:0');
+      expect(modelsApi.fetchModelCapabilities).toHaveBeenCalledWith('nova-pro-v1:0');
     });
   });
 });

@@ -1,5 +1,7 @@
 // backend/src/workers/certificationWorker.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Nota: Este arquivo usa 'any' para tipos dinâmicos do Bull queue
 
 import dotenv from 'dotenv';
 // 🔍 DEBUG: Carregar .env ANTES de qualquer import
@@ -87,11 +89,20 @@ class CertificationWorker {
       
       // 🔍 LOG: Verificar se banco foi atualizado com sucesso
       try {
+        // CORREÇÃO Schema v2: job.data.deploymentId é o UUID do ModelDeployment
+        // A tabela ModelCertification usa deploymentId como FK
+        const deploymentId = job.data.deploymentId;
+        
+        if (!deploymentId) {
+          logger.warn(`Job ${job.id} sem deploymentId no data, pulando verificação de sincronia`, { job: job.data });
+          return;
+        }
+        
         const certInDb = await prisma.modelCertification.findUnique({
           where: {
-            modelId_region: { 
-              modelId: job.data.modelId, 
-              region: job.data.region 
+            deploymentId_region: {
+              deploymentId: deploymentId,
+              region: job.data.region
             }
           },
           select: {
@@ -104,22 +115,22 @@ class CertificationWorker {
         
         logger.info(`🔍 [SYNC-CHECK] Job completed - DEPOIS de atualizar banco`, {
           bullJobId: job.id,
-          modelId: job.data.modelId,
+          deploymentId: deploymentId,
           region: job.data.region,
           redisState: 'completed',
           dbState: certInDb?.status || 'NOT_FOUND',
           dbPassed: certInDb?.passed,
           dbScore: certInDb?.score,
           dbCompletedAt: certInDb?.completedAt,
-          syncOk: certInDb?.status === 'CERTIFIED' || certInDb?.status === 'FAILED',
+          syncOk: certInDb?.status === 'PASSED' || certInDb?.status === 'FAILED',
           timestamp: new Date().toISOString()
         });
         
         // ⚠️ ALERTA: Detectar dessincronia
-        if (!certInDb || (certInDb.status !== 'CERTIFIED' && certInDb.status !== 'FAILED')) {
+        if (!certInDb || (certInDb.status !== 'PASSED' && certInDb.status !== 'FAILED')) {
           logger.error(`🚨 [SYNC-ERROR] Dessincronia detectada! Job completed no Redis mas banco não atualizado`, {
             bullJobId: job.id,
-            modelId: job.data.modelId,
+            deploymentId: deploymentId,
             region: job.data.region,
             redisResult: result,
             dbState: certInDb,
@@ -252,155 +263,184 @@ class CertificationWorker {
   }
 
   /**
-   * Atualiza CertificationJob quando job inicia (hook: active)
+   * Atualiza ModelCertification quando job inicia (hook: active)
+   * Schema v2: CertificationJob foi removido, usar ModelCertification diretamente
    */
   private async updateJobOnActive(job: Job): Promise<void> {
     try {
-      const { jobId } = job.data;
+      const { deploymentId, region } = job.data;
       
-      if (!jobId) {
-        logger.warn(`Job ${job.id} sem jobId no data, pulando atualização`, { job: job.data });
+      if (!deploymentId || !region) {
+        logger.warn(`Job ${job.id} sem deploymentId/region no data, pulando atualização`, { job: job.data });
         return;
       }
 
-      await prisma.certificationJob.update({
-        where: { id: jobId },
-        data: {
-          status: 'PROCESSING',
-          startedAt: new Date()
+      // Schema v2: Atualizar ModelCertification diretamente
+      await prisma.modelCertification.upsert({
+        where: {
+          deploymentId_region: { deploymentId, region }
+        },
+        update: {
+          status: 'RUNNING',
+          startedAt: new Date(),
+          jobId: String(job.id)
+        },
+        create: {
+          deploymentId,
+          region,
+          status: 'RUNNING',
+          startedAt: new Date(),
+          jobId: String(job.id)
         }
       });
 
-      logger.debug(`📊 CertificationJob ${jobId} atualizado para PROCESSING`, {
+      logger.debug(`📊 ModelCertification ${deploymentId}/${region} atualizado para RUNNING`, {
         bullJobId: job.id,
-        jobId
+        deploymentId,
+        region
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Não deve quebrar o worker se falhar atualização
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`❌ Erro ao atualizar job no hook active`, {
         bullJobId: job.id,
-        jobId: job.data.jobId,
-        error: error.message
+        deploymentId: job.data.deploymentId,
+        region: job.data.region,
+        error: errorMessage
       });
     }
   }
 
   /**
-   * Atualiza CertificationJob quando job completa (hook: completed)
+   * Atualiza ModelCertification quando job completa (hook: completed)
+   * Schema v2: CertificationJob foi removido, usar ModelCertification diretamente
    */
-  private async updateJobOnCompleted(job: Job, _result: any): Promise<void> {
+  private async updateJobOnCompleted(job: Job, result: unknown): Promise<void> {
     try {
-      const { jobId } = job.data;
+      const { deploymentId, region } = job.data;
       
-      if (!jobId) {
-        logger.warn(`Job ${job.id} sem jobId no data, pulando atualização`, { job: job.data });
+      if (!deploymentId || !region) {
+        logger.warn(`Job ${job.id} sem deploymentId/region no data, pulando atualização`, { job: job.data });
         return;
       }
 
-      // Buscar job atual para calcular se está completo
-      const certJob = await prisma.certificationJob.findUnique({
-        where: { id: jobId }
+      const now = new Date();
+      const certResult = result as { passed?: boolean; score?: number } | null;
+      const passed = certResult?.passed ?? false;
+      const score = certResult?.score ?? 0;
+      const status = passed ? 'PASSED' : 'FAILED';
+
+      // Buscar certificação para calcular duração
+      const existingCert = await prisma.modelCertification.findUnique({
+        where: {
+          deploymentId_region: { deploymentId, region }
+        },
+        select: { startedAt: true }
       });
 
-      if (!certJob) {
-        logger.warn(`CertificationJob ${jobId} não encontrado`, { bullJobId: job.id });
-        return;
-      }
-
-      // Verificar se todos os modelos foram processados
-      const isComplete = certJob.processedModels >= certJob.totalModels;
-      const completedAt = isComplete ? new Date() : null;
-      const duration = isComplete && certJob.startedAt 
-        ? Date.now() - certJob.startedAt.getTime() 
+      const duration = existingCert?.startedAt
+        ? now.getTime() - existingCert.startedAt.getTime()
         : null;
 
-      // 🔍 LOG: Antes de atualizar CertificationJob
-      logger.debug(`🔍 [DB-UPDATE] Atualizando CertificationJob`, {
+      // 🔍 LOG: Antes de atualizar ModelCertification
+      logger.debug(`🔍 [DB-UPDATE] Atualizando ModelCertification`, {
         bullJobId: job.id,
-        jobId,
-        isComplete,
-        newStatus: isComplete ? 'COMPLETED' : 'PROCESSING',
-        processedModels: certJob.processedModels,
-        totalModels: certJob.totalModels
+        deploymentId,
+        region,
+        newStatus: status,
+        passed,
+        score
       });
       
-      await prisma.certificationJob.update({
-        where: { id: jobId },
+      await prisma.modelCertification.update({
+        where: {
+          deploymentId_region: { deploymentId, region }
+        },
         data: {
-          status: isComplete ? 'COMPLETED' : 'PROCESSING',
-          completedAt,
-          duration
+          status,
+          passed,
+          score,
+          completedAt: now,
+          duration,
+          certifiedAt: passed ? now : null
         }
       });
 
-      logger.info(`✅ [DB-UPDATE] CertificationJob atualizado com sucesso`, {
+      logger.info(`✅ [DB-UPDATE] ModelCertification atualizado com sucesso`, {
         bullJobId: job.id,
-        jobId,
-        isComplete,
-        status: isComplete ? 'COMPLETED' : 'PROCESSING',
-        processedModels: certJob.processedModels,
-        totalModels: certJob.totalModels
+        deploymentId,
+        region,
+        status,
+        passed,
+        score
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Não deve quebrar o worker se falhar atualização
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`❌ Erro ao atualizar job no hook completed`, {
         bullJobId: job.id,
-        jobId: job.data.jobId,
-        error: error.message
+        deploymentId: job.data.deploymentId,
+        region: job.data.region,
+        error: errorMessage
       });
     }
   }
 
   /**
-   * Atualiza CertificationJob quando job falha (hook: failed)
+   * Atualiza ModelCertification quando job falha (hook: failed)
+   * Schema v2: CertificationJob foi removido, usar ModelCertification diretamente
    */
   private async updateJobOnFailed(job: Job, err: Error): Promise<void> {
     try {
-      const { jobId } = job.data;
+      const { deploymentId, region } = job.data;
       
-      if (!jobId) {
-        logger.warn(`Job ${job.id} sem jobId no data, pulando atualização`, { job: job.data });
+      if (!deploymentId || !region) {
+        logger.warn(`Job ${job.id} sem deploymentId/region no data, pulando atualização`, { job: job.data });
         return;
       }
 
-      // Buscar job atual
-      const certJob = await prisma.certificationJob.findUnique({
-        where: { id: jobId }
+      const now = new Date();
+
+      // Buscar certificação para calcular duração
+      const existingCert = await prisma.modelCertification.findUnique({
+        where: {
+          deploymentId_region: { deploymentId, region }
+        },
+        select: { startedAt: true }
       });
 
-      if (!certJob) {
-        logger.warn(`CertificationJob ${jobId} não encontrado`, { bullJobId: job.id });
-        return;
-      }
-
-      // Verificar se todos os modelos foram processados (mesmo com falha)
-      const isComplete = certJob.processedModels >= certJob.totalModels;
-      const completedAt = isComplete ? new Date() : null;
-      const duration = isComplete && certJob.startedAt 
-        ? Date.now() - certJob.startedAt.getTime() 
+      const duration = existingCert?.startedAt
+        ? now.getTime() - existingCert.startedAt.getTime()
         : null;
 
-      await prisma.certificationJob.update({
-        where: { id: jobId },
+      await prisma.modelCertification.update({
+        where: {
+          deploymentId_region: { deploymentId, region }
+        },
         data: {
-          status: isComplete ? 'FAILED' : 'PROCESSING',
-          completedAt,
-          duration
+          status: 'ERROR',
+          passed: false,
+          completedAt: now,
+          duration,
+          lastError: err.message,
+          errorMessage: err.message
         }
       });
 
-      logger.debug(`📊 CertificationJob ${jobId} atualizado após falha`, {
+      logger.debug(`📊 ModelCertification ${deploymentId}/${region} atualizado após falha`, {
         bullJobId: job.id,
-        jobId,
-        isComplete,
+        deploymentId,
+        region,
         error: err.message
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Não deve quebrar o worker se falhar atualização
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`❌ Erro ao atualizar job no hook failed`, {
         bullJobId: job.id,
-        jobId: job.data.jobId,
-        error: error.message
+        deploymentId: job.data.deploymentId,
+        region: job.data.region,
+        error: errorMessage
       });
     }
   }

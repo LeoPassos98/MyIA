@@ -3,11 +3,16 @@
 
 import { ModelCertificationService } from '../certification.service';
 import { prisma } from '../../../../lib/prisma';
-import { ModelRegistry } from '../../registry';
 
 // Mock do Prisma
 jest.mock('../../../../lib/prisma', () => ({
   prisma: {
+    provider: {
+      findUnique: jest.fn()
+    },
+    modelDeployment: {
+      findFirst: jest.fn()
+    },
     modelCertification: {
       findUnique: jest.fn(),
       upsert: jest.fn()
@@ -15,11 +20,17 @@ jest.mock('../../../../lib/prisma', () => ({
   }
 }));
 
-// Mock do ModelRegistry
-jest.mock('../../registry', () => ({
-  ModelRegistry: {
-    getModel: jest.fn()
-  }
+// Mock dos services
+const mockDeploymentService = {
+  findByDeploymentId: jest.fn()
+};
+const mockBaseModelService = {
+  findByVendor: jest.fn(),
+  findActive: jest.fn()
+};
+jest.mock('../../../models', () => ({
+  deploymentService: mockDeploymentService,
+  baseModelService: mockBaseModelService
 }));
 
 // Mock do BedrockProvider
@@ -35,16 +46,29 @@ describe('CertificationService - Rating Integration', () => {
   
   describe('Rating Calculation', () => {
     it('deve calcular e salvar rating após certificação bem-sucedida', async () => {
-      // Mock do modelo no registry
-      (ModelRegistry.getModel as jest.Mock).mockReturnValue({
-        modelId: 'anthropic.claude-sonnet-4',
-        vendor: 'anthropic',
-        displayName: 'Claude Sonnet 4',
-        capabilities: {
-          maxContextWindow: 200000,
-          maxOutputTokens: 8192,
-          vision: false,
-          functionCalling: true
+      // Mock do provider
+      (prisma.provider.findUnique as jest.Mock).mockResolvedValue({
+        id: 'provider-uuid',
+        slug: 'bedrock',
+        name: 'AWS Bedrock'
+      });
+      
+      // Mock do deployment via deploymentService
+      mockDeploymentService.findByDeploymentId.mockResolvedValue({
+        id: 'deployment-uuid',
+        deploymentId: 'anthropic.claude-sonnet-4',
+        baseModelId: 'base-model-uuid',
+        providerId: 'provider-uuid',
+        baseModel: {
+          id: 'base-model-uuid',
+          vendor: 'Anthropic',
+          name: 'Claude Sonnet 4',
+          capabilities: {
+            maxContextWindow: 200000,
+            maxOutputTokens: 8192,
+            vision: false,
+            functionCalling: true
+          }
         }
       });
       
@@ -52,12 +76,12 @@ describe('CertificationService - Rating Integration', () => {
       (prisma.modelCertification.findUnique as jest.Mock).mockResolvedValue(null);
       
       // Mock do upsert para capturar dados salvos
-      let savedData: any;
+      let savedData: Record<string, unknown> | undefined;
       (prisma.modelCertification.upsert as jest.Mock).mockImplementation(async (data) => {
-        savedData = data.update;
+        savedData = data.update as Record<string, unknown>;
         return {
           id: 'test-id',
-          modelId: 'bedrock:anthropic.claude-sonnet-4',
+          deploymentId: 'deployment-uuid',
           ...data.update
         };
       });
@@ -73,7 +97,7 @@ describe('CertificationService - Rating Integration', () => {
           },
           false
         );
-      } catch (error) {
+      } catch {
         // Esperado falhar sem provider real
       }
       

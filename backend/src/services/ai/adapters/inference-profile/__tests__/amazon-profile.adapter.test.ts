@@ -310,7 +310,7 @@ describe('AmazonProfileAdapter', () => {
     });
 
     it('deve retornar chunk vazio para chunk null', () => {
-      const result = adapter.parseChunk(null);
+      const result = adapter.parseChunk(null as unknown as Record<string, unknown>);
 
       expect(result).toEqual({
         type: 'chunk',

@@ -1,0 +1,350 @@
+// backend/prisma/schema-v2.prisma
+// Standards: docs/STANDARDS.md
+// 
+// Schema v2 - Clean Slate do Sistema de Modelos
+// Conforme: docs/CLEAN-SLATE-IMPLEMENTATION-PLAN.md
+// 
+// Objetivo: Banco de dados como Single Source of Truth para modelos AI
+// - Suporte a múltiplos providers por modelo
+// - Tipos de inferência (ON_DEMAND, INFERENCE_PROFILE, PROVISIONED)
+// - Certificação por deployment (não por modelo)
+// - Custos em 1M tokens (padrão da indústria)
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+/// Tipo de provider de AI
+/// Nota: Pode ser expandido futuramente para incluir novos providers
+enum ProviderType {
+  AWS_BEDROCK    // Amazon Bedrock
+  AZURE_OPENAI   // Azure OpenAI Service
+  OPENAI_DIRECT  // OpenAI API direta
+  GOOGLE_VERTEX  // Google Vertex AI
+}
+
+/// Tipo de inferência para deployments
+/// Nota: Enum pode ser expandido futuramente para novos tipos de inferência
+/// (ex: BATCH, FINE_TUNED, CUSTOM_ENDPOINT)
+enum InferenceType {
+  ON_DEMAND          // Modelo direto, sem prefixo regional
+  INFERENCE_PROFILE  // Requer prefixo regional (us., eu., apac.)
+  PROVISIONED        // ARN dedicado com throughput reservado
+}
+
+/// Status de certificação de deployment
+enum CertificationStatus {
+  PENDING   // Aguardando processamento
+  RUNNING   // Em execução
+  PASSED    // Todos os testes passaram
+  FAILED    // Falhou em testes críticos
+  ERROR     // Erro durante execução (não relacionado ao modelo)
+  SKIPPED   // Pulado (ex: modelo deprecated)
+}
+
+// ============================================================================
+// MODELOS PRINCIPAIS
+// ============================================================================
+
+/// Provider de AI (AWS Bedrock, Azure OpenAI, etc.)
+/// Representa onde os modelos são hospedados/executados
+model Provider {
+  id        String       @id @default(uuid())
+  
+  // Identificação
+  name      String       // "AWS Bedrock", "Azure OpenAI", "OpenAI"
+  slug      String       @unique // "bedrock", "azure", "openai"
+  type      ProviderType // Tipo do provider
+  
+  // Configuração
+  baseUrl   String?      // URL base da API (se aplicável)
+  authType  String?      // "aws_credentials", "api_key", "oauth"
+  
+  // Status
+  isActive  Boolean      @default(true)
+  
+  // Relacionamentos
+  deployments ModelDeployment[]
+  
+  // Timestamps
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  
+  @@index([type])
+  @@index([isActive])
+  @@map("providers")
+}
+
+/// Modelo base de AI (Claude, GPT, Llama, etc.)
+/// Definição do modelo, independente de provider
+model BaseModel {
+  id            String   @id @default(uuid())
+  
+  // Identificação
+  name          String   @unique // "Claude 3.5 Sonnet", "GPT-4", "Llama 3.1 70B"
+  vendor        String   // "Anthropic", "OpenAI", "Meta"
+  family        String?  // "Claude", "GPT", "Llama"
+  version       String?  // "3.5", "4", "3.1"
+  
+  // Capabilities (inerentes ao modelo)
+  // Estrutura esperada: { streaming: boolean, vision: boolean, functionCalling: boolean, 
+  //                       maxContextWindow: number, maxOutputTokens: number }
+  capabilities  Json
+  
+  // Parâmetros recomendados (padrão do modelo)
+  // Estrutura esperada: { temperature: number, topP: number, maxTokens: number }
+  defaultParams Json?
+  
+  // Metadados
+  description   String?
+  releaseDate   DateTime?
+  deprecated    Boolean  @default(false)
+  replacedBy    String?  // Nome do modelo substituto (se deprecated)
+  
+  // Relacionamentos
+  deployments   ModelDeployment[]
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([vendor])
+  @@index([family])
+  @@index([deprecated])
+  @@map("base_models")
+}
+
+/// Deployment de modelo em um provider específico
+/// Representa a instância de um modelo em um provider (com custos específicos)
+model ModelDeployment {
+  id              String        @id @default(uuid())
+  
+  // Relacionamentos
+  baseModelId     String
+  baseModel       BaseModel     @relation(fields: [baseModelId], references: [id])
+  providerId      String
+  provider        Provider      @relation(fields: [providerId], references: [id])
+  
+  // ID específico do provider
+  // Exemplos:
+  // - Bedrock: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  // - OpenAI: "gpt-4-turbo-2024-04-09"
+  // - Azure: "gpt-4-deployment-name"
+  deploymentId    String
+  
+  // Tipo de inferência
+  inferenceType   InferenceType @default(ON_DEMAND)
+  
+  // Configuração específica do provider
+  // Estrutura esperada: { arn?: string, profileFormat?: string, region?: string, ... }
+  providerConfig  Json?
+  
+  // Custos em USD por 1 MILHÃO de tokens (padrão da indústria)
+  // IMPORTANTE: Não usar costPer1k - sempre 1M tokens
+  costPer1MInput  Float         // Custo por 1M tokens de entrada
+  costPer1MOutput Float         // Custo por 1M tokens de saída
+  costPerHour     Float?        // Para provisioned throughput (opcional)
+  
+  // Parâmetros específicos (override do modelo base)
+  customParams    Json?
+  
+  // Validação de capabilities
+  capabilitiesVerifiedAt DateTime?
+  capabilitiesSource     String?  // "manual", "auto_test"
+  
+  // Status
+  isActive        Boolean       @default(true)
+  
+  // Relacionamentos
+  certifications  ModelCertification[]
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Constraints
+  @@unique([providerId, deploymentId])
+  
+  // Índices para queries comuns
+  @@index([baseModelId])
+  @@index([providerId])
+  @@index([inferenceType])
+  @@index([isActive])
+  @@map("model_deployments")
+}
+
+/// Certificação de deployment por região
+/// IMPORTANTE: Certificação é por deployment (FK), não por modelId string
+model ModelCertification {
+  id              String              @id @default(uuid())
+  
+  // FK para deployment (não string modelId!)
+  deploymentId    String
+  deployment      ModelDeployment     @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  
+  // Região AWS/Azure/etc
+  region          String              // "us-east-1", "us-west-2", "eastus", etc.
+  
+  // Status
+  status          CertificationStatus @default(PENDING)
+  
+  // Certificação
+  certifiedAt     DateTime?
+  expiresAt       DateTime?
+  certifiedBy     String?             // 'system' ou userId
+  
+  // Testes
+  lastTestedAt    DateTime?
+  testsPassed     Int                 @default(0)
+  testsFailed     Int                 @default(0)
+  successRate     Float               @default(0)
+  
+  // Performance
+  avgLatencyMs    Int?
+  lastError       String?
+  failureReasons  Json?               // Array de erros detalhados
+  
+  // Resultados detalhados
+  passed          Boolean?
+  score           Float?              // 0-100
+  testResults     Json?               // Resultados detalhados dos testes
+  errorMessage    String?
+  errorCategory   String?             // UNAVAILABLE, PERMISSION_ERROR, etc.
+  errorSeverity   String?             // CRITICAL, HIGH, MEDIUM, LOW
+  
+  // Sistema de Rating
+  rating          Float?              // 0-5.0
+  badge           String?             // PREMIUM, RECOMENDADO, FUNCIONAL, etc.
+  metrics         Json?               // ModelMetrics (successRate, averageRetries, etc.)
+  scores          Json?               // ModelScores (success, resilience, performance, stability)
+  ratingUpdatedAt DateTime?
+  
+  // Metadados de execução
+  jobId           String?             // Bull Queue job ID
+  startedAt       DateTime?
+  completedAt     DateTime?
+  duration        Int?                // Duração em ms
+  
+  // Timestamps
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdBy       String?             // User ID que iniciou
+  
+  // Constraints
+  @@unique([deploymentId, region])
+  
+  // Índices para queries comuns
+  @@index([status])
+  @@index([region])
+  @@index([jobId])
+  @@index([rating])
+  @@index([badge])
+  @@index([errorCategory])
+  @@index([createdAt])
+  @@map("model_certifications")
+}
+
+/// Métricas do sistema
+/// Para observabilidade e monitoramento
+model SystemMetric {
+  id            String    @id @default(uuid())
+  
+  // Referência opcional ao deployment
+  // Nota: Pode ser null para métricas globais do sistema
+  // Consideração do Architect: FK opcional para deploymentId
+  deploymentId  String?
+  
+  // Tipo de métrica
+  metricType    String    // "latency", "error_rate", "usage", "certification", "cost"
+  
+  // Valor
+  value         Float
+  
+  // Timestamp
+  timestamp     DateTime  @default(now())
+  
+  // Metadados adicionais
+  // Estrutura esperada: { region?: string, provider?: string, ... }
+  metadata      Json?
+  
+  // Índices para queries de séries temporais
+  @@index([deploymentId, metricType, timestamp])
+  @@index([metricType, timestamp])
+  @@index([timestamp])
+  @@map("system_metrics")
+}
+
+// ============================================================================
+// MODELOS DE USUÁRIO (mantidos do schema original)
+// ============================================================================
+
+/// Usuário do sistema
+model User {
+  id        String        @id @default(uuid())
+  email     String        @unique
+  password  String
+  name      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  
+  // Relacionamentos
+  settings  UserSettings?
+  
+  @@map("users")
+}
+
+/// Configurações do usuário
+model UserSettings {
+  id               String   @id @default(uuid())
+  
+  // Preferências
+  theme            String   @default("light") // "light" ou "dark"
+  
+  // AWS Bedrock Configuration
+  // IMPORTANTE: Criptografar antes de salvar!
+  awsAccessKey     String?
+  awsSecretKey     String?
+  awsRegion        String?  @default("us-east-1")
+  awsEnabledModels String[] @default([]) // Array de deploymentIds habilitados
+  
+  // Relacionamento
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  
+  @@map("user_settings")
+}
+
+// ============================================================================
+// MODELO DE LOGS (mantido do schema original)
+// ============================================================================
+
+/// Sistema de Logging Estruturado
+model Log {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  level       String   // 'info' | 'warn' | 'error' | 'debug'
+  message     String
+  requestId   String?
+  userId      String?
+  inferenceId String?
+  metadata    Json?    // JSONB para contexto adicional
+  error       Json?    // JSONB para stack traces e detalhes de erro
+  
+  // Índices de performance para queries comuns
+  @@index([timestamp(sort: Desc)])
+  @@index([level])
+  @@index([userId])
+  @@index([requestId])
+  @@map("logs")
+}

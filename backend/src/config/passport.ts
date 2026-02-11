@@ -1,8 +1,12 @@
 // src/config/passport.ts
 import passport from 'passport';
-import { Strategy as GitHubStrategy } from 'passport-github2';
+import { Strategy as GitHubStrategy, Profile } from 'passport-github2';
+import { User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import logger from '../utils/logger';
+
+// Tipo para callback do passport
+type DoneCallback = (error: Error | null, user?: User | false) => void;
 
 passport.use(
   new GitHubStrategy(
@@ -12,7 +16,7 @@ passport.use(
       callbackURL: process.env.GITHUB_OAUTH_CALLBACK_URL || 'http://localhost:3001/api/auth/github/callback',
       scope: ['user:email'],
     },
-    async (accessToken: string, _refreshToken: string, profile: any, done: any) => {
+    async (accessToken: string, _refreshToken: string, profile: Profile, done: DoneCallback) => {
       try {
         logger.info('[GitHub OAuth] Callback recebido');
         logger.info('[GitHub OAuth] Profile:', JSON.stringify(profile, null, 2));
@@ -34,6 +38,7 @@ passport.use(
         logger.info('[GitHub OAuth] Buscando/criando usuário...');
         
         // 3. Busca ou cria o usuário (Upsert)
+        // Schema v2: providerCredentials foi removido do User
         const user = await prisma.user.upsert({
           where: { email },
           update: {
@@ -47,39 +52,37 @@ passport.use(
               create: { theme: 'dark' }
             }
           },
-          include: { providerCredentials: true }
+          include: { settings: true }
         });
 
         logger.info('[GitHub OAuth] Usuário criado/atualizado', { userId: user.id, email: user.email });
 
-        // 4. Linka a credencial do GitHub se necessário
-        const githubProvider = await prisma.aIProvider.findUnique({ where: { slug: 'github' } });
+        // Schema v2: AIProvider → Provider
+        // Schema v2: UserProviderCredential foi removido
+        // GitHub OAuth não precisa mais salvar credencial em tabela separada
+        // O accessToken do GitHub é usado apenas para autenticação, não para API calls
+        const githubProvider = await prisma.provider.findUnique({ where: { slug: 'github' } });
         if (githubProvider) {
-          logger.info('[GitHub OAuth] Salvando credencial do provider GitHub');
-          await prisma.userProviderCredential.upsert({
-            where: {
-              userId_providerId: { userId: user.id, providerId: githubProvider.id }
-            },
-            update: { apiKey: accessToken },
-            create: {
-              userId: user.id,
-              providerId: githubProvider.id,
-              apiKey: accessToken,
-            }
-          });
+          logger.info('[GitHub OAuth] Provider GitHub encontrado, mas credenciais não são mais salvas em tabela separada (schema v2)');
+          // NOTA: Se precisar armazenar o token do GitHub para uso futuro,
+          // considere adicionar um campo em UserSettings ou criar uma nova tabela
         }
 
         logger.info('[GitHub OAuth] Autenticação bem-sucedida!');
         return done(null, user);
       } catch (error) {
         logger.error('[GitHub OAuth] Erro na estratégia:', error);
-        return done(error);
+        const err = error instanceof Error ? error : new Error(String(error));
+        return done(err);
       }
     }
   )
 );
 
-passport.serializeUser((user: any, done) => done(null, user.id));
-passport.deserializeUser((id: string, done) => done(null, { id }));
+passport.serializeUser((user: Express.User, done) => {
+  const typedUser = user as User;
+  done(null, typedUser.id);
+});
+passport.deserializeUser((id: string, done) => done(null, { id } as Express.User));
 
 export default passport;

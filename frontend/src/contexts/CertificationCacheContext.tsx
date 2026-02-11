@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useCallback, ReactNode, useEffect,
 import { certificationService } from '../services/certificationService';
 import { api } from '../services/api';
 import { ModelBadge } from '../types/model-rating';
+import { useAuth } from './AuthContext';
 
 /**
  * Dados de rating/badge de um modelo certificado
@@ -56,7 +57,10 @@ export function CertificationCacheProvider({ children }: { children: ReactNode }
   const [ratingDataMap, setRatingDataMap] = useState<Record<string, CertificationRatingData>>({});
   const [loading, setLoading] = useState(true);
   
-  // 🔒 Flag para prevenir múltiplas execuções simultâneas
+  // 🔐 Verificar autenticação antes de carregar certificações
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  
+  // � Flag para prevenir múltiplas execuções simultâneas
   const isLoadingRef = useRef(false);
   
   /**
@@ -167,10 +171,24 @@ export function CertificationCacheProvider({ children }: { children: ReactNode }
     return ratingDataMap[modelId];
   }, [ratingDataMap]);
   
-  // Carregar dados na montagem
+  // 🔐 Carregar dados apenas quando autenticado
+  // Evita erros 401 antes do login
   useEffect(() => {
-    loadCertifications();
-  }, [loadCertifications]);
+    // Aguarda autenticação terminar de carregar
+    if (authLoading) {
+      console.log('[CertificationCacheContext] ⏳ Aguardando autenticação...');
+      return;
+    }
+    
+    // Só carrega se estiver autenticado
+    if (isAuthenticated) {
+      console.log('[CertificationCacheContext] 🔓 Usuário autenticado, carregando certificações...');
+      loadCertifications();
+    } else {
+      console.log('[CertificationCacheContext] 🔒 Usuário não autenticado, pulando carregamento...');
+      setLoading(false);
+    }
+  }, [loadCertifications, isAuthenticated, authLoading]);
   
   const value: CertificationCacheContextType = {
     certifiedModels,

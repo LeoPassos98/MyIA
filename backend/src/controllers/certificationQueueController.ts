@@ -205,6 +205,7 @@ export async function getJobStatus(req: Request, res: Response) {
 /**
  * GET /api/certification-queue/history
  * Lista histórico de jobs de certificação
+ * Schema v2: CertificationJob foi removido - usar Bull queue + ModelCertification
  */
 export async function getJobHistory(req: Request, res: Response) {
   try {
@@ -219,29 +220,52 @@ export async function getJobHistory(req: Request, res: Response) {
     }
 
     const { page, limit } = paginationValidation;
-    const { status, type } = req.query;
+    const { status } = req.query;
     const skip = (page! - 1) * limit!;
 
-    // Construir filtros usando tipo do Prisma
-    const where: Prisma.CertificationJobWhereInput = {};
-    if (status) where.status = status as Prisma.EnumJobStatusFilter;
-    if (type) where.type = type as Prisma.EnumCertificationJobTypeFilter;
+    // Schema v2: CertificationJob foi removido
+    // Usar ModelCertification agrupado por data/região como "jobs"
+    const where: Prisma.ModelCertificationWhereInput = {};
+    if (status) {
+      // Mapear status de job para status de certificação
+      const statusMap: Record<string, string> = {
+        'QUEUED': 'PENDING',
+        'PROCESSING': 'RUNNING',
+        'COMPLETED': 'PASSED',
+        'FAILED': 'FAILED'
+      };
+      where.status = (statusMap[status as string] || status) as Prisma.EnumCertificationStatusFilter;
+    }
 
-    // Buscar jobs
-    const [jobs, total] = await Promise.all([
-      prisma.certificationJob.findMany({
+    // Buscar certificações como histórico de jobs
+    const [certifications, total] = await Promise.all([
+      prisma.modelCertification.findMany({
         where,
         skip,
         take: limit,
         include: {
-          certifications: {
-            orderBy: { createdAt: 'desc' }
+          deployment: {
+            include: {
+              baseModel: true
+            }
           }
         },
         orderBy: { createdAt: 'desc' }
       }),
-      prisma.certificationJob.count({ where })
+      prisma.modelCertification.count({ where })
     ]);
+
+    // Transformar certificações em formato de "jobs" para compatibilidade
+    const jobs = certifications.map(cert => ({
+      id: cert.id,
+      type: 'SINGLE',
+      status: cert.status,
+      deploymentId: cert.deploymentId,
+      region: cert.region,
+      createdAt: cert.createdAt,
+      updatedAt: cert.updatedAt,
+      certifications: [cert]
+    }));
 
     return res.status(200).json(
       ApiResponse.success({
@@ -291,8 +315,9 @@ export async function getCertifications(req: Request, res: Response) {
     const skip = (page! - 1) * limit!;
 
     // Construir filtros usando tipo do Prisma
+    // Schema v2: modelId foi substituído por deploymentId
     const where: Prisma.ModelCertificationWhereInput = {};
-    if (modelId) where.modelId = modelId as string;
+    if (modelId) where.deploymentId = modelId as string;
     if (region) where.region = region as string;
     if (status) where.status = status as Prisma.EnumCertificationStatusFilter;
 

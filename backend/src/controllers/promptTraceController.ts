@@ -2,9 +2,9 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md
 
 import { Request, Response } from 'express';
+import { get_encoding } from 'tiktoken';
 import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
-import { get_encoding } from 'tiktoken';
 import { jsend } from '../utils/jsend';
 
 // Encoder para contagem de tokens (mesmo usado no contextService)
@@ -87,7 +87,7 @@ class PromptTraceController {
         });
 
         // Busca mensagem do usuário (pergunta atual)
-        const userMessage = sentContext.userMessageId 
+        const userMessage = sentContext.userMessageId
           ? await prisma.message.findUnique({
               where: { id: sentContext.userMessageId },
               select: { role: true, content: true }
@@ -96,7 +96,7 @@ class PromptTraceController {
 
         // Reconstrói o payload na ordem correta
         payload.push({ role: 'system', content: systemPrompt });
-        historyMessages.forEach(msg => {
+        historyMessages.forEach((msg: { id: string; role: string; content: string }) => {
           payload.push({ role: msg.role, content: msg.content });
         });
         if (userMessage) {

@@ -13,10 +13,13 @@ import logger from '../../../../utils/logger';
 import { categorizeError } from '../../certification/error-categorizer';
 
 // Importar módulos modularizados
+import { deploymentService, InferenceType } from '../../../models';
 import { ModelIdNormalizer, InferenceProfileResolver, ModelIdVariationGenerator } from './modelId';
 import { RateLimitDetector, AWSErrorParser } from './errors';
 import { RetryStrategy, RetryConfig } from './retry';
 import { StreamProcessor, StreamConfig } from './streaming';
+
+// Importar novos services de models (Clean Slate)
 
 /**
  * Configuração padrão de retry
@@ -85,7 +88,7 @@ export class BedrockProvider extends BaseAIProvider {
   }
 
   async *streamChat(
-    messages: any[],
+    messages: Array<{ role: string; content: string }>,
     options: AIRequestOptions
   ): AsyncGenerator<StreamChunk> {
     // Validar credenciais
@@ -110,7 +113,7 @@ export class BedrockProvider extends BaseAIProvider {
     try {
       adapter = AdapterFactory.getAdapterForModel(options.modelId);
       logger.info(`🔍 [Bedrock] Using adapter: ${adapter.displayName} for model: ${options.modelId}`);
-    } catch (_error) {
+    } catch {
       yield {
         type: 'error',
         error: `Model ${options.modelId} is not supported. Please check the model ID.`,
@@ -147,18 +150,8 @@ export class BedrockProvider extends BaseAIProvider {
     }
     
     // Verificar se modelo requer inference profile
-    let requiresInferenceProfile = false;
-    try {
-      const { ModelRegistry } = await import('../../registry');
-      const platformRule = ModelRegistry.getPlatformRules(normalizedModelId, 'bedrock');
-      requiresInferenceProfile = platformRule?.rule === 'requires_inference_profile';
-      
-      if (requiresInferenceProfile) {
-        logger.info(`🔍 [Bedrock] Model ${normalizedModelId} requires Inference Profile`);
-      }
-    } catch (error) {
-      logger.debug(`[Bedrock] Could not check platform rules:`, error);
-    }
+    // REFATORADO: Usa novos services de models com fallback para registry antigo
+    const requiresInferenceProfile = await this.checkRequiresInferenceProfile(normalizedModelId);
     
     // Gerar variações de model ID para auto-test
     const variations = await this.variationGenerator.generate(
@@ -171,7 +164,7 @@ export class BedrockProvider extends BaseAIProvider {
     logger.debug(`[Bedrock] Variations:`, variations.map(v => v.modelId));
     
     // Tentar cada variação
-    let lastGlobalError: any = null;
+    let lastGlobalError: unknown = null;
     
     for (let i = 0; i < variations.length; i++) {
       const variation = variations[i];
@@ -239,6 +232,61 @@ export class BedrockProvider extends BaseAIProvider {
   }
 
   /**
+   * Verifica se o modelo requer Inference Profile
+   * 
+   * REFATORADO (Clean Slate): Usa novos services de models com fallback para registry antigo
+   * 
+   * Ordem de verificação:
+   * 1. Tenta buscar no banco via deploymentService (novo schema v2)
+   * 2. Se não encontrar, faz fallback para ModelRegistry (antigo)
+   * 
+   * @param modelId - ID do modelo normalizado
+   * @returns true se requer inference profile
+   */
+  private async checkRequiresInferenceProfile(modelId: string): Promise<boolean> {
+    // Schema v2: Usar deploymentService como fonte de verdade
+    // ModelRegistry foi removido - usar apenas banco de dados
+    try {
+      // Buscar provider Bedrock
+      const { prisma } = await import('../../../../lib/prisma');
+      const bedrockProvider = await prisma.provider.findUnique({
+        where: { slug: 'bedrock' }
+      });
+      
+      if (bedrockProvider) {
+        // Buscar deployment pelo deploymentId
+        const deployment = await deploymentService.findByDeploymentId(
+          bedrockProvider.id,
+          modelId,
+          false, // includeBaseModel
+          false, // includeProvider
+          false  // includeCertifications
+        );
+        
+        if (deployment) {
+          const requiresProfile = deployment.inferenceType === InferenceType.INFERENCE_PROFILE;
+          
+          if (requiresProfile) {
+            logger.info(`🔍 [Bedrock] Model ${modelId} requires Inference Profile (from DB)`);
+          }
+          
+          return requiresProfile;
+        }
+      }
+    } catch (error) {
+      logger.debug(`[Bedrock] Could not check deployment in DB:`, error);
+    }
+    
+    // Schema v2: ModelRegistry foi removido
+    // Se não encontrar no banco, assumir que não requer inference profile
+    // Modelos novos devem ser cadastrados no banco com inferenceType correto
+    logger.debug(`[Bedrock] Model ${modelId} not found in DB, assuming ON_DEMAND`);
+    
+    // Default: não requer inference profile
+    return false;
+  }
+
+  /**
    * Trata caso onde todas as variações falharam
    */
   private async *handleAllVariationsFailed(
@@ -246,7 +294,7 @@ export class BedrockProvider extends BaseAIProvider {
     normalizedModelId: string,
     variationsTried: string[],
     requiresInferenceProfile: boolean,
-    lastError: any
+    lastError: unknown
   ): AsyncGenerator<StreamChunk> {
     const errorMessage = lastError instanceof Error 
       ? lastError.message 

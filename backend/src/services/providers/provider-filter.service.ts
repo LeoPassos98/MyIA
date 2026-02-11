@@ -2,25 +2,36 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { prisma } from '../../lib/prisma';
-import logger from '../../utils/logger';
-import { Provider } from '../../types/providers';
+import { logger } from '../../utils/logger';
+import { modelCacheService } from '../models/modelCacheService';
+import { Provider, Model } from '../../types/providers';
 
 /**
  * Service para filtragem de providers configurados pelo usuário
  * Responsabilidade: Buscar e filtrar providers baseado em configurações do usuário
+ * 
+ * Refatorado para Clean Slate v2:
+ * - Usa prisma.provider (schema v2) em vez de prisma.aIProvider
+ * - Usa modelCacheService para obter deployments
+ * - Remove dependência de providerCredentialValidation (não existe no schema v2)
+ * - Filtra deployments por provider
  */
 export class ProviderFilterService {
   /**
    * Busca providers configurados para o usuário
    * - Busca configurações do usuário
-   * - Busca validação AWS
-   * - Busca providers ativos
-   * - Filtra por configuração
-   * - Cria modelos dinâmicos (AWS)
+   * - Busca providers ativos do banco (schema v2)
+   * - Agrupa deployments por provider
+   * - Filtra por configuração do usuário (AWS)
+   * 
+   * Refatorado para Clean Slate v2:
+   * - Usa Provider do schema v2
+   * - Usa ModelDeployment em vez de AIModel
+   * - Remove dependência de providerCredentialValidation
    * 
    * @param userId - ID do usuário
    * @param requestId - ID da requisição (para logging)
-   * @returns Lista de providers configurados
+   * @returns Lista de providers configurados com seus modelos
    */
   async getConfiguredProviders(userId: string, requestId?: string): Promise<Provider[]> {
     logger.debug('Buscando providers configurados', {
@@ -33,144 +44,196 @@ export class ProviderFilterService {
       where: { userId }
     });
 
-    // 2. Buscar validação AWS
-    const awsValidation = await prisma.providerCredentialValidation.findUnique({
-      where: { userId_provider: { userId, provider: 'bedrock' } }
+    // 2. Buscar todos os providers ativos (schema v2)
+    const allProviders = await prisma.provider.findMany({
+      where: { isActive: true }
     });
 
-    // 3. Buscar todos os providers ativos
-    const allProviders = await prisma.aIProvider.findMany({
-      where: { isActive: true },
-      include: {
-        models: {
-          where: { isActive: true },
-          orderBy: { name: 'asc' }
-        }
-      }
-    });
+    // 3. Buscar deployments ativos do cache
+    const deployments = await modelCacheService.getAllActiveDeployments(true, true);
 
-    logger.debug('Providers encontrados', {
+    logger.debug('Providers e deployments encontrados', {
       requestId,
       totalProviders: allProviders.length,
-      awsEnabledModels: settings?.awsEnabledModels?.length || 0,
-      awsValidationStatus: awsValidation?.status
+      totalDeployments: deployments.length,
+      awsEnabledModels: settings?.awsEnabledModels?.length || 0
     });
 
-    // 4. Filtrar providers baseado em configuração
-    const filteredProviders = allProviders.filter(provider => {
-      // Providers padrão (sempre disponíveis)
-      if (['openai', 'groq', 'together'].includes(provider.slug)) {
-        return true;
+    // 4. Agrupar deployments por provider
+    const providerDeploymentsMap = new Map<string, typeof deployments>();
+    for (const deployment of deployments) {
+      const providerId = deployment.providerId;
+      if (!providerDeploymentsMap.has(providerId)) {
+        providerDeploymentsMap.set(providerId, []);
       }
-
-      // AWS Bedrock: só mostrar se validado E com modelos habilitados
-      if (provider.slug === 'bedrock') {
-        return this.filterAWSProvider(provider, settings, awsValidation, requestId);
-      }
-
-      return true;
-    });
-
-    logger.debug('Providers filtrados', {
-      requestId,
-      totalFiltered: filteredProviders.length,
-      providerSlugs: filteredProviders.map(p => p.slug)
-    });
-
-    return filteredProviders as Provider[];
-  }
-
-  /**
-   * Filtra provider AWS baseado em validação e modelos habilitados
-   *
-   * @param provider - Provider AWS
-   * @param settings - Configurações do usuário
-   * @param awsValidation - Validação AWS
-   * @param requestId - ID da requisição
-   * @returns true se provider deve ser incluído
-   */
-  private filterAWSProvider(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    provider: any,
-    settings: { awsEnabledModels?: string[] } | null,
-    awsValidation: { status?: string } | null,
-    requestId?: string
-  ): boolean {
-    if (awsValidation?.status === 'valid' && settings?.awsEnabledModels?.length) {
-      // Filtrar apenas modelos habilitados pelo usuário
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const existingModels = provider.models.filter((m: any) =>
-        settings.awsEnabledModels!.includes(m.apiModelId)
-      );
-
-      // Criar modelos dinâmicos para IDs que não existem no banco
-      const dynamicModels = this.createDynamicModels(
-        provider,
-        settings.awsEnabledModels!,
-        requestId
-      );
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider.models = [...existingModels, ...dynamicModels] as any;
-
-      logger.debug('Bedrock modelos filtrados', {
-        requestId,
-        totalModels: provider.models.length,
-        existingModels: existingModels.length,
-        dynamicModels: dynamicModels.length
-      });
-
-      return provider.models.length > 0;
+      providerDeploymentsMap.get(providerId)!.push(deployment);
     }
 
-    logger.debug('Bedrock excluído: não validado ou sem modelos habilitados', {
+    // 5. Construir lista de providers com modelos
+    const configuredProviders: Provider[] = [];
+
+    for (const provider of allProviders) {
+      const providerDeployments = providerDeploymentsMap.get(provider.id) || [];
+      
+      // Filtrar providers baseado em configuração
+      if (provider.slug === 'bedrock') {
+        // AWS Bedrock: filtrar por modelos habilitados pelo usuário
+        const filteredDeployments = this.filterAWSDeployments(
+          providerDeployments,
+          settings?.awsEnabledModels || [],
+          requestId
+        );
+
+        if (filteredDeployments.length === 0) {
+          logger.debug('Bedrock excluído: sem modelos habilitados', {
+            requestId,
+            enabledModelsCount: settings?.awsEnabledModels?.length || 0
+          });
+          continue;
+        }
+
+        configuredProviders.push({
+          id: provider.id,
+          name: provider.name,
+          slug: provider.slug,
+          isActive: provider.isActive,
+          models: this.deploymentsToModels(filteredDeployments)
+        });
+      } else {
+        // Outros providers: incluir todos os deployments
+        if (providerDeployments.length > 0) {
+          configuredProviders.push({
+            id: provider.id,
+            name: provider.name,
+            slug: provider.slug,
+            isActive: provider.isActive,
+            models: this.deploymentsToModels(providerDeployments)
+          });
+        }
+      }
+    }
+
+    logger.debug('Providers configurados', {
       requestId,
-      validationStatus: awsValidation?.status,
-      enabledModelsCount: settings?.awsEnabledModels?.length || 0
+      totalConfigured: configuredProviders.length,
+      providerSlugs: configuredProviders.map(p => p.slug)
     });
 
-    return false;
+    return configuredProviders;
   }
 
   /**
-   * Cria modelos dinâmicos para IDs não cadastrados no banco
+   * Filtra deployments AWS baseado em modelos habilitados pelo usuário
    * 
-   * @param provider - Provider AWS
-   * @param enabledModelIds - IDs de modelos habilitados
+   * @param deployments - Deployments do provider AWS
+   * @param enabledModelIds - IDs de modelos habilitados pelo usuário
    * @param requestId - ID da requisição
-   * @returns Lista de modelos dinâmicos
+   * @returns Deployments filtrados
    */
-  private createDynamicModels(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    provider: any,
+  private filterAWSDeployments(
+    deployments: Awaited<ReturnType<typeof modelCacheService.getAllActiveDeployments>>,
     enabledModelIds: string[],
     requestId?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): any[] {
-    const missingModelIds = enabledModelIds.filter(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (modelId: string) => !provider.models.some((m: any) => m.apiModelId === modelId)
-    );
+  ): typeof deployments {
+    if (enabledModelIds.length === 0) {
+      return [];
+    }
 
-    if (missingModelIds.length > 0) {
-      logger.warn('Criando modelos dinâmicos (não cadastrados no banco)', {
+    const enabledSet = new Set(enabledModelIds);
+    const filtered = deployments.filter(d => enabledSet.has(d.deploymentId));
+
+    logger.debug('Deployments AWS filtrados', {
+      requestId,
+      totalDeployments: deployments.length,
+      enabledModels: enabledModelIds.length,
+      filteredDeployments: filtered.length
+    });
+
+    return filtered;
+  }
+
+  /**
+   * Converte deployments para formato Model (compatibilidade com interface antiga)
+   * 
+   * @param deployments - Deployments do cache
+   * @returns Lista de modelos no formato antigo
+   */
+  private deploymentsToModels(
+    deployments: Awaited<ReturnType<typeof modelCacheService.getAllActiveDeployments>>
+  ): Model[] {
+    return deployments.map(deployment => {
+      // Extrair contextWindow das capabilities do BaseModel
+      const capabilities = deployment.baseModel?.capabilities as {
+        maxContextWindow?: number;
+      } | undefined;
+
+      // Converter custos de 1M tokens para 1k tokens (compatibilidade)
+      const costPer1kInput = deployment.costPer1MInput / 1000;
+      const costPer1kOutput = deployment.costPer1MOutput / 1000;
+
+      return {
+        id: deployment.id,
+        name: deployment.baseModel?.name || deployment.deploymentId,
+        apiModelId: deployment.deploymentId,
+        contextWindow: capabilities?.maxContextWindow || 0,
+        costPer1kInput,
+        costPer1kOutput,
+        isActive: deployment.isActive,
+        providerId: deployment.providerId,
+        createdAt: deployment.createdAt,
+        updatedAt: deployment.updatedAt
+      };
+    });
+  }
+
+  /**
+   * Busca um provider específico por slug
+   * 
+   * @param slug - Slug do provider (ex: 'bedrock', 'openai')
+   * @param requestId - ID da requisição
+   * @returns Provider encontrado ou null
+   */
+  async getProviderBySlug(slug: string, requestId?: string) {
+    logger.debug('Buscando provider por slug', {
+      requestId,
+      slug
+    });
+
+    const provider = await prisma.provider.findUnique({
+      where: { slug }
+    });
+
+    if (!provider) {
+      logger.warn('Provider não encontrado', {
         requestId,
-        missingModelIds,
-        count: missingModelIds.length
+        slug
       });
     }
 
-    return missingModelIds.map((apiModelId: string) => ({
-      id: `dynamic-${apiModelId}`,
-      name: apiModelId.split('.').pop()?.replace(/-/g, ' ').toUpperCase() || apiModelId,
-      apiModelId,
-      contextWindow: 200000,
-      costPer1kInput: 0,
-      costPer1kOutput: 0,
-      isActive: true,
-      providerId: provider.id,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }));
+    return provider;
+  }
+
+  /**
+   * Lista todos os providers ativos
+   * 
+   * @param requestId - ID da requisição
+   * @returns Lista de providers ativos
+   */
+  async getAllActiveProviders(requestId?: string) {
+    logger.debug('Buscando todos os providers ativos', {
+      requestId
+    });
+
+    const providers = await prisma.provider.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' }
+    });
+
+    logger.debug('Providers ativos encontrados', {
+      requestId,
+      count: providers.length
+    });
+
+    return providers;
   }
 }

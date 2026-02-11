@@ -1,6 +1,19 @@
 // backend/src/services/ai/adapters/cohere.adapter.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
+/**
+ * REFATORADO: Clean Slate v2 - Fase 7 (Cleanup)
+ * - Removido ModelRegistry completamente
+ * - Usa adapterParamsService.getRecommendedParams() para buscar parâmetros do banco
+ * - Fallback para valores hardcoded específicos do vendor Cohere
+ * 
+ * REFATORADO: Resolução de dependência circular
+ * - Substituído import de AdapterFactory por adapterParamsService
+ */
+
+import { InferenceType } from '../types';
+import { logger } from '../../../utils/logger';
+import { adapterParamsService } from './adapter-params.service';
 import {
   BaseModelAdapter,
   Message,
@@ -8,8 +21,6 @@ import {
   AdapterPayload,
   AdapterChunk,
 } from './base.adapter';
-import { InferenceType } from '../types';
-import { ModelRegistry } from '../registry/model-registry';
 
 /**
  * Adapter for Cohere Command models (Legacy - ON_DEMAND)
@@ -42,6 +53,44 @@ export class CohereAdapter extends BaseModelAdapter {
     // Note: Direct API format (command-*) will be added when DirectProvider is implemented
   ];
 
+  /**
+   * Cache de parâmetros para evitar múltiplas buscas assíncronas
+   */
+  private paramsCache: Map<string, { temperature?: number; topP?: number; maxTokens?: number }> = new Map();
+
+  /**
+   * Busca parâmetros recomendados do banco (com cache)
+   *
+   * Prioridade:
+   * 1. Cache local
+   * 2. Banco de dados (via adapterParamsService)
+   * 3. Valores hardcoded para Cohere
+   */
+  private async getRecommendedParams(modelId: string): Promise<{ temperature?: number; topP?: number; maxTokens?: number }> {
+    // 1. Verificar cache local
+    if (this.paramsCache.has(modelId)) {
+      return this.paramsCache.get(modelId)!;
+    }
+
+    // 2. Tentar buscar do banco via adapterParamsService
+    try {
+      const params = await adapterParamsService.getRecommendedParams(modelId, this.vendor);
+      this.paramsCache.set(modelId, params);
+      return params;
+    } catch {
+      logger.debug(`[CohereAdapter] Failed to get params from adapterParamsService for ${modelId}`);
+    }
+
+    // 3. Valores hardcoded padrão para Cohere
+    const defaultParams = {
+      temperature: 0.3,
+      topP: 0.75,
+      maxTokens: 2048,
+    };
+    this.paramsCache.set(modelId, defaultParams);
+    return defaultParams;
+  }
+
   formatRequest(messages: Message[], options: UniversalOptions): AdapterPayload {
     const systemMessage = messages.find(m => m.role === 'system');
     const conversationMessages = messages.filter(m => m.role !== 'system');
@@ -55,16 +104,28 @@ export class CohereAdapter extends BaseModelAdapter {
     
     const lastMessage = conversationMessages[conversationMessages.length - 1];
     
-    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
-    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
-    const recommendedParams = modelDef?.recommendedParams;
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams
+    // NOTA: Como formatRequest é síncrono, usamos cache ou valores padrão
+    let recommendedParams: { temperature?: number; topP?: number; maxTokens?: number } | undefined;
+    
+    if (options.modelId) {
+      // Verificar cache primeiro (síncrono)
+      if (this.paramsCache.has(options.modelId)) {
+        recommendedParams = this.paramsCache.get(options.modelId);
+      } else {
+        // Popular cache em background (não bloqueia)
+        this.getRecommendedParams(options.modelId).catch(() => {
+          // Ignorar erros - já temos fallback hardcoded
+        });
+      }
+    }
 
     // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
     const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.3;
     const topP = options.topP ?? recommendedParams?.topP ?? 0.75;
     const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
     
-    const body: any = {
+    const body: Record<string, unknown> = {
       message: lastMessage?.content || '',
       temperature: temperature,
       max_tokens: maxTokens,
@@ -99,12 +160,12 @@ export class CohereAdapter extends BaseModelAdapter {
     };
   }
 
-  parseChunk(chunk: any): AdapterChunk {
+  parseChunk(chunk: Record<string, unknown>): AdapterChunk {
     // Text chunk
     if (chunk.text) {
       return {
         type: 'chunk',
-        content: chunk.text,
+        content: chunk.text as string,
       };
     }
     
@@ -119,10 +180,11 @@ export class CohereAdapter extends BaseModelAdapter {
     }
 
     // Error handling
-    if (chunk.error || chunk.message?.includes('error')) {
+    const message = chunk.message as string | undefined;
+    if (chunk.error || message?.includes('error')) {
       return {
         type: 'error',
-        error: chunk.error || chunk.message || 'Unknown error',
+        error: (chunk.error as string) || message || 'Unknown error',
       };
     }
 

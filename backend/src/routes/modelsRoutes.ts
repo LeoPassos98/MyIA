@@ -1,11 +1,19 @@
 // backend/src/routes/modelsRoutes.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+
+/**
+ * REFATORADO: Clean Slate v2 - Fase 7 (Cleanup)
+ * - Removido import de ModelRegistry (legado)
+ * - Substituído por modelCacheService e deploymentService
+ * - Mantida compatibilidade com API existente
+ */
 
 import { Router, Request, Response } from 'express';
-import { ModelRegistry, buildCapabilities } from '../services/ai/registry/model-registry';
 import { ModelCapabilities, CachedCapabilities } from '../types/capabilities';
 import { logger } from '../utils/logger';
 import { jsend } from '../utils/jsend';
+import { modelCacheService } from '../services/models';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
 
@@ -36,6 +44,175 @@ function cleanExpiredCache(): void {
 }
 
 /**
+ * Busca o provider padrão (bedrock)
+ */
+async function getDefaultProvider(): Promise<{ id: string; slug: string } | null> {
+  const provider = await prisma.provider.findUnique({
+    where: { slug: 'bedrock' }
+  });
+  return provider;
+}
+
+/**
+ * Normaliza modelId do formato frontend para o formato do banco
+ * 
+ * Frontend envia: "anthropic:claude-3-5-sonnet-20241022" ou "anthropic.claude-3-5-sonnet-20241022-v2:0"
+ * Banco espera: deploymentId (ex: "anthropic.claude-3-5-sonnet-20241022-v2:0")
+ */
+async function normalizeModelId(rawModelId: string): Promise<string | null> {
+  // Converte formato frontend (provider:model) para backend (provider.model)
+  const normalizedId = rawModelId.replace(':', '.');
+  
+  // Buscar provider padrão
+  const provider = await getDefaultProvider();
+  if (!provider) {
+    logger.warn('[normalizeModelId] Default provider (bedrock) not found');
+    return null;
+  }
+
+  // Tentar buscar deployment exato
+  const exactDeployment = await modelCacheService.getDeploymentByDeploymentId(
+    provider.id,
+    normalizedId,
+    true,
+    false,
+    false
+  );
+  
+  if (exactDeployment) {
+    return exactDeployment.deploymentId;
+  }
+
+  // Tentar buscar por prefixo (modelo sem versão)
+  // Ex: "anthropic.claude-3-5-sonnet-20241022" encontra "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  const allDeployments = await modelCacheService.getAllActiveDeployments(true, true);
+  
+  const prefixMatch = allDeployments.find(d => d.deploymentId.startsWith(normalizedId));
+  if (prefixMatch) {
+    logger.debug(`Model ID normalized: ${rawModelId} -> ${prefixMatch.deploymentId}`);
+    return prefixMatch.deploymentId;
+  }
+
+  // Busca por nome similar (remove versões e sufixos)
+  const baseModelId = normalizedId.split(':')[0];
+  const similarMatch = allDeployments.find(d => {
+    const baseDeploymentId = d.deploymentId.split(':')[0];
+    return baseDeploymentId.startsWith(baseModelId) || baseModelId.startsWith(baseDeploymentId);
+  });
+
+  if (similarMatch) {
+    logger.debug(`Model ID normalized (similar): ${rawModelId} -> ${similarMatch.deploymentId}`);
+    return similarMatch.deploymentId;
+  }
+
+  logger.warn(`Could not normalize model ID: ${rawModelId}`);
+  return null;
+}
+
+/**
+ * Constrói capabilities detalhadas a partir do deployment
+ * 
+ * Substitui a função buildCapabilities() do model-registry.ts
+ */
+function buildCapabilitiesFromDeployment(deployment: {
+  baseModel: {
+    vendor: string;
+    capabilities: Record<string, unknown>;
+  };
+}): ModelCapabilities {
+  const vendor = deployment.baseModel.vendor.toLowerCase();
+  const caps = deployment.baseModel.capabilities;
+  
+  logger.debug(`[buildCapabilities] Building for vendor: ${vendor}`);
+
+  // Extrair valores do capabilities do banco
+  const streaming = caps.streaming === true;
+  const vision = caps.vision === true;
+  const functionCalling = caps.functionCalling === true;
+  const maxContextWindow = typeof caps.maxContextWindow === 'number' ? caps.maxContextWindow : 128000;
+  const maxOutputTokens = typeof caps.maxOutputTokens === 'number' ? caps.maxOutputTokens : 4096;
+
+  // Regras base comuns a todos os modelos
+  const baseCapabilities: ModelCapabilities = {
+    // Temperature: suportado por todos os vendors
+    temperature: {
+      enabled: true,
+      min: 0,
+      max: 1,
+      default: vendor === 'anthropic' ? 1 : vendor === 'cohere' ? 0.3 : 0.7,
+    },
+
+    // Top-K: NÃO suportado por Anthropic
+    topK: {
+      enabled: vendor !== 'anthropic',
+      min: vendor === 'cohere' ? 0 : 1,
+      max: 500,
+      default: vendor === 'cohere' ? 0 : 250,
+    },
+
+    // Top-P: suportado por todos os vendors
+    topP: {
+      enabled: true,
+      min: 0,
+      max: 1,
+      default: vendor === 'anthropic' ? 0.999 : vendor === 'cohere' ? 0.75 : 0.9,
+    },
+
+    // Max Tokens: suportado por todos
+    maxTokens: {
+      enabled: true,
+      min: 1,
+      max: maxOutputTokens,
+      default: Math.min(2048, maxOutputTokens),
+    },
+
+    // Stop Sequences: suportado por todos
+    stopSequences: {
+      enabled: true,
+      max: vendor === 'anthropic' ? 4 : 10,
+    },
+
+    // Streaming: baseado no capabilities
+    streaming: {
+      enabled: streaming,
+    },
+
+    // Vision: baseado no capabilities
+    vision: {
+      enabled: vision,
+    },
+
+    // Function Calling: baseado no capabilities
+    functionCalling: {
+      enabled: functionCalling,
+    },
+
+    // System Prompt: suportado por todos
+    systemPrompt: {
+      enabled: true,
+    },
+
+    // Context Window: do capabilities
+    maxContextWindow: maxContextWindow,
+
+    // Max Output Tokens: do capabilities
+    maxOutputTokens: maxOutputTokens,
+
+    // Inference Profile: verificar pelo inferenceType do deployment
+    requiresInferenceProfile: false, // Será definido pelo caller se necessário
+  };
+
+  logger.debug(`[buildCapabilities] Result:`, {
+    temperature: baseCapabilities.temperature,
+    topK: baseCapabilities.topK,
+    topP: baseCapabilities.topP,
+    maxTokens: baseCapabilities.maxTokens,
+  });
+
+  return baseCapabilities;
+}
+
+/**
  * GET /api/models/:modelId/capabilities
  * 
  * Retorna as capabilities detalhadas de um modelo específico.
@@ -59,7 +236,7 @@ function cleanExpiredCache(): void {
  *   }
  * }
  */
-router.get('/:modelId/capabilities', (req: Request, res: Response) => {
+router.get('/:modelId/capabilities', async (req: Request, res: Response) => {
   const startTime = Date.now();
   const { modelId: rawModelId } = req.params;
 
@@ -67,15 +244,19 @@ router.get('/:modelId/capabilities', (req: Request, res: Response) => {
     logger.info(`[Capabilities] Request for model: ${rawModelId}`);
 
     // Normaliza o modelId (converte formato frontend para backend)
-    const normalizedModelId = ModelRegistry.normalizeModelId(rawModelId);
+    const normalizedModelId = await normalizeModelId(rawModelId);
 
     if (!normalizedModelId) {
       logger.warn(`[Capabilities] Model not found after normalization: ${rawModelId}`);
+      
+      // Buscar lista de modelos disponíveis para sugestão
+      const allDeployments = await modelCacheService.getAllActiveDeployments(false, false);
+      
       return res.status(404).json(jsend.fail({
         modelId: rawModelId,
-        message: `Model '${rawModelId}' not found in registry`,
+        message: `Model '${rawModelId}' not found in database`,
         hint: 'Use format: provider.model-id (e.g., anthropic.claude-3-5-sonnet-20241022-v2:0)',
-        availableModels: ModelRegistry.getAllSupported().map(m => m.modelId),
+        availableModels: allDeployments.map(d => d.deploymentId),
       }));
     }
 
@@ -103,11 +284,26 @@ router.get('/:modelId/capabilities', (req: Request, res: Response) => {
 
     logger.debug(`[Capabilities] Cache MISS for ${normalizedModelId}`);
 
-    // Busca modelo no registry
-    const metadata = ModelRegistry.getModel(normalizedModelId);
+    // Buscar provider padrão
+    const provider = await getDefaultProvider();
+    if (!provider) {
+      return res.status(500).json(jsend.error(
+        'Default provider (bedrock) not configured',
+        500
+      ));
+    }
 
-    if (!metadata) {
-      logger.error(`[Capabilities] Model found during normalization but not in registry: ${normalizedModelId}`);
+    // Busca deployment no cache/banco
+    const deployment = await modelCacheService.getDeploymentByDeploymentId(
+      provider.id,
+      normalizedModelId,
+      true, // includeBaseModel
+      false, // includeProvider
+      false // includeCertifications
+    );
+
+    if (!deployment) {
+      logger.error(`[Capabilities] Deployment found during normalization but not in cache: ${normalizedModelId}`);
       return res.status(500).json(jsend.error(
         'Internal error: model normalization inconsistency',
         500,
@@ -117,7 +313,15 @@ router.get('/:modelId/capabilities', (req: Request, res: Response) => {
 
     // Constrói capabilities
     logger.debug(`[Capabilities] Building capabilities for ${normalizedModelId}`);
-    const capabilities = buildCapabilities(metadata);
+    const capabilities = buildCapabilitiesFromDeployment({
+      baseModel: {
+        vendor: deployment.baseModel.vendor,
+        capabilities: deployment.baseModel.capabilities as Record<string, unknown>,
+      }
+    });
+
+    // Verificar se requer inference profile
+    capabilities.requiresInferenceProfile = deployment.inferenceType === 'INFERENCE_PROFILE';
 
     // Armazena no cache (usa modelId normalizado)
     capabilitiesCache.set(normalizedModelId, {
@@ -168,39 +372,51 @@ router.get('/:modelId/capabilities', (req: Request, res: Response) => {
  * @route GET /api/models/capabilities
  * @returns {Object} Mapa de modelId -> capabilities
  */
-router.get('/capabilities', (_req: Request, res: Response) => {
+router.get('/capabilities', async (_req: Request, res: Response) => {
   const startTime = Date.now();
 
   try {
     logger.debug('Fetching capabilities for all models');
 
-    const allModels = ModelRegistry.getAllSupported();
+    // Buscar todos os deployments ativos
+    const allDeployments = await modelCacheService.getAllActiveDeployments(true, false);
     const capabilitiesMap: Record<string, ModelCapabilities> = {};
 
-    for (const metadata of allModels) {
+    for (const deployment of allDeployments) {
+      const modelId = deployment.deploymentId;
+      
       // Verifica cache primeiro
-      const cached = capabilitiesCache.get(metadata.modelId);
+      const cached = capabilitiesCache.get(modelId);
       const now = Date.now();
 
       if (cached && (now - cached.timestamp) < CACHE_TTL) {
-        capabilitiesMap[metadata.modelId] = cached.capabilities;
+        capabilitiesMap[modelId] = cached.capabilities;
       } else {
         // Constrói e cacheia
-        const capabilities = buildCapabilities(metadata);
-        capabilitiesCache.set(metadata.modelId, {
+        const capabilities = buildCapabilitiesFromDeployment({
+          baseModel: {
+            vendor: deployment.baseModel.vendor,
+            capabilities: deployment.baseModel.capabilities as Record<string, unknown>,
+          }
+        });
+        
+        // Verificar se requer inference profile
+        capabilities.requiresInferenceProfile = deployment.inferenceType === 'INFERENCE_PROFILE';
+        
+        capabilitiesCache.set(modelId, {
           capabilities,
           timestamp: now,
         });
-        capabilitiesMap[metadata.modelId] = capabilities;
+        capabilitiesMap[modelId] = capabilities;
       }
     }
 
     const elapsed = Date.now() - startTime;
-    logger.info(`Capabilities fetched for ${allModels.length} models (${elapsed}ms)`);
+    logger.info(`Capabilities fetched for ${allDeployments.length} models (${elapsed}ms)`);
 
     return res.json(jsend.success({
       models: capabilitiesMap,
-      count: allModels.length,
+      count: allDeployments.length,
       _meta: {
         responseTime: elapsed,
         cacheSize: capabilitiesCache.size,
@@ -233,6 +449,9 @@ router.get('/capabilities', (_req: Request, res: Response) => {
 router.delete('/capabilities/cache', (_req: Request, res: Response) => {
   const sizeBefore = capabilitiesCache.size;
   capabilitiesCache.clear();
+  
+  // Também invalida o cache do modelCacheService
+  modelCacheService.invalidateAll();
   
   logger.info(`Cache cleared: ${sizeBefore} entries removed`);
 

@@ -6,11 +6,22 @@
  *
  * Centraliza lógica de cálculo de custos de tokens.
  * Elimina duplicação de código entre hooks.
+ * 
+ * Os preços são expressos em custo por 1M tokens (padrão da indústria).
  *
  * @module hooks/cost/calculators/CostCalculator
  */
 
-import { ModelPricing, getModelPricing } from '../data/modelPricing';
+/**
+ * Estrutura de preços de um modelo
+ * Custos são por 1M tokens (padrão da indústria)
+ */
+export interface ModelPricing {
+  /** Preço por 1M tokens de entrada (USD) */
+  input: number;
+  /** Preço por 1M tokens de saída (USD) */
+  output: number;
+}
 
 /**
  * Entrada para cálculo de custo
@@ -20,7 +31,7 @@ export interface CostCalculationInput {
   inputTokens: number;
   /** Número de tokens de saída */
   outputTokens: number;
-  /** Preços do modelo */
+  /** Preços do modelo (custo por 1M tokens) */
   pricing: ModelPricing;
 }
 
@@ -41,6 +52,8 @@ export interface CostCalculationResult {
  * 
  * Classe estática que centraliza lógica de cálculo de custos.
  * Elimina duplicação de código entre diferentes hooks.
+ * 
+ * Os preços são expressos em custo por 1M tokens (padrão da indústria).
  */
 export class CostCalculator {
   /**
@@ -56,7 +69,7 @@ export class CostCalculator {
    * const result = CostCalculator.calculate({
    *   inputTokens: 1000,
    *   outputTokens: 2000,
-   *   pricing: { input: 3.0, output: 15.0 }
+   *   pricing: { input: 3.0, output: 15.0 } // USD por 1M tokens
    * });
    * 
    * console.log(result.totalCost); // 0.033 USD
@@ -78,57 +91,13 @@ export class CostCalculator {
   }
   
   /**
-   * Calcula custos para um modelo específico
-   * 
-   * Wrapper que busca preços automaticamente e calcula.
-   * 
-   * @param provider - Provider do modelo
-   * @param modelId - ID do modelo
-   * @param inputTokens - Tokens de entrada
-   * @param outputTokens - Tokens de saída
-   * @returns Resultado do cálculo ou null se modelo não tem preços
-   * 
-   * @example
-   * ```typescript
-   * const result = CostCalculator.calculateForModel(
-   *   'anthropic',
-   *   'claude-3-5-sonnet-20241022',
-   *   1000,
-   *   2000
-   * );
-   * 
-   * if (result) {
-   *   console.log(`Custo: $${result.totalCost}`);
-   * }
-   * ```
-   */
-  static calculateForModel(
-    provider: string | null,
-    modelId: string | null,
-    inputTokens: number,
-    outputTokens: number
-  ): CostCalculationResult | null {
-    const pricing = getModelPricing(provider, modelId);
-    
-    if (!pricing) {
-      return null;
-    }
-    
-    return this.calculate({
-      inputTokens,
-      outputTokens,
-      pricing
-    });
-  }
-  
-  /**
    * Calcula custo estimado baseado em ratio input/output
    * 
    * Útil quando não se sabe exatamente quantos tokens de saída haverá.
    * 
    * @param inputTokens - Tokens de entrada
    * @param outputRatio - Ratio de output (ex: 2.0 = 2x input)
-   * @param pricing - Preços do modelo
+   * @param pricing - Preços do modelo (custo por 1M tokens)
    * @returns Resultado do cálculo
    * 
    * @example
@@ -158,7 +127,7 @@ export class CostCalculator {
   /**
    * Calcula custo por token (útil para comparações)
    * 
-   * @param pricing - Preços do modelo
+   * @param pricing - Preços do modelo (custo por 1M tokens)
    * @returns Custo médio por token
    * 
    * @example

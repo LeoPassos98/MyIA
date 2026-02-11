@@ -1,33 +1,17 @@
 // backend/src/services/ai/providers/factory.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { prisma } from '../../../lib/prisma';
+import logger from '../../../utils/logger';
 import { BaseAIProvider } from './base';
 import { OpenAIProvider } from './openai';
-import crypto from 'crypto';
-import logger from '../../../utils/logger';
 
-function decryptApiKey(encryptedKey: string): string {
-  const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET;
-  if (!ENCRYPTION_SECRET) {
-    throw new Error('ENCRYPTION_SECRET não configurado no .env');
-  }
-
-  const [ivHex, authTagHex, encryptedHex] = encryptedKey.split(':');
-  if (!ivHex || !authTagHex || !encryptedHex) {
-    return encryptedKey; // Plaintext fallback
-  }
-
-  const iv = Buffer.from(ivHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(ENCRYPTION_SECRET, 'hex'), iv);
-  decipher.setAuthTag(authTag);
-
-  let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
-}
-
+/**
+ * Factory para criação de instâncias de providers de AI
+ * 
+ * REFATORADO (Clean Slate): Usa o novo schema v2 (Provider)
+ * Custos agora são em 1M tokens (costPer1MInput/Output)
+ */
 export class AIProviderFactory {
   
   /**
@@ -36,9 +20,10 @@ export class AIProviderFactory {
    */
   static async getProviderInstance(providerSlug: string): Promise<BaseAIProvider> {
     
-    // 1. Busca configurações no banco
-    const providerConfig = await prisma.aIProvider.findUnique({
+    // Busca configurações no banco (novo schema v2 - Provider)
+    const providerConfig = await prisma.provider.findUnique({
       where: { slug: providerSlug },
+      select: { id: true, slug: true, name: true, baseUrl: true, isActive: true }
     });
 
     if (!providerConfig) {
@@ -49,7 +34,7 @@ export class AIProviderFactory {
       throw new Error(`O provedor '${providerConfig.name}' está temporariamente desativado.`);
     }
 
-    // 2. Decide qual classe instanciar
+    // Decide qual classe instanciar
     switch (providerSlug) {
       case 'openai':
         return new OpenAIProvider();
@@ -79,15 +64,15 @@ export class AIProviderFactory {
   }
 
   static async getApiKey(userId: string, providerId: string): Promise<string> {
-    // Buscar informações do provider
-    const provider = await prisma.aIProvider.findUnique({
+    // Buscar informações do provider (novo schema v2)
+    const provider = await prisma.provider.findUnique({
       where: { id: providerId },
       select: { slug: true }
     });
 
     if (!provider) throw new Error("Provider não encontrado.");
 
-    // Caso especial: AWS Bedrock usa userSettings ao invés de userProviderCredential
+    // Caso especial: AWS Bedrock usa userSettings ao invés de credenciais separadas
     if (provider.slug === 'bedrock' || provider.slug === 'aws') {
       const { encryptionService } = await import('../../../services/encryptionService');
       const settings = await prisma.userSettings.findUnique({
@@ -103,16 +88,9 @@ export class AIProviderFactory {
       }
     }
 
-    // Buscar na tabela userProviderCredential (outros providers)
-    const userCred = await prisma.userProviderCredential.findUnique({
-      where: { userId_providerId: { userId, providerId } }
-    });
-
-    if (userCred) {
-      return decryptApiKey(userCred.apiKey);
-    }
-
     // Fallback: .env system keys
+    // NOTA: No novo schema v2, credenciais de usuário são gerenciadas via UserSettings
+    // A tabela userProviderCredential foi removida
     const envKeyMap: Record<string, string> = {
       'openai': process.env.OPENAI_API_KEY || '',
       'groq': process.env.GROQ_API_KEY || '',

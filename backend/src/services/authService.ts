@@ -1,8 +1,15 @@
 // backend/src/services/authService.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { prisma } from '../lib/prisma';
+/**
+ * ⚠️ ATENÇÃO: A funcionalidade de login social (GitHub) foi REMOVIDA do schema Prisma v2.
+ * A tabela user_provider_credentials não existe mais.
+ * 
+ * Referência: plans/CLEAN-SLATE-ORCHESTRATION.md (Fase 7 - Cleanup)
+ */
+
 import bcrypt from 'bcrypt';
+import { prisma } from '../lib/prisma';
 import { generateToken } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
 
@@ -36,21 +43,14 @@ export const authService = {
 
   async login(email: string, password: string) {
     // Buscar usuário
+    // NOTA: providerCredentials foi removido do schema v2 (Clean Slate)
+    // Login social (GitHub) não está mais disponível
     const user = await prisma.user.findUnique({ 
-      where: { email },
-      include: { providerCredentials: true } // Importante para saber se é social
+      where: { email }
     });
 
     if (!user) {
       throw new AppError('Credenciais inválidas', 401);
-    }
-
-    // 💡 Se o usuário não tem senha mas tem credencial de provedor (GitHub)
-    if (!user.password && user.providerCredentials.length > 0) {
-      throw new AppError(
-        'Esta conta foi criada via GitHub. Por favor, use o botão de Login Social.', 
-        401
-      );
     }
 
     // Verificar senha

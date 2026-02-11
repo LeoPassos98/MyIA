@@ -2,6 +2,7 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { PrismaClient, Prisma } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 import { QueueService } from '../QueueService';
 import { logger } from '../../../utils/logger';
 import { config } from '../../../config/env';
@@ -13,6 +14,7 @@ const prisma = new PrismaClient();
  * JobCreator
  * 
  * Responsabilidade: Criar registros de jobs no banco e adicionar à fila Bull
+ * Schema v2: CertificationJob foi removido, usar ModelCertification diretamente
  * - Cria job único no banco e na fila
  * - Cria job em lote (múltiplos modelos x múltiplas regiões)
  * - Cria registro de certificação no banco (upsert)
@@ -25,110 +27,88 @@ export class JobCreator {
 
   /**
    * Cria job único no banco e na fila
+   * Schema v2: Usa ModelCertification diretamente (CertificationJob removido)
    */
   async createSingleJob(
-    modelId: string,
+    deploymentId: string,
     region: string,
     createdBy?: string
   ): Promise<{ jobId: string; bullJobId: string }> {
-    logger.info(`📝 Criando job de certificação: ${modelId} @ ${region}`);
+    logger.info(`📝 Criando job de certificação: ${deploymentId} @ ${region}`);
 
-    // 1. Criar registro no banco
-    const certificationJob = await prisma.certificationJob.create({
-      data: {
-        type: 'SINGLE_MODEL',
-        regions: [region],
-        modelIds: [modelId],
-        status: 'PENDING',
-        totalModels: 1,
-        createdBy
-      }
-    });
+    // Gerar ID único para o job (substitui CertificationJob.id)
+    const jobId = uuidv4();
 
-    // 2. Criar certificação no banco
-    const certification = await this.createCertificationRecord(modelId, region, createdBy);
+    // 1. Criar certificação no banco
+    const certificationId = await this.createCertificationRecord(deploymentId, region, createdBy);
 
-    // 3. Adicionar job à fila Bull
+    // 2. Adicionar job à fila Bull
     const bullJob = await this.queueService.addJob<CertificationJobData>(
       this.queueName,
       {
-        jobId: certificationJob.id,
-        modelId,
+        jobId,
+        modelId: deploymentId, // Mantém compatibilidade com interface existente
+        deploymentId, // Novo campo para schema v2
         region,
         createdBy
       },
       {
-        jobId: certificationJob.id,
+        jobId,
         attempts: parseInt(config.certificationMaxRetries as string, 10),
         timeout: parseInt(config.certificationTimeout as string, 10)
       }
     );
 
-    // 4. Atualizar com bullJobId
-    await prisma.certificationJob.update({
-      where: { id: certificationJob.id },
-      data: {
-        bullJobId: bullJob.id?.toString(),
-        status: 'QUEUED'
-      }
-    });
-
+    // 3. Atualizar certificação com bullJobId
     await prisma.modelCertification.update({
-      where: { id: certification },
+      where: { id: certificationId },
       data: {
         jobId: bullJob.id?.toString(),
-        status: 'QUEUED'
+        status: 'PENDING'
       }
     });
 
-    logger.info(`✅ Job criado: ${certificationJob.id} (Bull: ${bullJob.id})`);
+    logger.info(`✅ Job criado: ${jobId} (Bull: ${bullJob.id})`);
 
     return {
-      jobId: certificationJob.id,
+      jobId,
       bullJobId: bullJob.id?.toString() || ''
     };
   }
 
   /**
    * Cria job em lote (múltiplos modelos x múltiplas regiões)
+   * Schema v2: Usa ModelCertification diretamente (CertificationJob removido)
    */
   async createBatchJob(
-    modelIds: string[],
+    deploymentIds: string[],
     regions: string[],
     createdBy?: string
   ): Promise<{ jobId: string; totalJobs: number }> {
-    logger.info(`📝 Criando job de certificação em lote: ${modelIds.length} modelos x ${regions.length} regiões`);
+    logger.info(`📝 Criando job de certificação em lote: ${deploymentIds.length} modelos x ${regions.length} regiões`);
 
-    // 1. Criar registro do job PAI no banco
-    const certificationJob = await prisma.certificationJob.create({
-      data: {
-        type: 'MULTIPLE_MODELS',
-        regions,
-        modelIds,
-        status: 'PENDING',
-        totalModels: modelIds.length * regions.length,
-        createdBy
-      }
-    });
+    // Gerar ID único para o job PAI (substitui CertificationJob.id)
+    const batchJobId = uuidv4();
 
-    // 2. Criar jobs individuais no Bull (todos vinculados ao job PAI)
+    // Criar jobs individuais no Bull
     let jobCount = 0;
-    for (const modelId of modelIds) {
+    for (const deploymentId of deploymentIds) {
       for (const region of regions) {
         // Criar ou atualizar certificação no banco
-        const certificationId = await this.createCertificationRecord(modelId, region, createdBy);
+        const certificationId = await this.createCertificationRecord(deploymentId, region, createdBy);
 
         // Adicionar job à fila Bull (vinculado ao job PAI)
         const bullJob = await this.queueService.addJob<CertificationJobData>(
           this.queueName,
           {
-            jobId: certificationJob.id, // Job PAI
-            modelId,
+            jobId: batchJobId, // Job PAI
+            modelId: deploymentId, // Mantém compatibilidade
+            deploymentId, // Novo campo para schema v2
             region,
             createdBy
           },
           {
-            jobId: `${certificationJob.id}-${certificationId}`, // ID único para o Bull
+            jobId: `${batchJobId}-${certificationId}`, // ID único para o Bull
             attempts: parseInt(config.certificationMaxRetries as string, 10),
             timeout: parseInt(config.certificationTimeout as string, 10)
           }
@@ -138,7 +118,7 @@ export class JobCreator {
           where: { id: certificationId },
           data: {
             jobId: bullJob.id?.toString(),
-            status: 'QUEUED'
+            status: 'PENDING'
           }
         });
 
@@ -146,38 +126,30 @@ export class JobCreator {
       }
     }
 
-    // 3. Atualizar status do job PAI
-    await prisma.certificationJob.update({
-      where: { id: certificationJob.id },
-      data: {
-        status: 'QUEUED',
-        startedAt: new Date()
-      }
-    });
-
-    logger.info(`✅ Job em lote criado: ${certificationJob.id} (${jobCount} jobs na fila)`);
+    logger.info(`✅ Job em lote criado: ${batchJobId} (${jobCount} jobs na fila)`);
 
     return {
-      jobId: certificationJob.id,
+      jobId: batchJobId,
       totalJobs: jobCount
     };
   }
 
   /**
    * Cria registro de certificação no banco (upsert)
+   * Schema v2: Usa deploymentId em vez de modelId
    * @returns ID da certificação criada/atualizada
    */
   private async createCertificationRecord(
-    modelId: string,
+    deploymentId: string,
     region: string,
     createdBy?: string
   ): Promise<string> {
     const certification = await prisma.modelCertification.upsert({
       where: {
-        modelId_region: { modelId, region }
+        deploymentId_region: { deploymentId, region }
       },
       create: {
-        modelId,
+        deploymentId,
         region,
         status: 'PENDING',
         createdBy

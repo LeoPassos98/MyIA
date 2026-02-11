@@ -1,5 +1,7 @@
 // backend/src/services/queue/processors/JobProcessor.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Nota: Este arquivo usa 'any' para tipos dinâmicos do Bull queue
 
 import { Job } from 'bull';
 import { PrismaClient } from '@prisma/client';
@@ -105,7 +107,8 @@ export class JobProcessor {
   }
 
   /**
-   * Identifica se modelId é UUID ou apiModelId e busca ambos
+   * Identifica se modelId é UUID ou deploymentId e busca ambos
+   * Schema v2: AIModel foi substituído por ModelDeployment
    */
   private async resolveModelIds(modelIdParam: string): Promise<{
     uuid: string;
@@ -114,34 +117,36 @@ export class JobProcessor {
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(modelIdParam);
 
     if (isUUID) {
-      // É UUID - buscar apiModelId
-      const model = await prisma.aIModel.findUnique({
+      // É UUID - buscar deploymentId
+      // Schema v2: ModelDeployment usa deploymentId como identificador do provider
+      const deployment = await prisma.modelDeployment.findUnique({
         where: { id: modelIdParam },
-        select: { id: true, apiModelId: true }
+        select: { id: true, deploymentId: true }
       });
 
-      if (!model) {
-        throw new Error(`Modelo ${modelIdParam} não encontrado no banco de dados`);
+      if (!deployment) {
+        throw new Error(`Deployment ${modelIdParam} não encontrado no banco de dados`);
       }
 
       return {
-        uuid: model.id,
-        apiModelId: model.apiModelId
+        uuid: deployment.id,
+        apiModelId: deployment.deploymentId // deploymentId é o equivalente ao antigo apiModelId
       };
     } else {
-      // É apiModelId - buscar UUID
-      const model = await prisma.aIModel.findFirst({
-        where: { apiModelId: modelIdParam },
-        select: { id: true, apiModelId: true }
+      // É deploymentId - buscar UUID
+      // Schema v2: deploymentId é único por provider, precisamos buscar
+      const deployment = await prisma.modelDeployment.findFirst({
+        where: { deploymentId: modelIdParam },
+        select: { id: true, deploymentId: true }
       });
 
-      if (!model) {
-        throw new Error(`Modelo ${modelIdParam} não encontrado no banco de dados`);
+      if (!deployment) {
+        throw new Error(`Deployment ${modelIdParam} não encontrado no banco de dados`);
       }
 
       return {
-        uuid: model.id,
-        apiModelId: model.apiModelId
+        uuid: deployment.id,
+        apiModelId: deployment.deploymentId
       };
     }
   }
@@ -224,10 +229,20 @@ export class JobProcessor {
       testResults = result.results;
 
       // Ler badge e rating CORRETOS do banco (salvos por certification.service via RatingCalculator)
-      const savedCert = await prisma.modelCertification.findUnique({
-        where: { modelId_region: { modelId: apiModelId, region } },
-        select: { badge: true, rating: true }
+      // Schema v2: Buscar por deploymentId (UUID) + region
+      // Primeiro, precisamos obter o deploymentId (UUID) a partir do apiModelId (deploymentId string)
+      const deployment = await prisma.modelDeployment.findFirst({
+        where: { deploymentId: apiModelId },
+        select: { id: true }
       });
+      
+      let savedCert = null;
+      if (deployment) {
+        savedCert = await prisma.modelCertification.findUnique({
+          where: { deploymentId_region: { deploymentId: deployment.id, region } },
+          select: { badge: true, rating: true }
+        });
+      }
       badge = savedCert?.badge || (passed ? 'FUNCIONAL' : 'INDISPONIVEL');
       rating = savedCert?.rating || 0;
     }
@@ -264,21 +279,22 @@ export class JobProcessor {
     let finalModelUUID = modelUUID;
 
     if (!apiModelId) {
+      // Schema v2: AIModel foi substituído por ModelDeployment
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(modelIdParam);
       if (isUUID) {
-        const model = await prisma.aIModel.findUnique({
+        const deployment = await prisma.modelDeployment.findUnique({
           where: { id: modelIdParam },
-          select: { id: true, apiModelId: true }
+          select: { id: true, deploymentId: true }
         });
-        finalApiModelId = model?.apiModelId || modelIdParam;
-        finalModelUUID = model?.id || modelIdParam;
+        finalApiModelId = deployment?.deploymentId || modelIdParam;
+        finalModelUUID = deployment?.id || modelIdParam;
       } else {
         finalApiModelId = modelIdParam;
-        const model = await prisma.aIModel.findFirst({
-          where: { apiModelId: modelIdParam },
+        const deployment = await prisma.modelDeployment.findFirst({
+          where: { deploymentId: modelIdParam },
           select: { id: true }
         });
-        finalModelUUID = model?.id || modelIdParam;
+        finalModelUUID = deployment?.id || modelIdParam;
       }
     }
 

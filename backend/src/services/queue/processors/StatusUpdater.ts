@@ -14,7 +14,7 @@ export interface CertificationUpdateResult {
   score: number;
   rating: number | null;
   badge: string;
-  testResults: any;
+  testResults: unknown;
   duration: number;
 }
 
@@ -30,79 +30,61 @@ export interface CertificationUpdateError {
 /**
  * StatusUpdater
  * 
- * Responsabilidade: Atualizar status de jobs e certificações no banco
- * - Atualiza JobCertification e ModelCertification quando job inicia
- * - Atualiza registros quando job completa com sucesso
- * - Atualiza registros quando job falha
- * - Atualiza contadores do CertificationJob (job PAI)
+ * Responsabilidade: Atualizar status de certificações no banco
+ * Schema v2: 
+ * - CertificationJob foi removido - usar Bull job data
+ * - JobCertification foi removido - usar ModelCertification diretamente
+ * - modelId_region → deploymentId_region
+ * - Status: PENDING, RUNNING, PASSED, FAILED, ERROR, SKIPPED
  */
 export class StatusUpdater {
   /**
-   * Atualiza JobCertification e ModelCertification quando job inicia
+   * Atualiza ModelCertification quando job inicia
+   * Schema v2: Usa deploymentId em vez de modelId
    */
   async updateOnStart(
-    jobId: string,
-    modelUUID: string,
-    apiModelId: string,
+    _jobId: string,
+    deploymentUUID: string,
+    _apiModelId: string,
     region: string
   ): Promise<void> {
-    logger.info(`▶️  Atualizando status para PROCESSING: ${apiModelId} @ ${region}`);
+    logger.info(`▶️  Atualizando status para RUNNING: ${deploymentUUID} @ ${region}`);
 
-    await Promise.all([
-      prisma.jobCertification.upsert({
-        where: {
-          jobId_modelId_region: { jobId, modelId: modelUUID, region }
-        },
-        create: {
-          jobId,
-          modelId: modelUUID,
-          region,
-          status: 'PROCESSING',
-          startedAt: new Date()
-        },
-        update: {
-          status: 'PROCESSING',
-          startedAt: new Date(),
-          completedAt: null,
-          duration: null,
-          error: null,
-          details: undefined
-        }
-      }),
-      prisma.modelCertification.upsert({
-        where: {
-          modelId_region: { modelId: apiModelId, region }
-        },
-        create: {
-          modelId: apiModelId,
-          region,
-          status: 'PROCESSING',
-          startedAt: new Date()
-        },
-        update: {
-          status: 'PROCESSING',
-          startedAt: new Date()
-        }
-      })
-    ]);
+    await prisma.modelCertification.upsert({
+      where: {
+        deploymentId_region: { deploymentId: deploymentUUID, region }
+      },
+      create: {
+        deploymentId: deploymentUUID,
+        region,
+        status: 'RUNNING',
+        startedAt: new Date()
+      },
+      update: {
+        status: 'RUNNING',
+        startedAt: new Date()
+      }
+    });
 
-    logger.info(`✅ Status atualizado para PROCESSING: ${apiModelId} @ ${region}`);
+    logger.info(`✅ Status atualizado para RUNNING: ${deploymentUUID} @ ${region}`);
   }
 
   /**
    * Atualiza registros quando job completa com sucesso
+   * Schema v2: Usa deploymentId em vez de modelId
    */
   async updateOnSuccess(
-    jobId: string,
-    modelUUID: string,
-    apiModelId: string,
+    _jobId: string,
+    deploymentUUID: string,
+    _apiModelId: string,
     region: string,
     result: CertificationUpdateResult
   ): Promise<void> {
     const updateTimestamp = new Date().toISOString();
+    const status = result.passed ? 'PASSED' : 'FAILED';
     
     logger.info(`🔍 [DB-SAVE] Salvando resultado no banco`, {
-      modelId: apiModelId,
+      deploymentId: deploymentUUID,
       region,
       passed: result.passed,
       score: result.score,
@@ -112,67 +94,40 @@ export class StatusUpdater {
       timestamp: updateTimestamp
     });
 
-    // Buscar JobCertification para obter o ID
-    const jobCert = await prisma.jobCertification.findUnique({
+    await prisma.modelCertification.upsert({
       where: {
-        jobId_modelId_region: { jobId, modelId: modelUUID, region }
+        deploymentId_region: { deploymentId: deploymentUUID, region }
       },
-      select: { id: true }
+      create: {
+        deploymentId: deploymentUUID,
+        region,
+        status,
+        passed: result.passed,
+        score: result.score,
+        rating: result.rating,
+        badge: result.badge,
+        testResults: result.testResults as object,
+        completedAt: new Date(),
+        duration: result.duration,
+        certifiedAt: result.passed ? new Date() : null
+      },
+      update: {
+        status,
+        passed: result.passed,
+        score: result.score,
+        // NÃO sobrescrever badge e rating - já salvos corretamente
+        // pelo certification.service.ts via RatingCalculator
+        testResults: result.testResults as object,
+        completedAt: new Date(),
+        duration: result.duration,
+        certifiedAt: result.passed ? new Date() : null
+      }
     });
 
-    if (!jobCert) {
-      throw new Error(`JobCertification não encontrado: jobId=${jobId}, modelId=${modelUUID}, region=${region}`);
-    }
-
-    await Promise.all([
-      prisma.jobCertification.update({
-        where: { id: jobCert.id },
-        data: {
-          status: result.passed ? 'PASSED' : 'FAILED',
-          completedAt: new Date(),
-          duration: result.duration,
-          details: {
-            timestamp: new Date().toISOString(),
-            score: result.score,
-            rating: result.rating,
-            badge: result.badge,
-            testResults: result.testResults
-          } as any
-        }
-      }),
-      prisma.modelCertification.upsert({
-        where: {
-          modelId_region: { modelId: apiModelId, region }
-        },
-        create: {
-          modelId: apiModelId,
-          region,
-          status: result.passed ? 'CERTIFIED' : 'FAILED',
-          passed: result.passed,
-          score: result.score,
-          rating: result.rating,
-          badge: result.badge,
-          testResults: result.testResults as any,
-          completedAt: new Date(),
-          duration: result.duration
-        },
-        update: {
-          status: result.passed ? 'CERTIFIED' : 'FAILED',
-          passed: result.passed,
-          score: result.score,
-          // NÃO sobrescrever badge e rating - já salvos corretamente
-          // pelo certification.service.ts via RatingCalculator
-          testResults: result.testResults as any,
-          completedAt: new Date(),
-          duration: result.duration
-        }
-      })
-    ]);
-
     logger.info(`✅ [DB-SAVE] Resultado salvo com sucesso no banco`, {
-      modelId: apiModelId,
+      deploymentId: deploymentUUID,
       region,
-      status: result.passed ? 'CERTIFIED' : 'FAILED',
+      status,
       passed: result.passed,
       score: result.score,
       rating: result.rating,
@@ -184,83 +139,67 @@ export class StatusUpdater {
 
   /**
    * Atualiza registros quando job falha
+   * Schema v2: Usa deploymentId em vez de modelId
    */
   async updateOnFailure(
-    jobId: string,
-    modelUUID: string,
-    apiModelId: string,
+    _jobId: string,
+    deploymentUUID: string,
+    _apiModelId: string,
     region: string,
     error: CertificationUpdateError
   ): Promise<void> {
-    logger.error(`❌ Atualizando status para FAILED: ${apiModelId} @ ${region}`, {
+    logger.error(`❌ Atualizando status para ERROR: ${deploymentUUID} @ ${region}`, {
       errorMessage: error.message,
       errorCategory: error.category,
       duration: error.duration
     });
 
-    await Promise.all([
-      prisma.jobCertification.updateMany({
-        where: {
-          jobId,
-          modelId: modelUUID,
-          region,
-          status: 'PROCESSING'
-        },
-        data: {
-          status: 'FAILED',
-          completedAt: new Date(),
-          duration: error.duration,
-          error: error.message
-        }
-      }),
-      prisma.modelCertification.upsert({
-        where: {
-          modelId_region: { modelId: apiModelId, region }
-        },
-        create: {
-          modelId: apiModelId,
-          region,
-          status: 'FAILED',
-          passed: false,
-          errorMessage: error.message,
-          errorCategory: error.category,
-          completedAt: new Date(),
-          duration: error.duration
-        },
-        update: {
-          status: 'FAILED',
-          passed: false,
-          errorMessage: error.message,
-          errorCategory: error.category,
-          completedAt: new Date(),
-          duration: error.duration
-        }
-      })
-    ]);
+    await prisma.modelCertification.upsert({
+      where: {
+        deploymentId_region: { deploymentId: deploymentUUID, region }
+      },
+      create: {
+        deploymentId: deploymentUUID,
+        region,
+        status: 'ERROR',
+        passed: false,
+        errorMessage: error.message,
+        errorCategory: error.category,
+        completedAt: new Date(),
+        duration: error.duration
+      },
+      update: {
+        status: 'ERROR',
+        passed: false,
+        errorMessage: error.message,
+        errorCategory: error.category,
+        completedAt: new Date(),
+        duration: error.duration
+      }
+    });
 
-    logger.info(`✅ Status atualizado para FAILED: ${apiModelId} @ ${region}`);
+    logger.info(`✅ Status atualizado para ERROR: ${deploymentUUID} @ ${region}`);
   }
 
   /**
-   * Atualiza contadores do CertificationJob (job PAI)
+   * Atualiza contadores do job
+   * Schema v2: CertificationJob foi removido - esta função agora é no-op
+   * Os contadores são gerenciados pelo Bull queue diretamente
    */
   async updateJobCounters(
-    jobId: string,
+    _jobId: string,
     increment: {
       processed: number;
       success?: number;
       failure?: number;
     }
   ): Promise<void> {
-    await prisma.certificationJob.update({
-      where: { id: jobId },
-      data: {
-        processedModels: { increment: increment.processed },
-        successCount: increment.success ? { increment: increment.success } : undefined,
-        failureCount: increment.failure ? { increment: increment.failure } : undefined
-      }
+    // Schema v2: CertificationJob foi removido
+    // Os contadores são gerenciados pelo Bull queue diretamente
+    // Esta função é mantida para compatibilidade com código existente
+    logger.debug(`📊 Contadores do job (no-op no schema v2)`, {
+      jobId: _jobId,
+      increment
     });
-
-    logger.info(`✅ Contadores do job atualizados: ${jobId}`, increment);
   }
 }

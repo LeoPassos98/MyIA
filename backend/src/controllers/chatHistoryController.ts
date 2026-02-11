@@ -1,4 +1,6 @@
 // backend/src/controllers/chatHistoryController.ts
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { prisma } from '../lib/prisma';
@@ -63,7 +65,7 @@ export const chatHistoryController = {
       const { chatId } = req.params;
 
       await prisma.message.deleteMany({ where: { chatId: chatId }});
-      await prisma.chat.delete({ 
+      await prisma.chat.delete({
         where: { id: chatId, userId: req.userId }
       });
 

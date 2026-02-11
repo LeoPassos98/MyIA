@@ -1,11 +1,11 @@
 // backend/src/services/ai/index.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
+import { prisma } from '../../lib/prisma';
+import logger from '../../utils/logger';
 import { StreamChunk } from './types';
 import { AIProviderFactory } from './providers/factory';
 import { getEmbedding, getEmbeddingsBatch, EmbeddingResponse } from './client/azureEmbeddingClient';
-import { prisma } from '../../lib/prisma';
-import logger from '../../utils/logger';
 
 export interface AIStreamOptions {
   providerSlug: string;
@@ -22,7 +22,7 @@ export const aiService = {
    * Usa a Factory e o Banco de Dados.
    */
   async *stream(
-    messages: any[],
+    messages: Array<{ role: string; content: string }>,
     options: AIStreamOptions
   ): AsyncGenerator<StreamChunk> {
     
@@ -31,7 +31,8 @@ export const aiService = {
     try {
       const provider = await AIProviderFactory.getProviderInstance(options.providerSlug);
 
-      const providerRecord = await prisma.aIProvider.findUnique({
+      // Schema v2: AIProvider → Provider
+      const providerRecord = await prisma.provider.findUnique({
         where: { slug: options.providerSlug }
       });
 
@@ -80,9 +81,12 @@ export const aiService = {
     return getEmbeddingsBatch(texts);
   },
   
-  // Método legado mantido para evitar quebra de contratos antigos se houver
-  async chat(_messages: any[], _providerSlug: string) {
-     // Implementação simplificada se necessária, ou erro
+  /**
+   * @deprecated Use aiService.stream para chat.
+   * Método legado mantido para evitar quebra de contratos antigos.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  chat: async function(): Promise<never> {
      throw new Error("Use aiService.stream para chat.");
   }
 };

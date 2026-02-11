@@ -1,16 +1,18 @@
 // backend/src/controllers/certificationQueue/transformers/responseTransformer.ts
 // Standards: docs/STANDARDS.md
 
-import { ModelCertification, CertificationJob } from '@prisma/client';
-import { statusTransformer } from './statusTransformer';
+import { ModelCertification, CertificationStatus } from '@prisma/client';
 import { logger } from '../../../utils/logger';
+import { statusTransformer } from './statusTransformer';
 
 /**
  * Certificação transformada para resposta
+ * Schema v2: Usa deploymentId em vez de modelId
  */
 export interface TransformedCertification {
   id: string;
-  modelId: string;
+  deploymentId: string;
+  modelId?: string; // Compatibilidade com código antigo
   region: string;
   status: string;
   rating: number | null;
@@ -85,13 +87,14 @@ export class ResponseTransformer {
   transformCertification(cert: ModelCertification): TransformedCertification {
     logger.debug('[ResponseTransformer] Transformando certificação', {
       certId: cert.id,
-      modelId: cert.modelId,
+      deploymentId: cert.deploymentId,
       status: cert.status
     });
 
     return {
       id: cert.id,
-      modelId: cert.modelId,
+      deploymentId: cert.deploymentId,
+      modelId: cert.deploymentId, // Compatibilidade com código antigo
       region: cert.region,
       status: statusTransformer.toFrontendStatus(cert.status),
       rating: cert.rating,
@@ -121,12 +124,26 @@ export class ResponseTransformer {
   }
 
   /**
-   * Transforma job do Prisma para formato de resposta
-   * 
-   * @param job - Job do Prisma
+   * Transforma job para formato de resposta
+   * Schema v2: CertificationJob foi removido - aceita objeto genérico
+   *
+   * @param job - Dados do job (pode vir do Bull queue ou agregação)
    * @returns Job transformado
    */
-  transformJobStatus(job: CertificationJob): TransformedJobStatus {
+  transformJobStatus(job: {
+    id: string;
+    bullJobId?: string | null;
+    type?: string;
+    status: string;
+    totalModels: number;
+    processedModels: number;
+    successCount: number;
+    failureCount: number;
+    createdAt: Date;
+    updatedAt: Date;
+    startedAt?: Date | null;
+    completedAt?: Date | null;
+  }): TransformedJobStatus {
     logger.debug('[ResponseTransformer] Transformando job status', {
       jobId: job.id,
       type: job.type,
@@ -136,7 +153,7 @@ export class ResponseTransformer {
     return {
       jobId: job.id,
       bullJobId: job.bullJobId || undefined,
-      type: job.type,
+      type: job.type || 'CERTIFICATION',
       status: job.status,
       totalModels: job.totalModels,
       processedModels: job.processedModels,
@@ -151,14 +168,14 @@ export class ResponseTransformer {
 
   /**
    * Transforma estatísticas para formato de resposta
-   * 
+   *
    * @param stats - Estatísticas brutas
    * @returns Estatísticas transformadas
    */
   transformStats(stats: {
-    queue: any;
-    certificationsByRegion: Array<{ region: string; status: any; _count: number }>;
-    certificationsByStatus: Array<{ status: any; _count: number }>;
+    queue: TransformedStats['queue'];
+    certificationsByRegion: Array<{ region: string; status: CertificationStatus; _count: number }>;
+    certificationsByStatus: Array<{ status: CertificationStatus; _count: number }>;
     recentCertifications: ModelCertification[];
   }): TransformedStats {
     logger.debug('[ResponseTransformer] Transformando estatísticas');

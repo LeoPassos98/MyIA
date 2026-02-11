@@ -108,8 +108,11 @@ describe('AnthropicOnDemandAdapter', () => {
 
       const result = adapter.formatRequest(messages, options);
 
-      expect(result.body.max_tokens).toBe(2048);
-      expect(result.body.temperature).toBe(0.7);
+      // Valores padrão hardcoded do adapter para Anthropic
+      // Nota: Se o cache do adapterParamsService estiver populado com valores do banco,
+      // esses valores podem ser diferentes. Os valores abaixo são os hardcoded do adapter.
+      expect(result.body.max_tokens).toBe(4096);
+      expect(result.body.temperature).toBe(1.0);
     });
 
     it('deve priorizar temperature sobre top_p', () => {
@@ -139,8 +142,10 @@ describe('AnthropicOnDemandAdapter', () => {
 
       const result = adapter.formatRequest(messages, options);
 
-      // Temperature tem prioridade e usa valor padrão (0.7)
-      expect(result.body.temperature).toBe(0.7);
+      // Temperature tem prioridade e usa valor padrão hardcoded (1.0 para Anthropic)
+      // Nota: Se o cache do adapterParamsService estiver populado com valores do banco,
+      // esses valores podem ser diferentes. Os valores abaixo são os hardcoded do adapter.
+      expect(result.body.temperature).toBe(1.0);
       expect(result.body.top_p).toBeUndefined();
     });
 
@@ -305,7 +310,7 @@ describe('AnthropicOnDemandAdapter', () => {
     });
 
     it('deve retornar chunk vazio para chunk null', () => {
-      const result = adapter.parseChunk(null);
+      const result = adapter.parseChunk(null as unknown as Record<string, unknown>);
 
       expect(result).toEqual({
         type: 'chunk',

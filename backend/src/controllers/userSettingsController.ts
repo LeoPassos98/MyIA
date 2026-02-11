@@ -9,6 +9,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { encryptionService } from '../services/encryptionService';
 import { jsend } from '../utils/jsend';
+import logger from '../utils/logger';
 
 // Helper: Encontrar ou criar configurações
 async function findOrCreateSettings(userId: string) {
@@ -62,13 +63,13 @@ export const userSettingsController = {
       const settings = await findOrCreateSettings(req.userId);
 
       // --- LÓGICA DO COFRE (GET) ---
-      const safeSettings = { ...settings };
+      const safeSettings: Record<string, unknown> = { ...settings };
 
       for (const key of encryptedKeys) {
         const encryptedValue = settings[key as keyof typeof settings] as string;
         if (encryptedValue) {
           const decryptedKey = encryptionService.decrypt(encryptedValue);
-          (safeSettings as any)[key] = encryptionService.getPlaceholder(decryptedKey);
+          safeSettings[key] = encryptionService.getPlaceholder(decryptedKey);
         }
       }
       // --- FIM DA LÓGICA ---
@@ -123,12 +124,12 @@ export const userSettingsController = {
       });
 
       // (Repetir a lógica do GET para retornar os placeholders)
-      const safeSettings = { ...updatedSettings };
+      const safeSettings: Record<string, unknown> = { ...updatedSettings };
       for (const key of encryptedKeys) {
         const encryptedValue = updatedSettings[key as keyof typeof updatedSettings] as string;
         if (encryptedValue) {
           const decryptedKey = encryptionService.decrypt(encryptedValue);
-          (safeSettings as any)[key] = encryptionService.getPlaceholder(decryptedKey);
+          safeSettings[key] = encryptionService.getPlaceholder(decryptedKey);
         }
       }
 
@@ -140,17 +141,31 @@ export const userSettingsController = {
   },
 
   // GET /api/settings/credentials
+  // Schema v2: UserProviderCredential foi removido
+  // As credenciais agora são armazenadas diretamente em UserSettings
   async getCredentials(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const credentials = await prisma.userProviderCredential.findMany({
-        where: { userId: req.userId },
-        include: { provider: true }
+      // Schema v2: Buscar credenciais diretamente de UserSettings
+      const settings = await prisma.userSettings.findUnique({
+        where: { userId: req.userId }
       });
 
+      // Mapear credenciais do UserSettings para o formato esperado
       const keyMap: Record<string, string> = {};
-      credentials.forEach(cred => {
-        keyMap[cred.provider.slug] = cred.apiKey;
-      });
+      
+      // AWS Bedrock credentials
+      if (settings?.awsAccessKey && settings?.awsSecretKey) {
+        // Retornar placeholder para não expor credenciais
+        keyMap['bedrock'] = encryptionService.getPlaceholder(
+          encryptionService.decrypt(settings.awsAccessKey)
+        );
+      }
+      
+      // NOTA: Outras credenciais de providers (openai, groq, etc.)
+      // também estão em UserSettings como campos individuais
+      // Ex: openaiApiKey, groqApiKey, etc.
+      
+      logger.info(`[getCredentials] Retornando credenciais para userId: ${req.userId}`);
 
       return res.json(jsend.success({ credentials: keyMap }));
     } catch (error) {
@@ -159,10 +174,13 @@ export const userSettingsController = {
   },
 
   // POST /api/settings/credentials
+  // Schema v2: UserProviderCredential foi removido
+  // As credenciais agora são armazenadas diretamente em UserSettings
+  // TODO: Refatorar para atualizar campos específicos em UserSettings
   async updateCredentials(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const keys = req.body as Record<string, string>; 
-      const userId = req.userId!;
+      const keys = req.body as Record<string, string>;
+      // Schema v2: userId disponível em req.userId para atualização via UserSettings
 
       if (!keys || typeof keys !== 'object') {
         return res.status(400).json(jsend.fail({ body: 'Body inválido' }));
@@ -171,23 +189,16 @@ export const userSettingsController = {
       const updatePromises = Object.entries(keys).map(async ([providerSlug, apiKey]) => {
         if (!apiKey || typeof apiKey !== 'string') return null;
 
-        const provider = await prisma.aIProvider.findUnique({ where: { slug: providerSlug } });
+        // Schema v2: AIProvider → Provider
+        const provider = await prisma.provider.findUnique({ where: { slug: providerSlug } });
         if (!provider) return null;
 
-        return prisma.userProviderCredential.upsert({
-          where: {
-            userId_providerId: {
-              userId,
-              providerId: provider.id
-            }
-          },
-          update: { apiKey },
-          create: {
-            userId,
-            providerId: provider.id,
-            apiKey
-          }
-        });
+        // Schema v2: UserProviderCredential foi removido
+        // As credenciais agora são armazenadas diretamente em UserSettings
+        // TODO: Implementar atualização via UserSettings baseado no providerSlug
+        // Ex: if (providerSlug === 'bedrock') { update awsAccessKey, awsSecretKey }
+        logger.warn(`[updateCredentials] UserProviderCredential removido do schema v2. Provider: ${providerSlug}. Use updateSettings para atualizar credenciais.`);
+        return null;
       });
 
       await Promise.all(updatePromises);

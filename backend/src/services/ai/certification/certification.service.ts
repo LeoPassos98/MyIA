@@ -1,13 +1,14 @@
 // backend/src/services/ai/certification/certification.service.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
-import { ModelRegistry } from '../registry';
+import { logger } from '../../../utils/logger';
+import { deploymentService, baseModelService } from '../../models';
+import { prisma } from '../../../lib/prisma';
 import {
   CertificationResult,
   ModelCertificationStatus,
   ProgressCallback
 } from './types';
-import { logger } from '../../../utils/logger';
 import { CertificationCacheManager } from './cache/cache-manager';
 import { VendorTestSelector } from './orchestration/vendor-test-selector';
 import { TestOrchestrator } from './orchestration/test-orchestrator';
@@ -25,6 +26,20 @@ interface AWSCredentials {
 // Região padrão para queries sem região especificada
 const DEFAULT_REGION = 'us-east-1';
 
+// Provider slug padrão (AWS Bedrock)
+const DEFAULT_PROVIDER_SLUG = 'bedrock';
+
+/**
+ * Informações do deployment resolvido
+ */
+interface ResolvedDeployment {
+  id: string;              // UUID interno do deployment
+  deploymentId: string;    // ID do provider (ex: "anthropic.claude-3-5-sonnet-20241022-v2:0")
+  baseModelId: string;     // UUID do modelo base
+  providerId: string;      // UUID do provider
+  vendor: string;          // Vendor do modelo base (ex: "Anthropic")
+}
+
 /**
  * Service principal de certificação de modelos
  * 
@@ -32,6 +47,7 @@ const DEFAULT_REGION = 'us-east-1';
  * - Orquestrar processo de certificação
  * - Coordenar módulos especializados
  * - Manter API pública compatível
+ * - Resolver modelId (string) para deploymentId (FK) usando deploymentService
  * 
  * Arquitetura:
  * - CacheManager: Gerencia cache de certificações
@@ -39,8 +55,13 @@ const DEFAULT_REGION = 'us-east-1';
  * - TestOrchestrator: Executa testes com retry
  * - MetricsCalculator: Calcula métricas de certificação
  * - StatusDeterminer: Determina status baseado em métricas
- * - CertificationRepository: Persiste certificações
- * - CertificationQueries: Consulta certificações
+ * - CertificationRepository: Persiste certificações (usa deploymentId FK)
+ * - CertificationQueries: Consulta certificações (usa deploymentId FK)
+ * 
+ * Clean Slate v2:
+ * - API pública continua recebendo modelId (string do provider)
+ * - Internamente resolve para deploymentId (UUID) via deploymentService
+ * - Todos os modelos devem estar no banco de dados
  */
 export class ModelCertificationService {
   private cacheManager: CertificationCacheManager;
@@ -59,6 +80,58 @@ export class ModelCertificationService {
     this.statusDeterminer = new StatusDeterminer();
     this.repository = new CertificationRepository();
     this.queries = new CertificationQueries();
+  }
+
+  /**
+   * Resolve modelId (string do provider) para deployment completo
+   *
+   * Estratégia de resolução:
+   * - Busca no banco via deploymentService (schema v2)
+   *
+   * @param modelId - ID do modelo no provider (ex: "anthropic.claude-3-5-sonnet-20241022-v2:0")
+   * @returns Deployment resolvido ou null se não encontrado
+   */
+  private async resolveDeployment(modelId: string): Promise<ResolvedDeployment | null> {
+    logger.debug('[CertificationService] Resolvendo deployment', { modelId });
+
+    // 1. Buscar provider Bedrock (padrão)
+    const provider = await prisma.provider.findUnique({
+      where: { slug: DEFAULT_PROVIDER_SLUG }
+    });
+
+    if (!provider) {
+      logger.warn('[CertificationService] Provider não encontrado', {
+        slug: DEFAULT_PROVIDER_SLUG
+      });
+      return null;
+    }
+
+    // 2. Buscar deployment pelo deploymentId (string do provider)
+    const deployment = await deploymentService.findByDeploymentId(
+      provider.id,
+      modelId,
+      true,  // includeBaseModel
+      true   // includeProvider
+    );
+
+    if (deployment && deployment.baseModel) {
+      logger.info('[CertificationService] Deployment encontrado no banco v2', {
+        deploymentId: deployment.id,
+        modelId: deployment.deploymentId,
+        vendor: deployment.baseModel.vendor
+      });
+
+      return {
+        id: deployment.id,
+        deploymentId: deployment.deploymentId,
+        baseModelId: deployment.baseModelId,
+        providerId: deployment.providerId,
+        vendor: deployment.baseModel.vendor
+      };
+    }
+
+    logger.error('[CertificationService] Modelo não encontrado no banco', { modelId });
+    return null;
   }
 
   /**
@@ -84,7 +157,7 @@ export class ModelCertificationService {
   /**
    * Certifica um modelo específico executando testes apropriados
    *
-   * @param modelId - ID do modelo a ser certificado
+   * @param modelId - ID do modelo a ser certificado (string do provider)
    * @param credentials - Credenciais AWS para acesso ao Bedrock
    * @param force - Se true, ignora cache e força re-certificação
    * @param onProgress - Callback opcional para feedback de progresso via SSE
@@ -127,27 +200,28 @@ export class ModelCertificationService {
       });
     }
     
-    // 2. Cache miss - executar testes
-    logger.info('[CertificationService] Cache miss, executando testes', {
+    // 2. Cache miss - resolver deployment
+    logger.info('[CertificationService] Cache miss, resolvendo deployment', {
       modelId
     });
     
-    // 3. Obter metadata do modelo
-    const metadata = ModelRegistry.getModel(modelId);
-    if (!metadata) {
-      logger.error('[CertificationService] Modelo não encontrado no registry', {
+    // 3. Resolver deployment (v2)
+    const deployment = await this.resolveDeployment(modelId);
+    if (!deployment) {
+      logger.error('[CertificationService] Modelo não encontrado', {
         modelId
       });
-      throw new Error(`Model ${modelId} not found in registry`);
+      throw new Error(`Model ${modelId} not found in database`);
     }
     
-    logger.info('[CertificationService] Metadata encontrada', {
-      modelId: metadata.modelId,
-      vendor: metadata.vendor
+    logger.info('[CertificationService] Deployment resolvido', {
+      deploymentId: deployment.id || '(fallback)',
+      modelId: deployment.deploymentId,
+      vendor: deployment.vendor
     });
     
     // 4. Selecionar testes apropriados
-    const tests = this.testSelector.getTestsForVendor(metadata.vendor);
+    const tests = this.testSelector.getTestsForVendor(deployment.vendor);
     
     // 5. Executar testes via TestOrchestrator
     const { results: testResults } = await this.testOrchestrator.runTests(
@@ -168,11 +242,12 @@ export class ModelCertificationService {
       metrics.qualityIssues
     );
     
-    // 8. Salvar no banco
+    // 8. Salvar no banco (usando deploymentId FK se disponível)
     await this.repository.save({
       modelId,
+      deploymentId: deployment.id || null,  // UUID do deployment (v2) ou null (fallback)
       region: credentials.region,
-      vendor: metadata.vendor,
+      vendor: deployment.vendor,
       status: statusResult.status,
       testsPassed: metrics.testsPassed,
       testsFailed: metrics.testsFailed,
@@ -188,6 +263,7 @@ export class ModelCertificationService {
     
     logger.info('[CertificationService] Resultado final', {
       modelId,
+      deploymentId: deployment.id || '(fallback)',
       status: statusResult.status,
       successRate: metrics.successRate.toFixed(1),
       isAvailable: statusResult.isAvailable
@@ -211,8 +287,12 @@ export class ModelCertificationService {
   
   /**
    * Certifica todos os modelos de um vendor específico
-   * 
-   * @param vendor - Nome do vendor (anthropic, cohere, amazon)
+   *
+   * Estratégia de resolução:
+   * 1. Busca modelos base do vendor via baseModelService (schema v2)
+   * 2. Para cada modelo base, busca deployments ativos
+   *
+   * @param vendor - Nome do vendor (Anthropic, Cohere, Amazon, Meta)
    * @param credentials - Credenciais AWS para acesso ao Bedrock
    * @returns Array de resultados de certificação
    */
@@ -224,28 +304,54 @@ export class ModelCertificationService {
       vendor
     });
     
-    const models = ModelRegistry.getModelsByVendor(vendor);
     const results: CertificationResult[] = [];
     
-    for (const model of models) {
-      try {
-        const result = await this.certifyModel(model.modelId, credentials, false);
-        results.push(result);
-      } catch (error) {
-        logger.error('[CertificationService] Falha ao certificar modelo', {
-          modelId: model.modelId,
-          error: error instanceof Error ? error.message : String(error)
-        });
-        results.push({
-          modelId: model.modelId,
-          status: ModelCertificationStatus.FAILED,
-          testsPassed: 0,
-          testsFailed: 0,
-          successRate: 0,
-          avgLatencyMs: 0,
-          isCertified: false,
-          results: []
-        });
+    // 1. Buscar modelos base do vendor via baseModelService (v2)
+    const { models: baseModels } = await baseModelService.findByVendor(vendor, {
+      includeDeployments: true
+    });
+    
+    if (baseModels.length === 0) {
+      logger.warn('[CertificationService] Nenhum modelo encontrado para o vendor', {
+        vendor
+      });
+      return results;
+    }
+    
+    logger.info('[CertificationService] Modelos encontrados no banco v2', {
+      vendor,
+      count: baseModels.length
+    });
+    
+    // 2. Para cada modelo base, certificar seus deployments ativos
+    for (const baseModel of baseModels) {
+      const deployments = baseModel.deployments?.filter(d => d.isActive) || [];
+      
+      for (const deployment of deployments) {
+        try {
+          const result = await this.certifyModel(
+            deployment.deploymentId,
+            credentials,
+            false
+          );
+          results.push(result);
+        } catch (error) {
+          logger.error('[CertificationService] Falha ao certificar deployment', {
+            deploymentId: deployment.deploymentId,
+            baseModel: baseModel.name,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          results.push({
+            modelId: deployment.deploymentId,
+            status: ModelCertificationStatus.FAILED,
+            testsPassed: 0,
+            testsFailed: 0,
+            successRate: 0,
+            avgLatencyMs: 0,
+            isCertified: false,
+            results: []
+          });
+        }
       }
     }
     
@@ -259,7 +365,11 @@ export class ModelCertificationService {
   
   /**
    * Certifica todos os modelos suportados
-   * 
+   *
+   * Estratégia de resolução:
+   * 1. Busca todos os modelos base ativos via baseModelService (schema v2)
+   * 2. Para cada modelo base, busca deployments ativos
+   *
    * @param credentials - Credenciais AWS para acesso ao Bedrock
    * @returns Array de resultados de certificação
    */
@@ -268,28 +378,51 @@ export class ModelCertificationService {
   ): Promise<CertificationResult[]> {
     logger.info('[CertificationService] Iniciando certificação completa');
     
-    const models = ModelRegistry.getAllSupported();
     const results: CertificationResult[] = [];
     
-    for (const model of models) {
-      try {
-        const result = await this.certifyModel(model.modelId, credentials, false);
-        results.push(result);
-      } catch (error) {
-        logger.error('[CertificationService] Falha ao certificar modelo', {
-          modelId: model.modelId,
-          error: error instanceof Error ? error.message : String(error)
-        });
-        results.push({
-          modelId: model.modelId,
-          status: ModelCertificationStatus.FAILED,
-          testsPassed: 0,
-          testsFailed: 0,
-          successRate: 0,
-          avgLatencyMs: 0,
-          isCertified: false,
-          results: []
-        });
+    // 1. Buscar todos os modelos base ativos via baseModelService (v2)
+    const { models: baseModels } = await baseModelService.findActive({
+      includeDeployments: true
+    });
+    
+    if (baseModels.length === 0) {
+      logger.warn('[CertificationService] Nenhum modelo ativo encontrado no banco');
+      return results;
+    }
+    
+    logger.info('[CertificationService] Modelos ativos encontrados no banco v2', {
+      count: baseModels.length
+    });
+    
+    // 2. Para cada modelo base, certificar seus deployments ativos
+    for (const baseModel of baseModels) {
+      const deployments = baseModel.deployments?.filter(d => d.isActive) || [];
+      
+      for (const deployment of deployments) {
+        try {
+          const result = await this.certifyModel(
+            deployment.deploymentId,
+            credentials,
+            false
+          );
+          results.push(result);
+        } catch (error) {
+          logger.error('[CertificationService] Falha ao certificar deployment', {
+            deploymentId: deployment.deploymentId,
+            baseModel: baseModel.name,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          results.push({
+            modelId: deployment.deploymentId,
+            status: ModelCertificationStatus.FAILED,
+            testsPassed: 0,
+            testsFailed: 0,
+            successRate: 0,
+            avgLatencyMs: 0,
+            isCertified: false,
+            results: []
+          });
+        }
       }
     }
     

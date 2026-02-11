@@ -20,7 +20,7 @@ export interface EnrichedModel {
   name: string;
   providerName: string;
   vendor?: string;
-  description?: string;
+  description?: string | null;
   costPer1kInput: number;
   costPer1kOutput: number;
   contextWindow: number;
@@ -34,7 +34,6 @@ export interface EnrichedModel {
     functionCalling?: boolean;
   };
   isInDatabase: boolean;
-  isInRegistry: boolean;
 }
 
 export interface DBModel {

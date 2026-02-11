@@ -2,13 +2,13 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { prisma } from '../../lib/prisma';
-import { ModelRegistry } from '../ai/registry';
 import logger from '../../utils/logger';
+import { VendorGroup, CertificationInfo } from '../../types/vendors';
+import { Provider } from '../../types/providers';
+import { modelCacheService } from '../models/modelCacheService';
 import { ProviderFilterService } from './provider-filter.service';
 import { ModelParser } from './utils/model-parser';
 import { VendorMapper } from './utils/vendor-mapper';
-import { VendorGroup, CertificationInfo } from '../../types/vendors';
-import { Provider } from '../../types/providers';
 
 /**
  * Service para agrupamento de modelos por vendor
@@ -82,7 +82,10 @@ export class VendorAggregationService {
 
   /**
    * Agrupa modelos por vendor
-   * 
+   *
+   * Clean Slate v2:
+   * - Usa modelCacheService para buscar metadados dos deployments
+   *
    * @param providers - Lista de providers
    * @param requestId - ID da requisição
    * @returns Map de vendors
@@ -92,6 +95,12 @@ export class VendorAggregationService {
     requestId?: string
   ): Promise<Map<string, VendorGroup>> {
     const vendorMap = new Map<string, VendorGroup>();
+    
+    // Buscar deployments do cache para metadados
+    const cachedDeployments = await modelCacheService.getAllActiveDeployments(true, true);
+    const deploymentsMap = new Map(
+      cachedDeployments.map(d => [d.deploymentId, d])
+    );
 
     for (const provider of providers) {
       for (const model of provider.models) {
@@ -114,8 +123,14 @@ export class VendorAggregationService {
         // Verificar se modelo já existe no grupo
         let existingModel = vendorGroup.models.find(m => m.apiModelId === model.apiModelId);
         
-        // Buscar metadata do registry
-        const registryMetadata = ModelRegistry.getModel(model.apiModelId);
+        // Buscar metadata do cache de deployments (Clean Slate v2)
+        const deployment = deploymentsMap.get(model.apiModelId);
+        const baseModelCapabilities = deployment?.baseModel?.capabilities as {
+          maxContextWindow?: number;
+          maxOutputTokens?: number;
+          vision?: boolean;
+          functionCalling?: boolean;
+        } | undefined;
         
         if (!existingModel) {
           existingModel = {
@@ -123,13 +138,13 @@ export class VendorAggregationService {
             name: model.name,
             apiModelId: model.apiModelId,
             contextWindow: model.contextWindow,
-            maxOutputTokens: registryMetadata?.capabilities.maxOutputTokens,
+            maxOutputTokens: baseModelCapabilities?.maxOutputTokens,
             version: this.modelParser.extractVersion(model.apiModelId),
             availableOn: [],
-            capabilities: registryMetadata ? {
-              supportsVision: registryMetadata.capabilities.vision,
-              supportsPromptCache: false, // TODO: adicionar ao registry
-              supportsFunctionCalling: registryMetadata.capabilities.functionCalling
+            capabilities: baseModelCapabilities ? {
+              supportsVision: baseModelCapabilities.vision,
+              supportsPromptCache: false,
+              supportsFunctionCalling: baseModelCapabilities.functionCalling
             } : undefined,
             pricing: {
               inputPer1M: model.costPer1kInput * 1000,
@@ -148,14 +163,14 @@ export class VendorAggregationService {
           requestId
         );
         
-        const hasRegistry = !!registryMetadata;
+        const isInDatabase = !!deployment;
         
         // Adicionar provider availability
         existingModel.availableOn.push({
           providerSlug: provider.slug,
           providerName: provider.name,
           isConfigured: true,
-          hasRegistry,
+          hasRegistry: isInDatabase,  // Agora indica se está no banco
           certification
         });
       }
@@ -191,27 +206,46 @@ export class VendorAggregationService {
 
   /**
    * Busca certificação do modelo em um provider específico
-   * 
-   * @param modelId - ID do modelo
-   * @param providerSlug - Slug do provider
+   *
+   * Clean Slate v2:
+   * - Busca deployment pelo deploymentId (string do provider)
+   * - Busca certificação pelo UUID do deployment
+   *
+   * @param apiModelId - ID do modelo no provider (ex: "anthropic.claude-3-5-sonnet-20241022-v2:0")
+   * @param _providerSlug - Slug do provider (não usado atualmente)
    * @param requestId - ID da requisição
    * @returns Informações de certificação ou null
    */
   private async getCertificationForModel(
-    modelId: string,
+    apiModelId: string,
     _providerSlug: string,
     requestId?: string
   ): Promise<CertificationInfo | null> {
     try {
+      // Buscar deployment pelo deploymentId (string do provider)
+      const deployment = await prisma.modelDeployment.findFirst({
+        where: { deploymentId: apiModelId }
+      });
+      
+      if (!deployment) {
+        logger.debug('Deployment não encontrado para certificação', {
+          requestId,
+          apiModelId
+        });
+        return null;
+      }
+      
+      // Buscar certificação pelo UUID do deployment
       const cert = await prisma.modelCertification.findFirst({
-        where: { modelId: modelId },
+        where: { deploymentId: deployment.id },
         orderBy: { createdAt: 'desc' }
       });
       
       if (!cert) {
         logger.debug('Certificação não encontrada', {
           requestId,
-          modelId
+          apiModelId,
+          deploymentId: deployment.id
         });
         return null;
       }
@@ -229,7 +263,7 @@ export class VendorAggregationService {
     } catch (error) {
       logger.warn('Erro ao buscar certificação', {
         requestId,
-        modelId,
+        apiModelId,
         error: error instanceof Error ? error.message : String(error)
       });
       return null;

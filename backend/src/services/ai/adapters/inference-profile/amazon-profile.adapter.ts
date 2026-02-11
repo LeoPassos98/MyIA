@@ -1,5 +1,15 @@
 // backend/src/services/ai/adapters/inference-profile/amazon-profile.adapter.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+
+/**
+ * REFATORADO: Clean Slate v2 - Fase 7 (Cleanup)
+ * - Removido ModelRegistry completamente
+ * - Usa adapterParamsService.getRecommendedParams() para buscar parâmetros do banco
+ * - Fallback para valores hardcoded específicos do vendor Amazon
+ * 
+ * REFATORADO: Resolução de dependência circular
+ * - Substituído import de AdapterFactory por adapterParamsService
+ */
 
 import {
   BaseModelAdapter,
@@ -9,7 +19,7 @@ import {
   AdapterChunk,
 } from '../base.adapter';
 import { InferenceType } from '../../types';
-import { ModelRegistry } from '../../registry/model-registry';
+import { adapterParamsService } from '../adapter-params.service';
 import { logger } from '../../../../utils/logger';
 
 /**
@@ -42,6 +52,11 @@ export class AmazonProfileAdapter extends BaseModelAdapter {
   ];
 
   /**
+   * Cache de parâmetros para evitar múltiplas buscas assíncronas
+   */
+  private paramsCache: Map<string, { temperature?: number; topP?: number; maxTokens?: number }> = new Map();
+
+  /**
    * Override supportsModel to only accept Inference Profile format
    */
   supportsModel(modelId: string): boolean {
@@ -54,6 +69,51 @@ export class AmazonProfileAdapter extends BaseModelAdapter {
     return super.supportsModel(modelId);
   }
 
+  /**
+   * Busca parâmetros recomendados do banco (com cache)
+   *
+   * Prioridade:
+   * 1. Cache local
+   * 2. Banco de dados (via adapterParamsService)
+   * 3. Valores hardcoded para Amazon Nova
+   */
+  private async getRecommendedParams(modelId: string): Promise<{ temperature?: number; topP?: number; maxTokens?: number }> {
+    // 1. Verificar cache local
+    if (this.paramsCache.has(modelId)) {
+      return this.paramsCache.get(modelId)!;
+    }
+
+    // 2. Tentar buscar do banco via adapterParamsService
+    // Nota: Para inference profile, o modelId pode ter prefixo regional
+    // Tentamos buscar com e sem o prefixo
+    const baseModelId = modelId.replace(/^(us|eu|apac)\./, '');
+    
+    try {
+      // Primeiro tenta com o modelId completo
+      let params = await adapterParamsService.getRecommendedParams(modelId, this.vendor);
+      if (params.temperature !== undefined || params.topP !== undefined || params.maxTokens !== undefined) {
+        this.paramsCache.set(modelId, params);
+        return params;
+      }
+      
+      // Se não encontrou, tenta sem o prefixo regional
+      params = await adapterParamsService.getRecommendedParams(baseModelId, this.vendor);
+      this.paramsCache.set(modelId, params);
+      return params;
+    } catch {
+      logger.debug(`[AmazonProfileAdapter] Failed to get params from adapterParamsService for ${modelId}`);
+    }
+
+    // 3. Valores hardcoded padrão para Amazon Nova
+    const defaultParams = {
+      temperature: 0.7,
+      topP: 0.9,
+      maxTokens: 2048,
+    };
+    this.paramsCache.set(modelId, defaultParams);
+    return defaultParams;
+  }
+
   formatRequest(messages: Message[], options: UniversalOptions): AdapterPayload {
     const systemMessage = messages.find(m => m.role === 'system');
     const conversationMessages = messages.filter(m => m.role !== 'system');
@@ -64,16 +124,28 @@ export class AmazonProfileAdapter extends BaseModelAdapter {
       content: [{ text: m.content }],
     }));
 
-    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams do Model Registry
-    const modelDef = options.modelId ? ModelRegistry.getModel(options.modelId) : undefined;
-    const recommendedParams = modelDef?.recommendedParams;
+    // 🎯 MODO AUTO/MANUAL: Buscar recommendedParams
+    // NOTA: Como formatRequest é síncrono, usamos cache ou valores padrão
+    let recommendedParams: { temperature?: number; topP?: number; maxTokens?: number } | undefined;
+    
+    if (options.modelId) {
+      // Verificar cache primeiro (síncrono)
+      if (this.paramsCache.has(options.modelId)) {
+        recommendedParams = this.paramsCache.get(options.modelId);
+      } else {
+        // Popular cache em background (não bloqueia)
+        this.getRecommendedParams(options.modelId).catch(() => {
+          // Ignorar erros - já temos fallback hardcoded
+        });
+      }
+    }
 
     // Aplicar fallback: Manual (options) → Auto (recommendedParams) → Hardcoded defaults
     const temperature = options.temperature ?? recommendedParams?.temperature ?? 0.7;
     const topP = options.topP ?? recommendedParams?.topP ?? 0.9;
     const maxTokens = options.maxTokens ?? recommendedParams?.maxTokens ?? 2048;
 
-    const body: any = {
+    const body: Record<string, unknown> = {
       messages: formattedMessages,
       inferenceConfig: {
         maxTokens: maxTokens,
@@ -89,7 +161,7 @@ export class AmazonProfileAdapter extends BaseModelAdapter {
 
     // Add stop sequences if provided
     if (options.stopSequences && options.stopSequences.length > 0) {
-      body.inferenceConfig.stopSequences = options.stopSequences;
+      (body.inferenceConfig as Record<string, unknown>).stopSequences = options.stopSequences;
     }
 
     logger.info(`[AmazonProfileAdapter] Nova Inference Profile request format:`, {
@@ -106,7 +178,7 @@ export class AmazonProfileAdapter extends BaseModelAdapter {
     };
   }
 
-  parseChunk(chunk: any): AdapterChunk {
+  parseChunk(chunk: Record<string, unknown>): AdapterChunk {
     // Handle null/undefined chunks
     if (!chunk) {
       return {
@@ -116,28 +188,34 @@ export class AmazonProfileAdapter extends BaseModelAdapter {
     }
 
     // Nova format (Converse API) - content block delta
-    if (chunk.contentBlockDelta?.delta?.text) {
-      return {
-        type: 'chunk',
-        content: chunk.contentBlockDelta.delta.text,
-      };
+    const contentBlockDelta = chunk.contentBlockDelta as Record<string, unknown> | undefined;
+    if (contentBlockDelta) {
+      const delta = contentBlockDelta.delta as Record<string, unknown> | undefined;
+      if (delta?.text) {
+        return {
+          type: 'chunk',
+          content: delta.text as string,
+        };
+      }
     }
 
     // Nova format - message stop
     if (chunk.messageStop) {
+      const messageStop = chunk.messageStop as Record<string, unknown>;
       return {
         type: 'done',
         metadata: {
-          stopReason: chunk.messageStop.stopReason,
+          stopReason: messageStop.stopReason,
         },
       };
     }
 
     // Error handling
-    if (chunk.error || chunk.message?.includes('error')) {
+    const message = chunk.message as string | undefined;
+    if (chunk.error || message?.includes('error')) {
       return {
         type: 'error',
-        error: chunk.error || chunk.message || 'Unknown error',
+        error: (chunk.error as string) || message || 'Unknown error',
       };
     }
 

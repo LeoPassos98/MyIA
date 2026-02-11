@@ -2,166 +2,115 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 import { PrismaClient } from '@prisma/client';
-import { ModelRegistry } from '../../ai/registry';
 import { logger } from '../../../utils/logger';
 
 const prisma = new PrismaClient();
 
 /**
- * Modelo validado com informações essenciais
- */
-export interface ValidatedModel {
-  uuid: string;
-  apiModelId: string;
-  name: string;
-}
-
-/**
- * Resultado de validação de múltiplos modelos
- */
-export interface ValidationResult {
-  valid: ValidatedModel[];
-  invalid: string[];
-}
-
-/**
  * ModelValidator
  * 
  * Responsabilidade: Validar modelos antes de criar jobs de certificação
- * - Verifica existência no banco de dados
- * - Valida presença no ModelRegistry
- * - Filtra modelos inválidos
+ * Schema v2: Usa ModelDeployment em vez de AIModel
  */
 export class ModelValidator {
   /**
-   * Valida se modelo existe no banco e no ModelRegistry
-   * @throws Error se modelo inválido
+   * Valida se um modelo existe no banco
+   * Schema v2: Busca em ModelDeployment
    */
-  async validateModel(modelId: string): Promise<ValidatedModel> {
-    logger.info(`🔍 Validando modelo: ${modelId}`);
+  async validateModel(modelId: string): Promise<{ uuid: string; deploymentId: string }> {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(modelId);
 
-    // Buscar por apiModelId (ID da AWS) primeiro
-    let model = await prisma.aIModel.findFirst({
-      where: { apiModelId: modelId },
-      select: { id: true, apiModelId: true, name: true }
-    });
-
-    // Fallback: tentar buscar por id (UUID) se não encontrar por apiModelId
-    if (!model) {
-      model = await prisma.aIModel.findUnique({
+    if (isUUID) {
+      const deployment = await prisma.modelDeployment.findUnique({
         where: { id: modelId },
-        select: { id: true, apiModelId: true, name: true }
+        select: { id: true, deploymentId: true }
       });
+
+      if (!deployment) {
+        throw new Error(`Deployment ${modelId} não encontrado no banco de dados`);
+      }
+
+      return {
+        uuid: deployment.id,
+        deploymentId: deployment.deploymentId
+      };
+    } else {
+      const deployment = await prisma.modelDeployment.findFirst({
+        where: { deploymentId: modelId },
+        select: { id: true, deploymentId: true }
+      });
+
+      if (!deployment) {
+        throw new Error(`Deployment ${modelId} não encontrado no banco de dados`);
+      }
+
+      return {
+        uuid: deployment.id,
+        deploymentId: deployment.deploymentId
+      };
     }
-
-    if (!model) {
-      throw new Error(`Modelo ${modelId} não encontrado no banco de dados`);
-    }
-
-    // Validar no ModelRegistry
-    if (!ModelRegistry.isSupported(model.apiModelId)) {
-      logger.error(`❌ Modelo ${model.name} (${model.apiModelId}) não encontrado no ModelRegistry`);
-      throw new Error(`Modelo ${model.name} (${model.apiModelId}) não suportado - não existe no ModelRegistry`);
-    }
-
-    logger.info(`✅ Modelo ${model.name} (${model.apiModelId}) validado no ModelRegistry`);
-
-    return {
-      uuid: model.id,
-      apiModelId: model.apiModelId,
-      name: model.name
-    };
   }
 
   /**
-   * Valida múltiplos modelos e retorna apenas os válidos
-   * @returns Array de modelos válidos + array de inválidos
+   * Valida múltiplos modelos
+   * Schema v2: Busca em ModelDeployment
    */
-  async validateModels(modelIds: string[]): Promise<ValidationResult> {
-    logger.info(`🔍 Validando ${modelIds.length} modelos`);
+  async validateModels(modelIds: string[]): Promise<{
+    valid: Array<{ uuid: string; deploymentId: string }>;
+    invalid: string[];
+  }> {
+    const valid: Array<{ uuid: string; deploymentId: string }> = [];
+    const invalid: string[] = [];
 
-    // Buscar informações dos modelos
-    const modelsInfo = await prisma.aIModel.findMany({
-      where: { id: { in: modelIds } },
-      select: { id: true, apiModelId: true, name: true }
-    });
-
-    // Validar cada modelo no Registry
-    const validModels: ValidatedModel[] = [];
-    const invalidModels: string[] = [];
-
-    for (const model of modelsInfo) {
-      if (ModelRegistry.isSupported(model.apiModelId)) {
-        validModels.push({
-          uuid: model.id,
-          apiModelId: model.apiModelId,
-          name: model.name
-        });
-      } else {
-        const invalidEntry = `${model.name} (${model.apiModelId})`;
-        invalidModels.push(invalidEntry);
-        logger.warn(`⚠️ Modelo ${invalidEntry} não encontrado no ModelRegistry - ignorando`);
+    for (const modelId of modelIds) {
+      try {
+        const result = await this.validateModel(modelId);
+        valid.push(result);
+      } catch {
+        invalid.push(modelId);
+        logger.warn(`Modelo ${modelId} não encontrado no banco de dados`);
       }
     }
 
-    if (invalidModels.length > 0) {
-      logger.warn(`⚠️ ${invalidModels.length} modelos ignorados por não existirem no ModelRegistry: ${invalidModels.join(', ')}`);
-    }
-
-    logger.info(`✅ ${validModels.length} modelos válidos no ModelRegistry (de ${modelsInfo.length} no banco)`);
-
-    return {
-      valid: validModels,
-      invalid: invalidModels
-    };
+    return { valid, invalid };
   }
 
   /**
-   * Busca todos modelos Bedrock ativos e válidos
+   * Obtém todos os modelos Bedrock válidos
+   * Schema v2: Busca em ModelDeployment com provider Bedrock
    */
-  async getValidBedrockModels(): Promise<ValidatedModel[]> {
-    logger.info(`📊 Buscando todos os modelos Bedrock ativos`);
+  async getValidBedrockModels(): Promise<Array<{ uuid: string; deploymentId: string }>> {
+    // Buscar provider Bedrock
+    const bedrockProvider = await prisma.provider.findFirst({
+      where: { 
+        OR: [
+          { slug: 'bedrock' },
+          { type: 'AWS_BEDROCK' }
+        ]
+      },
+      select: { id: true }
+    });
 
-    // Buscar todos os modelos ativos do provider Bedrock
-    const models = await prisma.aIModel.findMany({
+    if (!bedrockProvider) {
+      logger.warn('Provider Bedrock não encontrado');
+      return [];
+    }
+
+    // Buscar deployments do provider Bedrock
+    const deployments = await prisma.modelDeployment.findMany({
       where: {
-        isActive: true,
-        provider: {
-          slug: 'bedrock'
-        }
+        providerId: bedrockProvider.id,
+        isActive: true
       },
       select: {
         id: true,
-        apiModelId: true,
-        name: true
+        deploymentId: true
       }
     });
 
-    logger.info(`📊 Encontrados ${models.length} modelos Bedrock ativos no banco`);
-
-    // Filtrar apenas modelos que existem no ModelRegistry
-    const validModels: ValidatedModel[] = [];
-
-    for (const model of models) {
-      const existsInRegistry = ModelRegistry.isSupported(model.apiModelId);
-      if (existsInRegistry) {
-        validModels.push({
-          uuid: model.id,
-          apiModelId: model.apiModelId,
-          name: model.name
-        });
-      } else {
-        logger.warn(`⚠️ Modelo ${model.name} (${model.apiModelId}) não encontrado no ModelRegistry - ignorando`);
-      }
-    }
-
-    logger.info(`✅ ${validModels.length} modelos válidos no ModelRegistry (de ${models.length} no banco)`);
-
-    if (validModels.length === 0) {
-      logger.warn(`⚠️ Nenhum modelo Bedrock válido encontrado para certificação`);
-      throw new Error('Nenhum modelo Bedrock válido encontrado para certificação');
-    }
-
-    return validModels;
+    return deployments.map(d => ({
+      uuid: d.id,
+      deploymentId: d.deploymentId
+    }));
   }
 }

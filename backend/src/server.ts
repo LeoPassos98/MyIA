@@ -25,6 +25,8 @@ import certificationRoutes from './routes/certificationRoutes';
 import modelsRoutes from './routes/modelsRoutes';
 import logsRoutes from './routes/logsRoutes';
 import certificationQueueRoutes from './routes/certificationQueueRoutes';
+// API v2 - Nova arquitetura de models/deployments/providers
+import { registerModelsV2Routes } from './routes/modelsRoutes-v2';
 import passport from './config/passport';
 import { setupBullBoard } from './config/bullBoard';
 import { queueService } from './services/queue/QueueService';
@@ -109,11 +111,21 @@ app.use('/api/user', apiLimiter, userRoutes);
 app.use('/api/chat-history', apiLimiter, chatHistoryRoutes);
 app.use('/api/audit', apiLimiter, auditRoutes);
 app.use('/api/prompt-trace', apiLimiter, promptTraceRoutes);
+
+// ⚠️ DEPRECATED: Rotas v1 de providers/models - Serão removidas em versão futura
+// Use /api/v2/providers, /api/v2/models e /api/v2/deployments
+// Mantidas para compatibilidade durante transição
 app.use('/api/providers', apiLimiter, providersRoutes);
 app.use('/api/certification', certificationRoutes);
 app.use('/api/certification-queue', apiLimiter, certificationQueueRoutes);
 app.use('/api/models', apiLimiter, modelsRoutes);
 app.use('/api/logs', apiLimiter, logsRoutes);
+
+// ============================================================================
+// API v2 - Nova arquitetura de models/deployments/providers
+// Documentação: docs/api/v2/models-api.md (a ser criado)
+// ============================================================================
+registerModelsV2Routes(app);
 
 // 📊 Bull Board - Dashboard de Monitoramento de Filas
 // Acesso: http://localhost:3001/admin/queues

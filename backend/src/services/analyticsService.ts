@@ -1,60 +1,48 @@
 // backend/src/services/analyticsService.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
-import { prisma } from '../lib/prisma';
+// Schema v2: prisma import mantido para uso futuro com SystemMetric
+// import { prisma } from '../lib/prisma';
+import logger from '../utils/logger';
 
+/**
+ * Schema v2: ApiCallLog foi REMOVIDO do schema
+ *
+ * Este serviço precisa ser refatorado para usar SystemMetric ou outra fonte de dados.
+ * Por enquanto, retornamos dados vazios para não quebrar o build.
+ *
+ * TODO: Implementar analytics usando SystemMetric ou criar nova tabela de logs de uso
+ */
 export const analyticsService = {
   getCostOverTime: async (userId: string) => {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-
-    const data = await prisma.apiCallLog.groupBy({
-      by: ['timestamp'],
-      where: {
-        userId,
-        timestamp: { gte: startDate },
-      },
-      _sum: { costInUSD: true },
-      orderBy: { timestamp: 'asc' },
-    });
-
-    return data.map(item => ({
-      date: item.timestamp.toISOString().split('T')[0],
-      cost: item._sum.costInUSD || 0,
-    }));
+    // Schema v2: ApiCallLog foi removido
+    // Retornar array vazio até implementar nova solução
+    logger.warn(`[analyticsService.getCostOverTime] ApiCallLog removido do schema v2. userId: ${userId}`);
+    
+    // TODO: Implementar usando SystemMetric
+    // const data = await prisma.systemMetric.findMany({
+    //   where: { metricType: 'cost', metadata: { path: ['userId'], equals: userId } },
+    //   orderBy: { timestamp: 'asc' }
+    // });
+    
+    return [];
   },
 
   getCostEfficiency: async (userId: string) => {
-    const data = await prisma.apiCallLog.groupBy({
-      by: ['provider'],
-      where: {
-        userId,
-        tokensOut: { gt: 0 },
-      },
-      _sum: {
-        costInUSD: true,
-        tokensOut: true,
-      },
-    });
-
-    return data.map(item => {
-      const totalCost = item._sum.costInUSD || 0;
-      const totalTokensOut = item._sum.tokensOut || 1;
-      const costPer1kTokens = (totalCost / (totalTokensOut / 1000)) || 0;
-      return {
-        provider: item.provider,
-        costPer1kTokens,
-      };
-    });
+    // Schema v2: ApiCallLog foi removido
+    // Retornar array vazio até implementar nova solução
+    logger.warn(`[analyticsService.getCostEfficiency] ApiCallLog removido do schema v2. userId: ${userId}`);
+    
+    // TODO: Implementar usando SystemMetric
+    return [];
   },
 
   getLoadMap: async (userId: string) => {
-    const data = await prisma.apiCallLog.findMany({
-      where: { userId },
-      select: { provider: true, tokensIn: true, tokensOut: true },
-      take: 200,
-      orderBy: { timestamp: 'desc' },
-    });
-    return data;
+    // Schema v2: ApiCallLog foi removido
+    // Retornar array vazio até implementar nova solução
+    logger.warn(`[analyticsService.getLoadMap] ApiCallLog removido do schema v2. userId: ${userId}`);
+    
+    // TODO: Implementar usando SystemMetric
+    return [];
   }
 };

@@ -107,21 +107,21 @@ export class InferenceProfileResolver {
 
   /**
    * Verifica se um modelo requer Inference Profile
-   * 
-   * Usa import dinâmico para evitar dependência circular
+   *
+   * Schema v2: ModelRegistry foi removido
+   * Esta verificação agora é feita pelo BedrockProvider usando deploymentService
+   * Este método é mantido para compatibilidade, mas sempre retorna false
+   * A lógica real está em BedrockProvider.checkRequiresInferenceProfile()
    */
   private async requiresInferenceProfile(modelId: string): Promise<boolean> {
-    try {
-      const { ModelRegistry } = await import('../../../registry');
-      const platformRule = ModelRegistry.getPlatformRules(modelId, 'bedrock');
-      
-      logger.info(`🔍 [InferenceProfileResolver] Platform rule for ${modelId}:`, platformRule);
-      
-      return platformRule?.rule === 'requires_inference_profile';
-    } catch (error) {
-      logger.error(`❌ [InferenceProfileResolver] Error loading ModelRegistry:`, error);
-      return false;
-    }
+    // Schema v2: ModelRegistry foi removido
+    // A verificação de inference profile agora é feita pelo BedrockProvider
+    // usando deploymentService.findByDeploymentId() e verificando inferenceType
+    logger.debug(`[InferenceProfileResolver] requiresInferenceProfile called for ${modelId} - delegating to caller`);
+    
+    // Retornar false - a lógica real está em BedrockProvider
+    // Este método é chamado apenas quando o modelo não foi encontrado no banco
+    return false;
   }
 
   /**

@@ -169,7 +169,8 @@ describe('useFormattedTokenCount', () => {
     const { result } = renderHook(() => useFormattedTokenCount(longText));
     
     expect(result.current.count).toBe(1250);
-    expect(result.current.formatted).toBe('1.2K tokens');
+    // 1250/1000 = 1.25, toFixed(1) arredonda para 1.3
+    expect(result.current.formatted).toBe('1.3K tokens');
   });
 
   it('retorna 0 para string vazia', () => {

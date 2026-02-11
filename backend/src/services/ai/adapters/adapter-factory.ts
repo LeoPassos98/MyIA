@@ -1,16 +1,28 @@
 // backend/src/services/ai/adapters/adapter-factory.ts
-// Standards: docs/STANDARDS.md
+// LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CÓDIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
 
 /**
  * @file adapter-factory.ts
  * @description Factory para criar adapters baseado em vendor e inference type
  * @module services/ai/adapters
+ * 
+ * REFATORADO: Clean Slate v2 - Fase 7 (Cleanup)
+ * - Removido import de ModelRegistry (legado)
+ * - Substituído por modelCacheService para buscar informações do banco
+ * - Mantido fallback para valores hardcoded durante período de transição
+ * 
+ * REFATORADO: Resolução de dependência circular
+ * - Extraído adapterParamsService para evitar ciclo com adapters
+ * - Métodos getRecommendedParams, getModelCapabilities, etc. delegam para o serviço
  */
 
-import { BaseModelAdapter } from './base.adapter';
 import { InferenceType } from '../types';
 import { logger } from '../../../utils/logger';
-import { ModelRegistry } from '../registry/model-registry';
+
+// Serviço de parâmetros (sem dependência circular)
+import { adapterParamsService, DeploymentInfo } from './adapter-params.service';
+
+import { BaseModelAdapter } from './base.adapter';
 
 // Adapters antigos (ON_DEMAND)
 import { AnthropicAdapter } from './anthropic.adapter';
@@ -38,27 +50,37 @@ function isUseStrategyPattern(): boolean {
 
 /**
  * Mapa de adapters por vendor e inference type (LEGADO)
+ *
+ * NOTA: Usando lazy initialization para evitar dependência circular.
+ * O adapterMap é criado apenas quando necessário, não no momento da carga do módulo.
  */
-const adapterMap: Record<string, Record<InferenceType, new () => BaseModelAdapter>> = {
-  anthropic: {
-    ON_DEMAND: AnthropicAdapter,
-    INFERENCE_PROFILE: AnthropicProfileAdapter,
-    PROVISIONED: AnthropicAdapter,
-    CROSS_REGION: AnthropicAdapter
-  },
-  amazon: {
-    ON_DEMAND: AmazonAdapter,
-    INFERENCE_PROFILE: AmazonProfileAdapter,
-    PROVISIONED: AmazonAdapter,
-    CROSS_REGION: AmazonAdapter
-  },
-  cohere: {
-    ON_DEMAND: CohereAdapter,
-    INFERENCE_PROFILE: CohereAdapter,
-    PROVISIONED: CohereAdapter,
-    CROSS_REGION: CohereAdapter
+let _adapterMap: Record<string, Record<InferenceType, new () => BaseModelAdapter>> | null = null;
+
+function getAdapterMap(): Record<string, Record<InferenceType, new () => BaseModelAdapter>> {
+  if (_adapterMap === null) {
+    _adapterMap = {
+      anthropic: {
+        ON_DEMAND: AnthropicAdapter,
+        INFERENCE_PROFILE: AnthropicProfileAdapter,
+        PROVISIONED: AnthropicAdapter,
+        CROSS_REGION: AnthropicAdapter
+      },
+      amazon: {
+        ON_DEMAND: AmazonAdapter,
+        INFERENCE_PROFILE: AmazonProfileAdapter,
+        PROVISIONED: AmazonAdapter,
+        CROSS_REGION: AmazonAdapter
+      },
+      cohere: {
+        ON_DEMAND: CohereAdapter,
+        INFERENCE_PROFILE: CohereAdapter,
+        PROVISIONED: CohereAdapter,
+        CROSS_REGION: CohereAdapter
+      }
+    };
   }
-};
+  return _adapterMap;
+}
 
 /**
  * Factory para criar adapters
@@ -127,7 +149,8 @@ export class AdapterFactory {
       return this.createLegacyAdapter(vendor);
     }
 
-    // Sistema atual: adapterMap
+    // Sistema atual: adapterMap (lazy initialization para evitar dependência circular)
+    const adapterMap = getAdapterMap();
     const vendorAdapters = adapterMap[vendor.toLowerCase()];
     if (!vendorAdapters) {
       logger.warn(`No adapters found for vendor: ${vendor}, using legacy`);
@@ -211,18 +234,11 @@ export class AdapterFactory {
       return 'PROVISIONED';
     }
 
-    // 2. Consultar registry para verificar platformRules
-    try {
-      const metadata = ModelRegistry.getModel(modelId);
-      if (metadata?.platformRules) {
-        const bedrockRule = metadata.platformRules.find(rule => rule.platform === 'bedrock');
-        if (bedrockRule?.rule === 'requires_inference_profile') {
-          logger.debug(`Model ${modelId} requires INFERENCE_PROFILE per registry rules`);
-          return 'INFERENCE_PROFILE';
-        }
-      }
-    } catch (error) {
-      logger.debug(`Model ${modelId} not found in registry, using format-based detection`);
+    // 2. Detecção por padrão de modelo (Claude 4.x requer Inference Profile)
+    // Claude Sonnet 4, Opus 4, Haiku 4 requerem Inference Profile
+    if (/anthropic\.claude-(sonnet|opus|haiku)-4/i.test(modelId)) {
+      logger.debug(`Model ${modelId} requires INFERENCE_PROFILE (Claude 4.x)`);
+      return 'INFERENCE_PROFILE';
     }
 
     // 3. Default: ON_DEMAND
@@ -392,5 +408,80 @@ export class AdapterFactory {
     this.registry.clear();
     this.detector.reset();
     this.strategiesInitialized = false;
+  }
+
+  // ============================================================================
+  // CLEAN SLATE v2 - Métodos para buscar informações do banco
+  // Delegam para adapterParamsService para evitar dependência circular
+  // ============================================================================
+
+  /**
+   * Busca informações de deployment do banco de dados
+   * 
+   * Este método busca o deployment pelo deploymentId (string do provider)
+   * e retorna informações completas incluindo baseModel e capabilities.
+   * 
+   * @param deploymentId - ID do deployment no provider (ex: "anthropic.claude-3-5-sonnet-20241022-v2:0")
+   * @returns Deployment com baseModel ou null se não encontrado
+   * 
+   * @example
+   * ```typescript
+   * const deployment = await AdapterFactory.getDeploymentInfo('anthropic.claude-3-5-sonnet-20241022-v2:0');
+   * if (deployment) {
+   *   const capabilities = deployment.baseModel.capabilities;
+   *   const defaultParams = deployment.baseModel.defaultParams;
+   * }
+   * ```
+   */
+  static async getDeploymentInfo(deploymentId: string): Promise<DeploymentInfo | null> {
+    return adapterParamsService.getDeploymentInfo(deploymentId);
+  }
+
+  /**
+   * Busca parâmetros recomendados para um modelo
+   *
+   * Prioridade:
+   * 1. Banco de dados (deployment.baseModel.defaultParams)
+   * 2. Valores hardcoded padrão por vendor
+   *
+   * @param modelId - ID do modelo (deploymentId)
+   * @returns Parâmetros recomendados
+   */
+  static async getRecommendedParams(modelId: string): Promise<{
+    temperature?: number;
+    topP?: number;
+    maxTokens?: number;
+  }> {
+    return adapterParamsService.getRecommendedParams(modelId);
+  }
+
+  /**
+   * Busca capabilities de um modelo
+   *
+   * Prioridade:
+   * 1. Banco de dados (deployment.baseModel.capabilities)
+   * 2. Valores padrão hardcoded
+   *
+   * @param modelId - ID do modelo (deploymentId)
+   * @returns Capabilities do modelo ou null se não encontrado
+   */
+  static async getModelCapabilities(modelId: string): Promise<{
+    streaming?: boolean;
+    vision?: boolean;
+    functionCalling?: boolean;
+    maxContextWindow?: number;
+    maxOutputTokens?: number;
+  } | null> {
+    return adapterParamsService.getModelCapabilities(modelId);
+  }
+
+  /**
+   * Verifica se um modelo requer Inference Profile
+   *
+   * @param modelId - ID do modelo
+   * @returns true se requer Inference Profile
+   */
+  static async requiresInferenceProfile(modelId: string): Promise<boolean> {
+    return adapterParamsService.requiresInferenceProfile(modelId);
   }
 }

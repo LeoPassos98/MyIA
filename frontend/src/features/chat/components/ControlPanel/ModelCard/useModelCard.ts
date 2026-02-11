@@ -15,7 +15,6 @@ import { useModelRating } from '@/hooks/useModelRating';
 import type { ModelWithProviders } from '@/types/ai';
 import {
   hasConfiguredProvider,
-  hasMultipleProviders,
   shouldShowProviderSelector
 } from './utils/modelValidators';
 
@@ -149,7 +148,7 @@ export function useModelCard({
   
   // Validações de provider
   const hasConfiguredProviderValue = hasConfiguredProvider(model);
-  const hasMultipleProvidersValue = hasMultipleProviders(model);
+  // hasMultipleProviders não é usado diretamente, mas mantido para referência futura
   const showProviderSelector = shouldShowProviderSelector(model, isSelected, onProviderChange);
   
   // ========================================

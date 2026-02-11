@@ -31,7 +31,7 @@ export function CertificationSection({
   loadingCertDetails,
   isCertified,
   hasQualityWarning,
-  isUnavailable,
+  // isUnavailable não é usado atualmente, mas mantido na interface para compatibilidade
 }: CertificationSectionProps) {
   const theme = useTheme();
 

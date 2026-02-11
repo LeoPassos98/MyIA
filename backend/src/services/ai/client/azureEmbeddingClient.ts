@@ -2,8 +2,8 @@
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO
 
 import OpenAI from 'openai';
-import { getProviderInfo } from '../../../config/providerMap';
 import logger from '../../../utils/logger';
+import { prisma } from '../../../lib/prisma';
 
 // Interface para o retorno V9.2 (com custo calculado)
 export interface EmbeddingResponse {
@@ -12,6 +12,22 @@ export interface EmbeddingResponse {
   tokens: number;
   model: string;
 }
+
+/**
+ * Custos padrão para modelos de embedding (fallback)
+ * Valores baseados em preços públicos da OpenAI/Azure
+ */
+const DEFAULT_EMBEDDING_COSTS: Record<string, number> = {
+  'text-embedding-3-small': 0.02,   // $0.02 por 1M tokens
+  'text-embedding-3-large': 0.13,   // $0.13 por 1M tokens
+  'text-embedding-ada-002': 0.10,   // $0.10 por 1M tokens
+};
+const DEFAULT_EMBEDDING_COST = 0.10; // Fallback genérico
+
+// Cache de custos do banco para evitar queries repetidas
+let cachedEmbeddingCost: number | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
 // 1. Pegue as chaves do .env
 const endpoint = process.env.AZURE_EMBEDDING_ENDPOINT;
@@ -31,6 +47,55 @@ const client = (endpoint && apiKey)
       defaultHeaders: { 'api-key': apiKey },
     })
   : null;
+
+/**
+ * Busca o custo de embedding do banco de dados ou usa fallback
+ * Usa cache para evitar queries repetidas
+ */
+async function getEmbeddingCostPer1M(modelName: string): Promise<number> {
+  const now = Date.now();
+  
+  // Retorna cache se ainda válido
+  if (cachedEmbeddingCost !== null && (now - cacheTimestamp) < CACHE_TTL_MS) {
+    return cachedEmbeddingCost;
+  }
+
+  try {
+    // Busca deployment pelo deploymentId (nome do modelo)
+    const deployment = await prisma.modelDeployment.findFirst({
+      where: {
+        deploymentId: { contains: modelName, mode: 'insensitive' },
+        isActive: true
+      },
+      select: {
+        costPer1MInput: true
+      }
+    });
+
+    if (deployment) {
+      cachedEmbeddingCost = deployment.costPer1MInput;
+      cacheTimestamp = now;
+      logger.debug('Custo de embedding obtido do banco', { 
+        modelName, 
+        costPer1MInput: deployment.costPer1MInput 
+      });
+      return deployment.costPer1MInput;
+    }
+  } catch (error) {
+    logger.warn('Erro ao buscar custo de embedding do banco, usando fallback', {
+      modelName,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+
+  // Fallback: usar custos conhecidos ou padrão
+  const fallbackCost = DEFAULT_EMBEDDING_COSTS[modelName] ?? DEFAULT_EMBEDDING_COST;
+  cachedEmbeddingCost = fallbackCost;
+  cacheTimestamp = now;
+  
+  logger.debug('Usando custo de embedding fallback', { modelName, fallbackCost });
+  return fallbackCost;
+}
 
 /**
  * O "Tradutor/Contador" (V9.2)
@@ -53,9 +118,9 @@ export async function getEmbedding(text: string): Promise<EmbeddingResponse | nu
     const vector = response.data[0]?.embedding || [];
     const tokens = response.usage?.total_tokens || 0;
 
-    // Usar o "Motor V12" para buscar o custo
-    const modelInfo = getProviderInfo(deploymentName);
-    const cost = (tokens / 1_000_000) * modelInfo.costIn;
+    // Buscar custo do banco ou usar fallback
+    const costPer1M = await getEmbeddingCostPer1M(deploymentName);
+    const cost = (tokens / 1_000_000) * costPer1M;
 
     return {
       vector: vector,
@@ -85,6 +150,9 @@ export async function getEmbeddingsBatch(texts: string[]): Promise<EmbeddingResp
   const BATCH_SIZE = 16;
   const results: EmbeddingResponse[] = [];
 
+  // Buscar custo uma vez para todo o batch
+  const costPer1M = await getEmbeddingCostPer1M(deploymentName);
+
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE);
     
@@ -95,8 +163,7 @@ export async function getEmbeddingsBatch(texts: string[]): Promise<EmbeddingResp
       });
 
       const totalTokens = response.usage?.total_tokens || 0;
-      const modelInfo = getProviderInfo(deploymentName);
-      const totalCost = (totalTokens / 1_000_000) * modelInfo.costIn;
+      const totalCost = (totalTokens / 1_000_000) * costPer1M;
       
       // Distribuir custo proporcionalmente entre os textos
       const costPerText = totalCost / batch.length;

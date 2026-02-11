@@ -65,9 +65,9 @@ export const certifyModelStream = async (req: AuthRequest, res: Response) => {
     sendCompleteEvent(res, result.response.data.certification, req.id);
     closeSSEConnection(res, req.id);
     return;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[CertificationController] ❌ Erro durante certificação SSE:', error);
-    sendErrorEvent(res, error, req.id);
+    sendErrorEvent(res, error instanceof Error ? error : new Error(String(error)), req.id);
     closeSSEConnection(res, req.id);
     return;
   }
@@ -109,10 +109,26 @@ export const deleteCertification = async (req: AuthRequest, res: Response): Prom
     }
     
     // Deletar certificação do banco (todas as regiões)
+    // Schema v2: Usar deploymentId em vez de modelId
+    // O modelId recebido pode ser o deploymentId (string do provider) ou UUID
     logger.info(`[CertificationController] 🗑️ Deletando certificações para ${modelId} (todas as regiões)`);
-    await prisma.modelCertification.deleteMany({
-      where: { modelId }
+    
+    // Primeiro, tentar encontrar o deployment pelo deploymentId ou UUID
+    const deployment = await prisma.modelDeployment.findFirst({
+      where: {
+        OR: [
+          { id: modelId },
+          { deploymentId: modelId }
+        ]
+      },
+      select: { id: true }
     });
+    
+    if (deployment) {
+      await prisma.modelCertification.deleteMany({
+        where: { deploymentId: deployment.id }
+      });
+    }
     
     logger.info(`[CertificationController] ✅ Certificação deletada com sucesso: ${modelId}`);
     
@@ -121,10 +137,11 @@ export const deleteCertification = async (req: AuthRequest, res: Response): Prom
       modelId,
       previousStatus: existing.status
     }));
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[CertificationController] ❌ Erro ao deletar certificação:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete certification';
     return res.status(500).json(
-      jsend.error(error.message || 'Failed to delete certification')
+      jsend.error(errorMessage)
     );
   }
 };

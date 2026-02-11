@@ -1,9 +1,12 @@
 // backend/src/types/certification-queue.ts
 // LEIA ESSE ARQUIVO -> Standards: docs/STANDARDS.md <- NÃO EDITE O CODIGO SEM CONHECIMENTO DESSE ARQUIVO (MUITO IMPORTANTE)
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Nota: Este arquivo usa 'any' para tipos dinâmicos do Bull queue
 
 export interface CertificationJobData {
   jobId: string;
   modelId: string;
+  deploymentId?: string; // Schema v2: UUID do ModelDeployment
   region: string;
   createdBy?: string;
 }

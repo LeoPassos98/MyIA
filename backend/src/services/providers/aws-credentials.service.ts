@@ -4,7 +4,8 @@
 import { prisma } from '../../lib/prisma';
 import { encryptionService } from '../encryptionService';
 import { BedrockProvider } from '../ai/providers/bedrock';
-import logger from '../../utils/logger';
+import { logger } from '../../utils/logger';
+import { metricsService } from '../models/metricsService';
 import { 
   BedrockConfig, 
   AWSCredentials, 
@@ -14,6 +15,10 @@ import {
 /**
  * Service para gerenciamento de credenciais AWS Bedrock
  * Responsabilidade: Validação, criptografia e persistência de credenciais
+ * 
+ * Refatorado para Clean Slate v2:
+ * - Usa metricsService para registrar métricas de validação
+ * - Mantém compatibilidade com UserSettings do schema v2
  */
 export class AWSCredentialsService {
   /**
@@ -22,7 +27,7 @@ export class AWSCredentialsService {
    * - Descriptografa credenciais
    * - Valida via AWS SDK
    * - Persiste se válidas
-   * - Registra validação
+   * - Registra validação via métricas
    * 
    * @param userId - ID do usuário
    * @param config - Configuração AWS
@@ -85,8 +90,8 @@ export class AWSCredentialsService {
         latencyMs
       });
 
-      // Registrar validação falha
-      await this.recordValidation(userId, {
+      // Registrar validação falha via métricas
+      await this.recordValidationMetric(userId, {
         status: 'invalid',
         message: this.mapErrorMessage(error),
         latencyMs,
@@ -102,8 +107,8 @@ export class AWSCredentialsService {
       await this.saveCredentials(userId, credentials, requestId);
     }
 
-    // 4. Registrar validação bem-sucedida
-    await this.recordValidation(userId, {
+    // 4. Registrar validação bem-sucedida via métricas
+    await this.recordValidationMetric(userId, {
       status: 'valid',
       message: `Credenciais válidas. ${modelsCount} modelos disponíveis.`,
       latencyMs,
@@ -218,47 +223,49 @@ export class AWSCredentialsService {
   }
 
   /**
-   * Registra resultado da validação
+   * Registra resultado da validação via metricsService
+   * 
+   * Refatorado para Clean Slate v2:
+   * - Usa SystemMetric em vez de ProviderCredentialValidation (removido do schema)
+   * - Registra métricas de latência e status
    * 
    * @param userId - ID do usuário
    * @param result - Resultado da validação
    * @param requestId - ID da requisição
    */
-  private async recordValidation(
+  private async recordValidationMetric(
     userId: string,
     result: ValidationResult,
     requestId?: string
   ): Promise<void> {
-    logger.debug('Registrando validação', {
+    logger.debug('Registrando métrica de validação', {
       requestId,
       userId,
       status: result.status
     });
 
-    await prisma.providerCredentialValidation.upsert({
-      where: {
-        userId_provider: {
+    try {
+      // Registrar métrica de latência
+      await metricsService.create({
+        metricType: 'credential_validation',
+        value: result.latencyMs,
+        metadata: {
           userId,
-          provider: 'bedrock'
+          provider: 'bedrock',
+          status: result.status,
+          modelsCount: result.modelsCount,
+          error: result.error || null,
+          requestId
         }
-      },
-      update: {
-        status: result.status,
-        lastValidatedAt: new Date(),
-        latencyMs: result.latencyMs,
-        lastError: result.error || null,
-        errorCode: result.error ? 'VALIDATION_FAILED' : null
-      },
-      create: {
+      });
+    } catch (error) {
+      // Não falhar a validação se o registro de métricas falhar
+      logger.warn('Falha ao registrar métrica de validação', {
+        requestId,
         userId,
-        provider: 'bedrock',
-        status: result.status,
-        lastValidatedAt: new Date(),
-        latencyMs: result.latencyMs,
-        lastError: result.error || null,
-        errorCode: result.error ? 'VALIDATION_FAILED' : null
-      }
-    });
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 
   /**
